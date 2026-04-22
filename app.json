@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "JobReel",
+    "slug": "jobreel",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "scheme": "jobreel",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.jobreel.app"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0d0d14"
+      },
+      "package": "com.jobreel.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#0d0d14"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}

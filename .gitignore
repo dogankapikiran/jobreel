@@ -1,0 +1,29 @@
+node_modules/
+.expo/
+dist/
+build/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.orig.*
+web-build/
+
+# Environment
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+npm-debug.*
+*.log
+
+# TypeScript
+*.tsbuildinfo
+
+# Expo generated
+expo-env.d.ts
