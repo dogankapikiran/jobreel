@@ -13,8 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Job } from '@/types';
 import { useFeedStore } from '@/store/feedStore';
 import { useUserStore } from '@/store/userStore';
-import { fetchJobs } from '@/services/adzuna';
-import { buildFeed } from '@/services/algorithm';
+import { api } from '@/services/api';
 import JobCard from '@/components/JobCard';
 import {
   BOTTOM_NAV_HEIGHT,
@@ -31,7 +30,7 @@ export default function FeedScreen() {
 
   const { jobs, setJobs, appendJobs, isLoading, setLoading, currentIndex, setCurrentIndex } =
     useFeedStore();
-  const { profile, interactions } = useUserStore();
+  const { profile } = useUserStore();
 
   const [page, setPage] = useState(1);
   const listRef = useRef<FlatList<Job>>(null);
@@ -46,12 +45,7 @@ export default function FeedScreen() {
   async function loadInitialFeed() {
     setLoading(true);
     try {
-      const raw = await fetchJobs({
-        where: profile.preferences.location || 'istanbul',
-        resultsPerPage: 20,
-      });
-      // Tüm ilanları göster — filtre çok kısıtlayıcı olmasın
-      const feed = buildFeed(raw, { ...profile.preferences, workType: 'any' }, interactions);
+      const { jobs: feed } = await api.feed({ location: profile.preferences.location || 'istanbul' });
       setJobs(feed);
     } finally {
       setLoading(false);
@@ -64,12 +58,10 @@ export default function FeedScreen() {
     try {
       const nextPage = page + 1;
       setPage(nextPage);
-      const raw = await fetchJobs({
-        where: profile.preferences.location || 'istanbul',
+      const { jobs: more } = await api.feed({
         page: nextPage,
-        resultsPerPage: 10,
+        location: profile.preferences.location || 'istanbul',
       });
-      const more = buildFeed(raw, { ...profile.preferences, workType: 'any' }, interactions);
       appendJobs(more);
     } finally {
       loadingMoreRef.current = false;

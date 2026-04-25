@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
+  ActivityIndicator,
   FlatList,
   Linking,
   StyleSheet,
@@ -11,11 +12,12 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Job } from '@/types';
 import { useFeedStore } from '@/store/feedStore';
+import { api } from '@/services/api';
 import { timeAgo } from '@/services/adzuna';
 import { COLORS, FONT_SIZES, GRADIENTS, RADII, SPACING } from '@/constants/theme';
 
 function SavedJobRow({ job, onRemove }: { job: Job; onRemove: () => void }) {
-  const gradient = GRADIENTS[job.accentIndex % GRADIENTS.length];
+  const gradient = GRADIENTS[(job.accentIndex ?? 0) % GRADIENTS.length];
   return (
     <View style={styles.row}>
       <LinearGradient colors={gradient} style={styles.logo}>
@@ -48,7 +50,29 @@ function SavedJobRow({ job, onRemove }: { job: Job; onRemove: () => void }) {
 
 export default function SavedScreen() {
   const insets = useSafeAreaInsets();
-  const { savedJobs, unsaveJob } = useFeedStore();
+  const { savedJobs, setJobs: _, unsaveJob, saveJob } = useFeedStore();
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  async function refresh() {
+    setLoading(true);
+    try {
+      const jobs = await api.getSaved();
+      jobs.forEach((j) => saveJob(j));
+    } catch {
+      // fall back to locally cached savedJobs
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRemove(jobId: string) {
+    unsaveJob(jobId);
+    api.unsaveJob(jobId).catch(() => {});
+  }
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
@@ -61,6 +85,11 @@ export default function SavedScreen() {
         )}
       </View>
 
+      {loading && savedJobs.length === 0 ? (
+        <View style={styles.center}>
+          <ActivityIndicator color={COLORS.accent} />
+        </View>
+      ) : (
       <FlatList
         data={savedJobs}
         keyExtractor={(item) => item.id}
@@ -68,7 +97,7 @@ export default function SavedScreen() {
         showsVerticalScrollIndicator={false}
         ItemSeparatorComponent={() => <View style={styles.divider} />}
         renderItem={({ item }) => (
-          <SavedJobRow job={item} onRemove={() => unsaveJob(item.id)} />
+          <SavedJobRow job={item} onRemove={() => handleRemove(item.id)} />
         )}
         ListEmptyComponent={
           <View style={styles.empty}>
@@ -80,6 +109,7 @@ export default function SavedScreen() {
           </View>
         }
       />
+      )}
     </View>
   );
 }
@@ -88,6 +118,12 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: COLORS.bg,
+  },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 80,
   },
   header: {
     flexDirection: 'row',

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   ScrollView,
   StyleSheet,
@@ -8,8 +8,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
+import { useAuthStore } from '@/store/authStore';
 import { useUserStore } from '@/store/userStore';
 import { useFeedStore } from '@/store/feedStore';
+import { api } from '@/services/api';
 import { COLORS, FONT_SIZES, RADII, SPACING } from '@/constants/theme';
 
 function StatCard({ value, label }: { value: string | number; label: string }) {
@@ -35,8 +37,26 @@ function InfoRow({ icon, label, value }: { icon: string; label: string; value: s
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { profile, resetOnboarding } = useUserStore();
+  const { profile, setProfile, setPreferences, resetOnboarding } = useUserStore();
   const { savedJobs, appliedJobIds } = useFeedStore();
+  const signOut = useAuthStore((s) => s.signOut);
+
+  useEffect(() => {
+    api.getProfile().then((data) => {
+      if (data.display_name) setProfile({ name: data.display_name as string });
+      const prefs = data.user_preferences as Record<string, unknown> | undefined;
+      if (prefs) {
+        setPreferences({
+          sectors: (prefs.sectors as string[]) || [],
+          seniority: (prefs.seniority as string) || 'mid',
+          workType: (prefs.work_type as string) || 'any',
+          location: (prefs.location as string) || 'İstanbul',
+          salaryMin: (prefs.salary_min as number) || 0,
+          skills: (prefs.skills as string[]) || [],
+        });
+      }
+    }).catch(() => {});
+  }, []);
 
   const displayName = profile.name || 'Anonim';
   const initial = displayName.charAt(0).toUpperCase();
@@ -152,6 +172,15 @@ export default function ProfileScreen() {
           activeOpacity={0.8}
         >
           <Text style={styles.resetText}>Yeniden Kurulum</Text>
+        </TouchableOpacity>
+
+        {/* Sign out */}
+        <TouchableOpacity
+          style={styles.signOutBtn}
+          onPress={() => signOut()}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.signOutText}>Çıkış Yap</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>
@@ -314,5 +343,18 @@ const styles = StyleSheet.create({
     color: COLORS.textMuted,
     fontSize: FONT_SIZES.sm,
     fontWeight: '500',
+  },
+  signOutBtn: {
+    backgroundColor: 'rgba(255,59,48,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,59,48,0.25)',
+    borderRadius: RADII.full,
+    paddingVertical: SPACING.sm + 4,
+    alignItems: 'center',
+  },
+  signOutText: {
+    color: '#ff3b30',
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '600',
   },
 });

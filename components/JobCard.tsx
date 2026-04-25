@@ -13,6 +13,7 @@ import {
 import { timeAgo } from '@/services/adzuna';
 import { useFeedStore } from '@/store/feedStore';
 import { useUserStore } from '@/store/userStore';
+import { api } from '@/services/api';
 import TagBadge from './TagBadge';
 import SalaryBlock from './SalaryBlock';
 import ActionButtons from './ActionButtons';
@@ -52,22 +53,26 @@ export default function JobCard({ job, cardHeight, onNext }: Props) {
   const wt      = workTypeInfo(job.workType);
   const sl      = seniorityLabel(job.seniority);
 
-  const cardBg    = CARD_BACKGROUNDS[job.accentIndex % CARD_BACKGROUNDS.length];
-  const gradient  = GRADIENTS[job.accentIndex % GRADIENTS.length];
+  const accent_i  = job.accentIndex ?? 0;
+  const cardBg    = CARD_BACKGROUNDS[accent_i % CARD_BACKGROUNDS.length];
+  const gradient  = GRADIENTS[accent_i % GRADIENTS.length];
   const accent    = gradient[0];
 
   function handlePass() {
     const dur = Math.round((Date.now() - viewStart.current) / 1000);
     addInteraction({ jobId: job.id, action: 'skip', durationSeconds: dur, timestamp: Date.now() });
+    api.postInteraction(job.id, 'skip').catch(() => {});
     onNext?.();
   }
 
   function handleSave() {
     if (saved) {
       unsaveJob(job.id);
+      api.unsaveJob(job.id).catch(() => {});
     } else {
       saveJob(job);
       addInteraction({ jobId: job.id, action: 'save', timestamp: Date.now() });
+      api.postInteraction(job.id, 'save').catch(() => {});
     }
   }
 
@@ -75,6 +80,7 @@ export default function JobCard({ job, cardHeight, onNext }: Props) {
     if (!applied) {
       markApplied(job.id);
       addInteraction({ jobId: job.id, action: 'apply', timestamp: Date.now() });
+      api.postInteraction(job.id, 'apply').catch(() => {});
     }
     Linking.openURL(job.url).catch(() => {});
   }
@@ -129,7 +135,7 @@ export default function JobCard({ job, cardHeight, onNext }: Props) {
         salaryMax={job.salaryMax}
         currency={job.salaryCurrency}
         period={job.salaryPeriod}
-        accentIndex={job.accentIndex}
+        accentIndex={accent_i}
       />
 
       {/* Info pills */}
@@ -153,7 +159,7 @@ export default function JobCard({ job, cardHeight, onNext }: Props) {
 
       {/* Actions */}
       <ActionButtons
-        accentIndex={job.accentIndex}
+        accentIndex={accent_i}
         isSaved={saved}
         isApplied={applied}
         onPass={handlePass}

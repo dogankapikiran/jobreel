@@ -1,68 +1,90 @@
-import React from 'react';
-import { FlatList, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, FlatList, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFeedStore } from '@/store/feedStore';
+import { Job } from '@/types';
+import { api } from '@/services/api';
 import { timeAgo } from '@/services/adzuna';
 import { COLORS, FONT_SIZES, GRADIENTS, RADII, SPACING } from '@/constants/theme';
 
 export default function ApplicationsScreen() {
   const insets = useSafeAreaInsets();
-  const { jobs, appliedJobIds } = useFeedStore();
+  const [jobs, setJobs] = useState<Job[]>([]);
+  const [loading, setLoading] = useState(false);
 
-  const appliedJobs = jobs.filter((j) => appliedJobIds.includes(j.id));
+  useEffect(() => {
+    refresh();
+  }, []);
+
+  async function refresh() {
+    setLoading(true);
+    try {
+      const data = await api.getApplications();
+      setJobs(data);
+    } catch {
+      // keep empty list on error
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
     <View style={[styles.screen, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <Text style={styles.heading}>Başvurularım</Text>
-        {appliedJobs.length > 0 && (
+        {jobs.length > 0 && (
           <View style={styles.countBadge}>
-            <Text style={styles.countText}>{appliedJobs.length}</Text>
+            <Text style={styles.countText}>{jobs.length}</Text>
           </View>
         )}
       </View>
 
-      <FlatList
-        data={appliedJobs}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.list}
-        showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => {
-          const gradient = GRADIENTS[item.accentIndex % GRADIENTS.length];
-          return (
-            <TouchableOpacity
-              style={styles.card}
-              activeOpacity={0.85}
-              onPress={() => Linking.openURL(item.url).catch(() => {})}
-            >
-              <LinearGradient colors={gradient} style={styles.logo}>
-                <Text style={styles.logoText}>{item.company.charAt(0).toUpperCase()}</Text>
-              </LinearGradient>
+      {loading && jobs.length === 0 ? (
+        <View style={styles.center}>
+          <ActivityIndicator color={COLORS.accent} />
+        </View>
+      ) : (
+        <FlatList
+          data={jobs}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.list}
+          showsVerticalScrollIndicator={false}
+          renderItem={({ item }) => {
+            const gradient = GRADIENTS[(item.accentIndex ?? 0) % GRADIENTS.length];
+            return (
+              <TouchableOpacity
+                style={styles.card}
+                activeOpacity={0.85}
+                onPress={() => Linking.openURL(item.url).catch(() => {})}
+              >
+                <LinearGradient colors={gradient} style={styles.logo}>
+                  <Text style={styles.logoText}>{item.company.charAt(0).toUpperCase()}</Text>
+                </LinearGradient>
 
-              <View style={styles.info}>
-                <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
-                <Text style={styles.meta}>{item.company} · {item.location}</Text>
-                <Text style={styles.time}>{timeAgo(item.postedAt)}</Text>
-              </View>
+                <View style={styles.info}>
+                  <Text style={styles.title} numberOfLines={1}>{item.title}</Text>
+                  <Text style={styles.meta}>{item.company} · {item.location}</Text>
+                  <Text style={styles.time}>{timeAgo(item.postedAt)}</Text>
+                </View>
 
-              <View style={[styles.statusBadge, { backgroundColor: `${COLORS.success}18`, borderColor: `${COLORS.success}44` }]}>
-                <Text style={[styles.statusText, { color: COLORS.success }]}>Başvuruldu</Text>
-              </View>
-            </TouchableOpacity>
-          );
-        }}
-        ItemSeparatorComponent={() => <View style={styles.divider} />}
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>📨</Text>
-            <Text style={styles.emptyTitle}>Henüz başvurmadın</Text>
-            <Text style={styles.emptyDesc}>
-              İlanlara başvurdukça burada takip edebilirsin.
-            </Text>
-          </View>
-        }
-      />
+                <View style={[styles.statusBadge, { backgroundColor: `${COLORS.success}18`, borderColor: `${COLORS.success}44` }]}>
+                  <Text style={[styles.statusText, { color: COLORS.success }]}>Başvuruldu</Text>
+                </View>
+              </TouchableOpacity>
+            );
+          }}
+          ItemSeparatorComponent={() => <View style={styles.divider} />}
+          ListEmptyComponent={
+            <View style={styles.empty}>
+              <Text style={styles.emptyIcon}>📨</Text>
+              <Text style={styles.emptyTitle}>Henüz başvurmadın</Text>
+              <Text style={styles.emptyDesc}>
+                İlanlara başvurdukça burada takip edebilirsin.
+              </Text>
+            </View>
+          }
+        />
+      )}
     </View>
   );
 }
@@ -100,6 +122,12 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: FONT_SIZES.xs,
     fontWeight: '700',
+  },
+  center: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 80,
   },
   list: {
     padding: SPACING.md,

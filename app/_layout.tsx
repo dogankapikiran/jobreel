@@ -16,6 +16,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { StyleSheet } from 'react-native';
+import { useAuthStore } from '@/store/authStore';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -30,9 +31,14 @@ export default function RootLayout() {
     DMSans_500Medium,
   });
 
+  const initialize = useAuthStore((s) => s.initialize);
+  const isAuthLoading = useAuthStore((s) => s.isLoading);
+
+  useEffect(() => { initialize(); }, []);
+
   useEffect(() => {
-    if (fontsLoaded || fontsError) SplashScreen.hideAsync();
-  }, [fontsLoaded, fontsError]);
+    if ((fontsLoaded || fontsError) && !isAuthLoading) SplashScreen.hideAsync();
+  }, [fontsLoaded, fontsError, isAuthLoading]);
 
   if (!fontsLoaded && !fontsError) return null;
 
@@ -41,6 +47,7 @@ export default function RootLayout() {
       <StatusBar style="light" />
       <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
         <Stack.Screen name="index" />
+        <Stack.Screen name="auth" options={{ animation: 'fade' }} />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
         <Stack.Screen name="job/[id]" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
