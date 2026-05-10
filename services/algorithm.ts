@@ -28,7 +28,7 @@ export function scoreJob(
   const skillScore = job.skills.length > 0 ? matchedSkills.length / job.skills.length : 0.5;
 
   // Seniority match (25%)
-  const seniorityScore = prefs.seniority === job.seniority ? 1 : 0.3;
+  const seniorityScore = prefs.seniority.includes(job.seniority) ? 1 : 0.3;
 
   // Sector preference (20%)
   const sectorScore =

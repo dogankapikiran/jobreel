@@ -1,360 +1,711 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+import * as DocumentPicker from 'expo-document-picker';
+import * as WebBrowser from 'expo-web-browser';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useAuthStore } from '@/store/authStore';
 import { useUserStore } from '@/store/userStore';
 import { useFeedStore } from '@/store/feedStore';
-import { api } from '@/services/api';
-import { COLORS, FONT_SIZES, RADII, SPACING } from '@/constants/theme';
+import { api, CvParsed } from '@/services/api';
+import { LinearGradient } from 'expo-linear-gradient';
+import { ACCENT_GRADIENT, BOTTOM_NAV_HEIGHT, FONT_SIZES, RADII, SPACING, ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
-function StatCard({ value, label }: { value: string | number; label: string }) {
+function StatCard({ value, label, colors }: { value: string | number; label: string; colors: ThemeColors }) {
   return (
-    <View style={styles.stat}>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
+    <View style={statStyles(colors).stat}>
+      <Text style={statStyles(colors).statValue}>{value}</Text>
+      <Text style={statStyles(colors).statLabel}>{label}</Text>
     </View>
   );
 }
 
-function InfoRow({ icon, label, value }: { icon: string; label: string; value: string }) {
-  return (
-    <View style={styles.infoRow}>
-      <Text style={styles.infoIcon}>{icon}</Text>
-      <View style={styles.infoContent}>
-        <Text style={styles.infoLabel}>{label}</Text>
-        <Text style={styles.infoValue}>{value || '—'}</Text>
-      </View>
-    </View>
-  );
-}
+const statStyles = (colors: ThemeColors) => StyleSheet.create({
+  stat: { flex: 1, alignItems: 'center', gap: SPACING.xs },
+  statValue: { color: colors.accent, fontSize: FONT_SIZES.xl, fontWeight: '800' },
+  statLabel: { color: colors.textMuted, fontSize: FONT_SIZES.xs },
+});
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
-  const { profile, setProfile, setPreferences, resetOnboarding } = useUserStore();
-  const { savedJobs, appliedJobIds } = useFeedStore();
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { profile, setProfile, setPreferences } = useUserStore();
+  const { savedJobs, appliedJobs } = useFeedStore();
   const signOut = useAuthStore((s) => s.signOut);
+
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [cvParsed, setCvParsed] = useState<CvParsed | null>(null);
+  const [cvLoading, setCvLoading] = useState(false);
+
+  const [draftName, setDraftName] = useState('');
+  const [draftTitle, setDraftTitle] = useState('');
+  const [draftLocation, setDraftLocation] = useState('');
 
   useEffect(() => {
     api.getProfile().then((data) => {
       if (data.display_name) setProfile({ name: data.display_name as string });
-      const prefs = data.user_preferences as Record<string, unknown> | undefined;
+      if (data.title) setProfile({ title: data.title as string });
+      if (data.avatar_url) setProfile({ avatarUrl: data.avatar_url as string });
+      const prefs = data.preferences as Record<string, unknown> | undefined;
       if (prefs) {
         setPreferences({
           sectors: (prefs.sectors as string[]) || [],
-          seniority: (prefs.seniority as string) || 'mid',
+          seniority: (prefs.seniority as string[]) || [],
           workType: (prefs.work_type as string) || 'any',
           location: (prefs.location as string) || 'İstanbul',
           salaryMin: (prefs.salary_min as number) || 0,
           skills: (prefs.skills as string[]) || [],
         });
       }
+      if (data.cv_parsed) setCvParsed(data.cv_parsed as CvParsed);
     }).catch(() => {});
   }, []);
+
+  function startEdit() {
+    setDraftName(profile.name || '');
+    setDraftTitle(profile.title || '');
+    setDraftLocation(profile.preferences.location || '');
+    setEditing(true);
+  }
+
+  async function saveEdit() {
+    setSaving(true);
+    setProfile({ name: draftName, title: draftTitle });
+    setPreferences({ location: draftLocation });
+    setEditing(false);
+    setSaving(false);
+    api.updateProfile({
+      display_name: draftName,
+      title: draftTitle,
+      preferences: {
+        location: draftLocation,
+        work_type: profile.preferences.workType,
+        seniority: profile.preferences.seniority,
+        salary_min: profile.preferences.salaryMin,
+        sectors: profile.preferences.sectors,
+        skills: profile.preferences.skills,
+      },
+    }).catch(() => {});
+  }
+
+  async function handlePickCv() {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: 'application/pdf',
+      copyToCacheDirectory: true,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+
+    setCvLoading(true);
+    try {
+      const file = result.assets[0];
+      const { signedUrl } = await api.getCvUploadUrl();
+
+      await new Promise<void>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhr.open('PUT', signedUrl);
+        xhr.setRequestHeader('Content-Type', 'application/pdf');
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) resolve();
+          else reject(new Error(`Upload HTTP ${xhr.status}: ${xhr.responseText}`));
+        };
+        xhr.onerror = () => reject(new Error('Ağ hatası'));
+        xhr.ontimeout = () => reject(new Error('Zaman aşımı'));
+        xhr.timeout = 30000;
+        xhr.send({ uri: file.uri, type: 'application/pdf', name: 'cv.pdf' } as any);
+      });
+
+      const { parsed } = await api.parseCv();
+      setCvParsed(parsed);
+
+      if (parsed.skills && parsed.skills.length > 0) {
+        const merged = Array.from(new Set([...profile.skills, ...parsed.skills]));
+        setProfile({ skills: merged });
+        api.updateProfile({ skills: merged }).catch(() => {});
+      }
+
+      Alert.alert(
+        'CV Yüklendi',
+        `${parsed.skills?.length || 0} yetenek çıkarıldı. Feed eşleşme skorunuz güncellendi.`,
+      );
+    } catch (e: any) {
+      Alert.alert('Hata', e?.message || 'CV yüklenemedi. Tekrar deneyin.');
+    } finally {
+      setCvLoading(false);
+    }
+  }
+
+  async function handleViewCv() {
+    try {
+      const { signedUrl } = await api.getCvSignedUrl();
+      await WebBrowser.openBrowserAsync(signedUrl);
+    } catch {
+      Alert.alert('Hata', 'CV açılamadı. Dosyayı tekrar yükleyin.');
+    }
+  }
+
+  async function handleDisconnectLinkedIn() {
+    try {
+      await api.disconnectLinkedIn();
+      setProfile({ linkedInConnected: false, linkedInName: undefined, linkedInHeadline: undefined, linkedInPhotoUrl: undefined });
+    } catch {
+      Alert.alert('Hata', 'LinkedIn bağlantısı kesilemedi.');
+    }
+  }
+
+  async function handlePickAvatar() {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== 'granted') {
+      Alert.alert('İzin Gerekli', 'Fotoğraf seçmek için galeri iznine ihtiyaç var.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'] as ImagePicker.MediaType[],
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.7,
+    });
+    if (result.canceled || !result.assets[0]) return;
+    setUploadingAvatar(true);
+    try {
+      const uri = result.assets[0].uri;
+      const ext = (uri.split('.').pop() ?? 'jpg').toLowerCase().replace('jpeg', 'jpg');
+      const { signedUrl, publicUrl } = await api.getAvatarUploadUrl(ext);
+      const imageResponse = await fetch(uri);
+      const blob = await imageResponse.blob();
+      const uploadResponse = await fetch(signedUrl, {
+        method: 'PUT',
+        body: blob,
+        headers: { 'Content-Type': `image/${ext === 'jpg' ? 'jpeg' : ext}` },
+      });
+      if (!uploadResponse.ok) throw new Error(`Upload failed: ${uploadResponse.status}`);
+      await api.updateProfile({ avatar_url: publicUrl });
+      setProfile({ avatarUrl: publicUrl });
+    } catch {
+      Alert.alert('Hata', 'Fotoğraf yüklenemedi, tekrar deneyin.');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  }
+
+  const completionItems = [
+    { label: 'Ad Soyad', points: 15, done: !!profile.name },
+    { label: 'Ünvan', points: 10, done: !!profile.title },
+    { label: 'Yetenek (en az 3)', points: 20, done: profile.skills.length >= 3 },
+    { label: 'Sektör tercihleri', points: 15, done: profile.preferences.sectors.length > 0 },
+    { label: 'Fotoğraf', points: 10, done: !!profile.avatarUrl },
+    { label: 'LinkedIn bağla', points: 15, done: !!profile.linkedInConnected },
+    { label: 'CV Yükle', points: 10, done: !!cvParsed },
+    { label: 'Konum', points: 5, done: !!profile.preferences.location },
+  ];
+  const completionScore = completionItems.filter((i) => i.done).reduce((sum, i) => sum + i.points, 0);
+  const firstMissing = completionItems.find((i) => !i.done);
 
   const displayName = profile.name || 'Anonim';
   const initial = displayName.charAt(0).toUpperCase();
 
-  function handleResetOnboarding() {
-    resetOnboarding();
-    router.replace('/onboarding/welcome');
-  }
+  const workTypeLabel =
+    profile.preferences.workType === 'any' ? 'Farketmez' :
+    profile.preferences.workType === 'remote' ? 'Remote' :
+    profile.preferences.workType === 'hybrid' ? 'Hibrit' : 'Ofis';
+
+  const seniorityLabelMap: Record<string, string> = { junior: 'Junior', mid: 'Mid-Level', senior: 'Senior', lead: 'Lead' };
+  const seniorityLabel = (Array.isArray(profile.preferences.seniority) ? profile.preferences.seniority : [])
+    .map(s => seniorityLabelMap[s] ?? s).join(', ') || 'Belirtilmemiş';
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top }]}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
-        {/* Avatar + name */}
-        <View style={styles.hero}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initial}</Text>
-          </View>
-          <Text style={styles.name}>{displayName}</Text>
-          {profile.title ? <Text style={styles.jobTitle}>{profile.title}</Text> : null}
-          {profile.location ? (
-            <Text style={styles.location}>📍 {profile.location}</Text>
-          ) : null}
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <View style={[styles.screen, { paddingTop: insets.top }]}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Profil</Text>
+          {editing ? (
+            <View style={styles.headerActions}>
+              <TouchableOpacity onPress={() => setEditing(false)} style={styles.cancelBtn}>
+                <Text style={styles.cancelText}>İptal</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={saveEdit} style={styles.saveBtn} disabled={saving}>
+                {saving
+                  ? <ActivityIndicator color={colors.white} size="small" />
+                  : <Text style={styles.saveText}>Kaydet</Text>
+                }
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity onPress={startEdit} style={styles.editIconBtn}>
+              <Text style={styles.editIconText}>✏️ Düzenle</Text>
+            </TouchableOpacity>
+          )}
         </View>
 
-        {/* Stats */}
-        <View style={styles.statsRow}>
-          <StatCard value={savedJobs.length} label="Kaydedilen" />
-          <View style={styles.statDivider} />
-          <StatCard value={appliedJobIds.length} label="Başvurulan" />
-          <View style={styles.statDivider} />
-          <StatCard value={profile.skills.length} label="Yetenek" />
-        </View>
-
-        {/* Profile details */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Profil Bilgileri</Text>
-          <View style={styles.card}>
-            <InfoRow icon="👤" label="Ad Soyad" value={profile.name} />
-            <View style={styles.cardDivider} />
-            <InfoRow icon="💼" label="Ünvan" value={profile.title} />
-            <View style={styles.cardDivider} />
-            <InfoRow icon="📍" label="Konum" value={profile.location} />
-          </View>
-        </View>
-
-        {/* Preferences */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Tercihler</Text>
-          <View style={styles.card}>
-            <InfoRow
-              icon="🏢"
-              label="Çalışma Tipi"
-              value={
-                profile.preferences.workType === 'any'
-                  ? 'Farketmez'
-                  : profile.preferences.workType === 'remote'
-                  ? 'Remote'
-                  : profile.preferences.workType === 'hybrid'
-                  ? 'Hibrit'
-                  : 'Ofis'
-              }
-            />
-            <View style={styles.cardDivider} />
-            <InfoRow
-              icon="📊"
-              label="Kıdem"
-              value={
-                profile.preferences.seniority === 'junior'
-                  ? 'Junior'
-                  : profile.preferences.seniority === 'mid'
-                  ? 'Mid-Level'
-                  : profile.preferences.seniority === 'senior'
-                  ? 'Senior'
-                  : 'Lead'
-              }
-            />
-            <View style={styles.cardDivider} />
-            <InfoRow
-              icon="🏙️"
-              label="Şehir"
-              value={profile.preferences.location || 'Belirtilmemiş'}
-            />
-          </View>
-        </View>
-
-        {/* Skills */}
-        {profile.skills.length > 0 && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Yetenekler</Text>
-            <View style={styles.skillsWrap}>
-              {profile.skills.map((skill) => (
-                <View key={skill} style={styles.skillChip}>
-                  <Text style={styles.skillText}>{skill}</Text>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + SPACING.md }]} keyboardShouldPersistTaps="handled">
+          {/* Avatar */}
+          <View style={styles.hero}>
+            <TouchableOpacity onPress={handlePickAvatar} activeOpacity={0.8} style={styles.avatarWrap}>
+              {profile.avatarUrl ? (
+                <Image source={{ uri: profile.avatarUrl }} style={styles.avatarImg} />
+              ) : (
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{initial}</Text>
                 </View>
-              ))}
+              )}
+              {uploadingAvatar ? (
+                <View style={styles.avatarOverlay}>
+                  <ActivityIndicator color={colors.white} />
+                </View>
+              ) : (
+                <View style={styles.avatarEditBadge}>
+                  <Text style={styles.avatarEditIcon}>📷</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {editing ? (
+              <View style={styles.editFields}>
+                <TextInput
+                  style={styles.editInput}
+                  value={draftName}
+                  onChangeText={setDraftName}
+                  placeholder="Ad Soyad"
+                  placeholderTextColor={colors.textDim}
+                  autoCapitalize="words"
+                />
+                <TextInput
+                  style={styles.editInput}
+                  value={draftTitle}
+                  onChangeText={setDraftTitle}
+                  placeholder="Ünvan (örn. Senior Developer)"
+                  placeholderTextColor={colors.textDim}
+                />
+                <TextInput
+                  style={styles.editInput}
+                  value={draftLocation}
+                  onChangeText={setDraftLocation}
+                  placeholder="Şehir (örn. İstanbul)"
+                  placeholderTextColor={colors.textDim}
+                />
+              </View>
+            ) : (
+              <>
+                <Text style={styles.name}>{displayName}</Text>
+                {profile.title ? <Text style={styles.jobTitle}>{profile.title}</Text> : null}
+                {profile.preferences.location ? (
+                  <Text style={styles.location}>📍 {profile.preferences.location}</Text>
+                ) : null}
+              </>
+            )}
+          </View>
+
+          {/* Profil Tamamlanma */}
+          {completionScore < 100 && (
+            <View style={styles.completionCard}>
+              <View style={styles.completionHeader}>
+                <Text style={styles.completionTitle}>Profil Tamamlanma</Text>
+                <Text style={styles.completionScore}>{completionScore}%</Text>
+              </View>
+              <View style={styles.completionBar}>
+                <LinearGradient
+                  colors={ACCENT_GRADIENT}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={[styles.completionFill, { width: `${completionScore}%` }]}
+                />
+              </View>
+              {firstMissing && (
+                <Text style={styles.completionHint}>
+                  {firstMissing.label} ekle → +{firstMissing.points} puan
+                </Text>
+              )}
+            </View>
+          )}
+
+          {/* Stats */}
+          <View style={styles.statsRow}>
+            <StatCard value={savedJobs.length} label="Kaydedilen" colors={colors} />
+            <View style={styles.statDivider} />
+            <StatCard value={appliedJobs.length} label="Başvurulan" colors={colors} />
+            <View style={styles.statDivider} />
+            <StatCard value={profile.skills.length} label="Yetenek" colors={colors} />
+          </View>
+
+          {/* Preferences summary */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Tercihler</Text>
+            <View style={styles.card}>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoIcon}>🏢</Text>
+                <View style={styles.infoContent}>
+                  <Text style={styles.infoLabel}>Çalışma Tipi</Text>
+                  <Text style={styles.infoValue}>{workTypeLabel}</Text>
+                </View>
+              </View>
+              <View style={styles.cardDivider} />
+              <View style={styles.infoRow}>
+                <Text style={styles.infoIcon}>📊</Text>
+                <View style={styles.infoContent}>
+                  <Text style={styles.infoLabel}>Kıdem</Text>
+                  <Text style={styles.infoValue}>{seniorityLabel}</Text>
+                </View>
+              </View>
+              <View style={styles.cardDivider} />
+              <View style={styles.infoRow}>
+                <Text style={styles.infoIcon}>🏙️</Text>
+                <View style={styles.infoContent}>
+                  <Text style={styles.infoLabel}>Şehir</Text>
+                  <Text style={styles.infoValue}>{profile.preferences.location || 'Belirtilmemiş'}</Text>
+                </View>
+              </View>
             </View>
           </View>
-        )}
 
-        {/* Edit preferences */}
-        <TouchableOpacity
-          style={styles.editBtn}
-          onPress={() => router.push('/onboarding/preferences')}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.editBtnText}>Tercihleri Düzenle</Text>
-        </TouchableOpacity>
+          {/* Skills */}
+          {profile.skills.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Yetenekler</Text>
+              <View style={styles.skillsWrap}>
+                {profile.skills.map((skill) => (
+                  <View key={skill} style={styles.skillChip}>
+                    <Text style={styles.skillText}>{skill}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
 
-        {/* Reset */}
-        <TouchableOpacity
-          style={styles.resetBtn}
-          onPress={handleResetOnboarding}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.resetText}>Yeniden Kurulum</Text>
-        </TouchableOpacity>
+          {/* CV */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>CV / Özgeçmiş</Text>
+            {cvParsed ? (
+              <TouchableOpacity style={styles.card} onPress={handleViewCv} activeOpacity={0.7}>
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoIcon}>📄</Text>
+                  <View style={styles.infoContent}>
+                    <Text style={styles.infoValue}>{cvParsed.title || 'CV yüklendi'}</Text>
+                    <Text style={styles.infoLabel}>
+                      {cvParsed.skills?.length || 0} yetenek · {cvParsed.experience?.length || 0} deneyim
+                    </Text>
+                  </View>
+                  {cvLoading ? (
+                    <ActivityIndicator size="small" color={colors.textDim} />
+                  ) : (
+                    <View style={{ flexDirection: 'row', gap: SPACING.sm }}>
+                      <Text style={styles.linkedInDisconnect}>Görüntüle</Text>
+                      <TouchableOpacity onPress={handlePickCv} hitSlop={8}>
+                        <Text style={styles.linkedInDisconnect}>Güncelle</Text>
+                      </TouchableOpacity>
+                    </View>
+                  )}
+                </View>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.cvUploadBtn}
+                onPress={handlePickCv}
+                activeOpacity={0.8}
+                disabled={cvLoading}
+              >
+                {cvLoading ? (
+                  <ActivityIndicator color={colors.accent} />
+                ) : (
+                  <>
+                    <Text style={styles.cvUploadIcon}>📄</Text>
+                    <View>
+                      <Text style={styles.cvUploadText}>CV Yükle (PDF)</Text>
+                      <Text style={styles.cvUploadSub}>İlan eşleşme skorunuzu artırın</Text>
+                    </View>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
 
-        {/* Sign out */}
-        <TouchableOpacity
-          style={styles.signOutBtn}
-          onPress={() => signOut()}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.signOutText}>Çıkış Yap</Text>
-        </TouchableOpacity>
-      </ScrollView>
-    </View>
+          {/* LinkedIn */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>LinkedIn</Text>
+            {profile.linkedInConnected ? (
+              <View style={styles.card}>
+                <View style={styles.infoRow}>
+                  <View style={styles.linkedInBadge}>
+                    <Text style={styles.linkedInBadgeText}>in</Text>
+                  </View>
+                  <View style={styles.infoContent}>
+                    <Text style={styles.infoValue}>{profile.linkedInName}</Text>
+                    {profile.linkedInHeadline
+                      ? <Text style={styles.infoLabel}>{profile.linkedInHeadline}</Text>
+                      : null}
+                  </View>
+                  <TouchableOpacity onPress={handleDisconnectLinkedIn} hitSlop={8}>
+                    <Text style={styles.linkedInDisconnect}>Kes</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.linkedInBtn}
+                onPress={() => router.push('/linkedin-connect')}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.linkedInBtnText}>LinkedIn Profilini Bağla</Text>
+                <Text style={styles.linkedInBtnSub}>Adını, ünvanını ve fotoğrafını otomatik doldur</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <TouchableOpacity
+            style={styles.editPrefsBtn}
+            onPress={() => router.push('/onboarding/preferences?edit=1')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.editPrefsBtnText}>Tercihleri Düzenle</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.settingsBtn}
+            onPress={() => router.push('/settings')}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.settingsBtnText}>Ayarlar</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.signOutBtn}
+            onPress={async () => { await signOut(); router.replace('/auth'); }}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.signOutText}>Çıkış Yap</Text>
+          </TouchableOpacity>
+        </ScrollView>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: COLORS.bg,
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.bg },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.cardBorder,
   },
+  headerTitle: {
+    color: colors.text,
+    fontSize: FONT_SIZES.xl,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  headerActions: { flexDirection: 'row', gap: SPACING.sm },
+  cancelBtn: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs + 2,
+    borderRadius: RADII.full,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  cancelText: { color: colors.textMuted, fontSize: FONT_SIZES.sm, fontWeight: '600' },
+  saveBtn: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.xs + 2,
+    borderRadius: RADII.full,
+    backgroundColor: colors.accent,
+    minWidth: 68,
+    alignItems: 'center',
+  },
+  saveText: { color: colors.white, fontSize: FONT_SIZES.sm, fontWeight: '700' },
+  editIconBtn: {
+    paddingHorizontal: SPACING.sm + 4,
+    paddingVertical: SPACING.xs + 2,
+    borderRadius: RADII.full,
+    backgroundColor: colors.cardBg,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  editIconText: { color: colors.textMuted, fontSize: FONT_SIZES.sm },
   content: {
     padding: SPACING.lg,
     paddingBottom: SPACING.xxl,
     gap: SPACING.lg,
   },
-  hero: {
-    alignItems: 'center',
-    paddingVertical: SPACING.lg,
-  },
+  hero: { alignItems: 'center', paddingVertical: SPACING.md },
+  avatarWrap: { position: 'relative', marginBottom: SPACING.md },
   avatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: COLORS.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.md,
+    width: 80, height: 80, borderRadius: 40,
+    backgroundColor: colors.accent,
+    alignItems: 'center', justifyContent: 'center',
   },
-  avatarText: {
-    color: COLORS.white,
-    fontSize: 32,
-    fontWeight: '800',
+  avatarImg: { width: 80, height: 80, borderRadius: 40 },
+  avatarOverlay: {
+    position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
+    borderRadius: 40, backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  avatarEditBadge: {
+    position: 'absolute', bottom: 0, right: 0,
+    width: 26, height: 26, borderRadius: 13,
+    backgroundColor: colors.bg,
+    borderWidth: 1, borderColor: colors.cardBorder,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  avatarEditIcon: { fontSize: 14 },
+  avatarText: { color: colors.white, fontSize: 32, fontWeight: '800' },
+  editFields: { width: '100%', gap: SPACING.sm, marginTop: SPACING.sm },
+  editInput: {
+    backgroundColor: colors.cardBg,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    borderRadius: RADII.md,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm + 2,
+    color: colors.text,
+    fontSize: FONT_SIZES.md,
+    textAlign: 'center',
   },
   name: {
-    color: COLORS.white,
-    fontSize: FONT_SIZES.xl,
-    fontWeight: '800',
-    letterSpacing: -0.5,
+    color: colors.text, fontSize: FONT_SIZES.xl,
+    fontWeight: '800', letterSpacing: -0.5,
   },
-  jobTitle: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZES.md,
-    marginTop: SPACING.xs,
-  },
-  location: {
-    color: COLORS.textDim,
-    fontSize: FONT_SIZES.sm,
-    marginTop: SPACING.xs,
-  },
+  jobTitle: { color: colors.textMuted, fontSize: FONT_SIZES.md, marginTop: SPACING.xs },
+  location: { color: colors.textDim, fontSize: FONT_SIZES.sm, marginTop: SPACING.xs },
   statsRow: {
     flexDirection: 'row',
-    backgroundColor: COLORS.cardBg,
+    backgroundColor: colors.cardBg,
+    borderWidth: 1, borderColor: colors.cardBorder,
+    borderRadius: RADII.lg, padding: SPACING.md,
+  },
+  statDivider: { width: 1, backgroundColor: colors.cardBorder },
+  section: { gap: SPACING.sm },
+  sectionTitle: {
+    color: colors.textMuted, fontSize: FONT_SIZES.xs,
+    fontWeight: '600', textTransform: 'uppercase', letterSpacing: 1,
+  },
+  card: {
+    backgroundColor: colors.cardBg, borderWidth: 1,
+    borderColor: colors.cardBorder, borderRadius: RADII.lg, overflow: 'hidden',
+  },
+  cardDivider: { height: 1, backgroundColor: colors.cardBorder },
+  infoRow: {
+    flexDirection: 'row', alignItems: 'center',
+    gap: SPACING.sm + 4, padding: SPACING.md,
+  },
+  infoIcon: { fontSize: 18, width: 24, textAlign: 'center' },
+  infoContent: { flex: 1 },
+  infoLabel: { color: colors.textDim, fontSize: FONT_SIZES.xs, marginBottom: 2 },
+  infoValue: { color: colors.text, fontSize: FONT_SIZES.sm, fontWeight: '500' },
+  skillsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
+  skillChip: {
+    backgroundColor: `${colors.accent}18`, borderWidth: 1,
+    borderColor: `${colors.accent}44`, borderRadius: RADII.full,
+    paddingHorizontal: SPACING.sm + 4, paddingVertical: SPACING.xs + 2,
+  },
+  skillText: { color: colors.accentLight, fontSize: FONT_SIZES.xs, fontWeight: '500' },
+  editPrefsBtn: {
+    backgroundColor: colors.accent, borderRadius: RADII.full,
+    paddingVertical: SPACING.sm + 4, alignItems: 'center',
+  },
+  editPrefsBtnText: { color: colors.white, fontSize: FONT_SIZES.md, fontWeight: '700' },
+  settingsBtn: {
+    backgroundColor: colors.cardBg, borderWidth: 1,
+    borderColor: colors.cardBorder, borderRadius: RADII.full,
+    paddingVertical: SPACING.sm + 4, alignItems: 'center',
+  },
+  settingsBtnText: { color: colors.text, fontSize: FONT_SIZES.sm, fontWeight: '600' },
+  signOutBtn: {
+    backgroundColor: 'rgba(255,59,48,0.1)', borderWidth: 1,
+    borderColor: 'rgba(255,59,48,0.25)', borderRadius: RADII.full,
+    paddingVertical: SPACING.sm + 4, alignItems: 'center',
+  },
+  signOutText: { color: '#ff3b30', fontSize: FONT_SIZES.sm, fontWeight: '600' },
+  cvUploadBtn: {
+    backgroundColor: `${colors.accent}10`,
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderColor: `${colors.accent}33`,
     borderRadius: RADII.lg,
     padding: SPACING.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.md,
+    justifyContent: 'center',
   },
-  stat: {
-    flex: 1,
+  cvUploadIcon: { fontSize: 24 },
+  cvUploadText: { color: colors.accent, fontSize: FONT_SIZES.md, fontWeight: '700' },
+  cvUploadSub: { color: colors.textDim, fontSize: FONT_SIZES.xs, marginTop: 2 },
+  linkedInBtn: {
+    backgroundColor: 'rgba(10, 102, 194, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(10, 102, 194, 0.3)',
+    borderRadius: RADII.lg,
+    padding: SPACING.md,
     alignItems: 'center',
     gap: SPACING.xs,
   },
-  statValue: {
-    color: COLORS.white,
-    fontSize: FONT_SIZES.xl,
-    fontWeight: '800',
+  linkedInBtnText: { color: '#4A9EDB', fontSize: FONT_SIZES.md, fontWeight: '700' },
+  linkedInBtnSub: { color: colors.textDim, fontSize: FONT_SIZES.xs },
+  linkedInBadge: {
+    width: 30, height: 30, borderRadius: 6,
+    backgroundColor: '#0A66C2',
+    alignItems: 'center', justifyContent: 'center',
   },
-  statLabel: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZES.xs,
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: COLORS.cardBorder,
-  },
-  section: {
+  linkedInBadgeText: { color: colors.white, fontWeight: '800', fontSize: 14 },
+  linkedInDisconnect: { color: colors.textDim, fontSize: FONT_SIZES.xs },
+  completionCard: {
+    backgroundColor: colors.cardBg,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    borderRadius: RADII.lg,
+    padding: SPACING.md,
     gap: SPACING.sm,
   },
-  sectionTitle: {
-    color: COLORS.textMuted,
+  completionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  completionTitle: {
+    color: colors.textMuted,
     fontSize: FONT_SIZES.xs,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
-  card: {
-    backgroundColor: COLORS.cardBg,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-    borderRadius: RADII.lg,
+  completionScore: {
+    color: colors.accent,
+    fontSize: FONT_SIZES.md,
+    fontWeight: '800',
+  },
+  completionBar: {
+    height: 6,
+    backgroundColor: `${colors.accent}22`,
+    borderRadius: RADII.full,
     overflow: 'hidden',
   },
-  cardDivider: {
-    height: 1,
-    backgroundColor: COLORS.cardBorder,
+  completionFill: {
+    height: '100%',
+    borderRadius: RADII.full,
   },
-  infoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm + 4,
-    padding: SPACING.md,
-  },
-  infoIcon: {
-    fontSize: 18,
-    width: 24,
-    textAlign: 'center',
-  },
-  infoContent: {
-    flex: 1,
-  },
-  infoLabel: {
-    color: COLORS.textDim,
+  completionHint: {
+    color: colors.textDim,
     fontSize: FONT_SIZES.xs,
-    marginBottom: 2,
-  },
-  infoValue: {
-    color: COLORS.white,
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '500',
-  },
-  skillsWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.sm,
-  },
-  skillChip: {
-    backgroundColor: `${COLORS.accent}18`,
-    borderWidth: 1,
-    borderColor: `${COLORS.accent}44`,
-    borderRadius: RADII.full,
-    paddingHorizontal: SPACING.sm + 4,
-    paddingVertical: SPACING.xs + 2,
-  },
-  skillText: {
-    color: COLORS.accentLight,
-    fontSize: FONT_SIZES.xs,
-    fontWeight: '500',
-  },
-  editBtn: {
-    backgroundColor: COLORS.accent,
-    borderRadius: RADII.full,
-    paddingVertical: SPACING.sm + 4,
-    alignItems: 'center',
-  },
-  editBtnText: {
-    color: COLORS.white,
-    fontSize: FONT_SIZES.md,
-    fontWeight: '700',
-  },
-  resetBtn: {
-    backgroundColor: COLORS.cardBg,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-    borderRadius: RADII.full,
-    paddingVertical: SPACING.sm + 4,
-    alignItems: 'center',
-  },
-  resetText: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '500',
-  },
-  signOutBtn: {
-    backgroundColor: 'rgba(255,59,48,0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,59,48,0.25)',
-    borderRadius: RADII.full,
-    paddingVertical: SPACING.sm + 4,
-    alignItems: 'center',
-  },
-  signOutText: {
-    color: '#ff3b30',
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '600',
   },
 });

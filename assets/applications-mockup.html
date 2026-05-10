@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Başvurularım — Mockup</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  background: #060610;
+  display: flex;
+  justify-content: center;
+  padding: 48px 20px;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+}
+.phone {
+  width: 375px;
+  background: #0d0d14;
+  border-radius: 44px;
+  overflow: hidden;
+  box-shadow: 0 40px 120px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.1);
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+.status-bar {
+  height: 50px;
+  background: #0d0d14;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 0 24px 8px;
+  flex-shrink: 0;
+}
+.status-bar .time { color:#fff; font-size:15px; font-weight:600; }
+.status-icons { display:flex; gap:6px; align-items:center; }
+.battery {
+  width:25px; height:12px; border:1.5px solid rgba(255,255,255,0.5);
+  border-radius:3px; position:relative; display:flex; align-items:center; padding:1.5px;
+}
+.battery::after {
+  content:''; width:2px; height:5px; background:rgba(255,255,255,0.4);
+  position:absolute; right:-4px; border-radius:0 1px 1px 0;
+}
+.battery-fill { width:70%; height:100%; background:#fff; border-radius:1.5px; }
+.signal { display:flex; align-items:flex-end; gap:1.5px; }
+.signal span { background:#fff; border-radius:1px; display:block; width:3px; }
+
+/* Scrollable content area */
+.screen {
+  background: #0d0d14;
+  flex: 1;
+  overflow-y: auto;
+  /* extra bottom padding so content doesn't hide behind floating tab bar */
+  padding-bottom: 90px;
+  scrollbar-width: none;
+}
+.screen::-webkit-scrollbar { display: none; }
+
+.header { padding: 6px 18px 0; }
+.header-row { display:flex; align-items:baseline; justify-content:space-between; }
+.heading { color:#fff; font-size:30px; font-weight:700; letter-spacing:-0.8px; }
+.heading-count { color:rgba(255,255,255,0.55); font-size:13px; font-weight:600; letter-spacing:0.2px; }
+
+.filter-row {
+  display:flex; gap:8px; margin-top:14px; margin-bottom:2px;
+  overflow-x:auto; padding-bottom:10px; scrollbar-width:none;
+}
+.chip {
+  padding:6px 12px; border-radius:999px;
+  border:1px solid rgba(255,255,255,0.1);
+  background:rgba(255,255,255,0.05);
+  color:rgba(255,255,255,0.7);
+  font-size:12px; font-weight:600; white-space:nowrap; cursor:pointer;
+}
+.chip.active { background:#fff; border-color:#fff; color:#0a0b12; }
+
+.list { padding:4px 14px 20px; }
+
+.group-header { display:flex; align-items:center; gap:10px; padding:12px 4px 2px; }
+.group-label {
+  font-size:10.5px; font-weight:600; letter-spacing:1.2px;
+  color:rgba(255,255,255,0.4); text-transform:uppercase; white-space:nowrap;
+}
+.group-line { flex:1; height:1px; background:rgba(255,255,255,0.06); }
+
+.card {
+  border-radius:18px; border:1px solid rgba(255,255,255,0.07);
+  overflow:hidden; margin-top:10px; position:relative; cursor:pointer;
+  transition:opacity 0.15s;
+}
+.card:hover { opacity:0.85; }
+.card-tint { position:absolute; inset:0; pointer-events:none; }
+.card-row { display:flex; align-items:flex-start; gap:12px; padding:14px; position:relative; }
+.logo {
+  width:44px; height:44px; border-radius:12px;
+  display:flex; align-items:center; justify-content:center;
+  flex-shrink:0; font-size:18px; font-weight:800; color:#fff; letter-spacing:-0.5px;
+}
+.card-body { flex:1; min-width:0; }
+.card-title {
+  color:#fff; font-size:14px; font-weight:600; line-height:18px;
+  letter-spacing:-0.2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.card-sub {
+  color:rgba(255,255,255,0.6); font-size:11.5px; margin-top:4px;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.meta-row { display:flex; align-items:center; gap:8px; margin-top:9px; flex-wrap:wrap; }
+.status-pill {
+  display:flex; align-items:center; gap:4px;
+  padding:3px 7px 3px 6px; border-radius:999px; border:1px solid;
+  font-size:10.5px; font-weight:700; letter-spacing:0.1px;
+}
+.dot { width:5px; height:5px; border-radius:50%; flex-shrink:0; }
+.meta-tag { font-size:10.5px; font-weight:500; color:rgba(255,255,255,0.55); }
+.meta-sep { width:2px; height:2px; border-radius:50%; background:rgba(255,255,255,0.25); }
+.card-actions { display:flex; flex-direction:column; align-items:flex-end; gap:6px; flex-shrink:0; }
+.detail-btn {
+  display:flex; align-items:center; gap:4px;
+  padding:8px 13px; border-radius:11px; margin-top:18px;
+  background:rgba(124,109,250,0.13); border:1px solid rgba(124,109,250,0.28);
+  font-size:12px; font-weight:700; color:#a89cfc; cursor:pointer;
+}
+
+/* ── Floating pill tab bar — _layout.tsx ile birebir ── */
+/* position:absolute, bottom:16, left:16, right:16, height:58, borderRadius:30 */
+.tab-bar {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  right: 16px;
+  height: 58px;
+  border-radius: 30px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  /* blur simulation */
+  background: rgba(18, 18, 30, 0.82);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+/* topBorder */
+.tab-bar::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 1px;
+  background: rgba(255,255,255,0.08);
+  z-index: 1;
+}
+.tab-row {
+  display: flex;
+  flex: 1;
+  align-items: center;
+}
+.tab-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 58px;
+  cursor: pointer;
+}
+/* center home pill */
+.center-pill {
+  width: 40px;
+  height: 40px;
+  border-radius: 20px;
+  background: rgba(255,255,255,0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+</style>
+</head>
+<body>
+<div class="phone">
+  <!-- Status bar -->
+  <div class="status-bar">
+    <span class="time">9:41</span>
+    <div class="status-icons">
+      <div class="signal">
+        <span style="height:4px"></span>
+        <span style="height:6px"></span>
+        <span style="height:9px"></span>
+        <span style="height:11px;opacity:0.3"></span>
+      </div>
+      <svg width="16" height="11" viewBox="0 0 16 11" fill="none">
+        <path d="M8 2.5C10.2 2.5 12.2 3.4 13.6 4.9L15 3.4C13.2 1.5 10.7 0.3 8 0.3 5.3 0.3 2.8 1.5 1 3.4L2.4 4.9C3.8 3.4 5.8 2.5 8 2.5Z" fill="white"/>
+        <path d="M8 5.5C9.5 5.5 10.8 6.1 11.8 7.1L13.2 5.6C11.8 4.3 10 3.5 8 3.5 6 3.5 4.2 4.3 2.8 5.6L4.2 7.1C5.2 6.1 6.5 5.5 8 5.5Z" fill="white"/>
+        <circle cx="8" cy="10" r="1.5" fill="white"/>
+      </svg>
+      <div class="battery"><div class="battery-fill"></div></div>
+    </div>
+  </div>
+
+  <!-- Scrollable screen content -->
+  <div class="screen">
+    <div class="header">
+      <div class="header-row">
+        <span class="heading">Başvurularım</span>
+        <span class="heading-count">6 başvuru</span>
+      </div>
+      <div class="filter-row">
+        <div class="chip active">Tümü</div>
+        <div class="chip">Kapananlar</div>
+      </div>
+    </div>
+
+    <div class="list">
+      <!-- BUGÜN -->
+      <div class="group-header">
+        <span class="group-label">Bugün</span>
+        <div class="group-line"></div>
+      </div>
+
+      <!-- Trendyol — Görüşme -->
+      <div class="card">
+        <div class="card-tint" style="background:linear-gradient(135deg,rgba(250,112,154,0.22) 0%,transparent 60%)"></div>
+        <div class="card-row">
+          <div class="logo" style="background:linear-gradient(135deg,#fa709a,#fee140)">T</div>
+          <div class="card-body">
+            <div class="card-title">Senior React Native Developer</div>
+            <div class="card-sub">Trendyol · İstanbul, Hibrit</div>
+            <div class="meta-row">
+              <div class="status-pill" style="background:rgba(46,204,113,0.13);border-color:rgba(46,204,113,0.28);color:#2ecc71;">
+                <div class="dot" style="background:#86efac"></div>Başvuruldu
+              </div>
+              <div class="meta-sep"></div>
+              <span class="meta-tag">2 saat önce</span>
+            </div>
+          </div>
+          <div class="card-actions">
+            <div class="detail-btn">Detay →</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Getir — Beklemede -->
+      <div class="card">
+        <div class="card-tint" style="background:linear-gradient(135deg,rgba(67,233,123,0.18) 0%,transparent 60%)"></div>
+        <div class="card-row">
+          <div class="logo" style="background:linear-gradient(135deg,#43e97b,#38f9d7)">G</div>
+          <div class="card-body">
+            <div class="card-title">Frontend Engineer</div>
+            <div class="card-sub">Getir · İstanbul, Uzaktan</div>
+            <div class="meta-row">
+              <div class="status-pill" style="background:rgba(90,90,122,0.15);border-color:rgba(90,90,122,0.35);color:#5a5a7a;">
+                <div class="dot" style="background:#5a5a7a"></div>İlan Kapalı
+              </div>
+              <div class="meta-sep"></div>
+              <span class="meta-tag">5 saat önce</span>
+            </div>
+          </div>
+          <div class="card-actions">
+            <div class="detail-btn">Detay →</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DÜN -->
+      <div class="group-header">
+        <span class="group-label">Dün</span>
+        <div class="group-line"></div>
+      </div>
+
+      <!-- Insider — Görüşme -->
+      <div class="card">
+        <div class="card-tint" style="background:linear-gradient(135deg,rgba(79,172,254,0.2) 0%,transparent 60%)"></div>
+        <div class="card-row">
+          <div class="logo" style="background:linear-gradient(135deg,#4facfe,#00f2fe)">I</div>
+          <div class="card-body">
+            <div class="card-title">Mobile Developer (iOS)</div>
+            <div class="card-sub">Insider · İstanbul, Ofis</div>
+            <div class="meta-row">
+              <div class="status-pill" style="background:rgba(46,204,113,0.13);border-color:rgba(46,204,113,0.28);color:#2ecc71;">
+                <div class="dot" style="background:#86efac"></div>Başvuruldu
+              </div>
+              <div class="meta-sep"></div>
+              <span class="meta-tag">Dün</span>
+            </div>
+          </div>
+          <div class="card-actions">
+            <div class="detail-btn">Detay →</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Peak Games — Beklemede -->
+      <div class="card">
+        <div class="card-tint" style="background:linear-gradient(135deg,rgba(240,147,251,0.18) 0%,transparent 60%)"></div>
+        <div class="card-row">
+          <div class="logo" style="background:linear-gradient(135deg,#f093fb,#f5576c)">P</div>
+          <div class="card-body">
+            <div class="card-title">Product Manager</div>
+            <div class="card-sub">Peak Games · İstanbul, Hibrit</div>
+            <div class="meta-row">
+              <div class="status-pill" style="background:rgba(46,204,113,0.13);border-color:rgba(46,204,113,0.28);color:#2ecc71;">
+                <div class="dot" style="background:#86efac"></div>Başvuruldu
+              </div>
+              <div class="meta-sep"></div>
+              <span class="meta-tag">Dün</span>
+            </div>
+          </div>
+          <div class="card-actions">
+            <div class="detail-btn">Detay →</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 3 GÜN ÖNCE -->
+      <div class="group-header">
+        <span class="group-label">3 Gün Önce</span>
+        <div class="group-line"></div>
+      </div>
+
+      <!-- Hepsiburada — Reddedildi -->
+      <div class="card">
+        <div class="card-tint" style="background:linear-gradient(135deg,rgba(239,68,68,0.17) 0%,transparent 60%)"></div>
+        <div class="card-row">
+          <div class="logo" style="background:linear-gradient(135deg,#667eea,#764ba2)">H</div>
+          <div class="card-body">
+            <div class="card-title">Backend Developer (Node.js)</div>
+            <div class="card-sub">Hepsiburada · Ankara, Uzaktan</div>
+            <div class="meta-row">
+              <div class="status-pill" style="background:rgba(90,90,122,0.15);border-color:rgba(90,90,122,0.35);color:#5a5a7a;">
+                <div class="dot" style="background:#5a5a7a"></div>İlan Kapalı
+              </div>
+              <div class="meta-sep"></div>
+              <span class="meta-tag">3 gün önce</span>
+            </div>
+          </div>
+          <div class="card-actions">
+            <div class="detail-btn">Detay →</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Yemeksepeti — Kabul -->
+      <div class="card">
+        <div class="card-tint" style="background:linear-gradient(135deg,rgba(46,204,113,0.18) 0%,transparent 60%)"></div>
+        <div class="card-row">
+          <div class="logo" style="background:linear-gradient(135deg,#43e97b,#38f9d7)">Y</div>
+          <div class="card-body">
+            <div class="card-title">UX Designer</div>
+            <div class="card-sub">Yemeksepeti · İstanbul, Ofis</div>
+            <div class="meta-row">
+              <div class="status-pill" style="background:rgba(46,204,113,0.13);border-color:rgba(46,204,113,0.28);color:#2ecc71;">
+                <div class="dot" style="background:#86efac"></div>Başvuruldu
+              </div>
+              <div class="meta-sep"></div>
+              <span class="meta-tag">3 gün önce</span>
+            </div>
+          </div>
+          <div class="card-actions">
+            <div class="detail-btn">Detay →</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!--
+    Tab bar — _layout.tsx CustomTabBar ile birebir:
+    position:absolute, bottom:16, left:16, right:16
+    height:58, borderRadius:30, BlurView dark
+    Sıra: saved | applications(AKTİF) | index(center) | alerts | profile
+    Aktif applications: briefcase dolu, renk #4facfe
+    Pasif: rgba(255,255,255,0.38)
+    Center: 40×40 pill, rgba(255,255,255,0.08) bg, home-outline ikon
+  -->
+  <div class="tab-bar">
+    <div class="tab-row">
+
+      <!-- saved (bookmark-outline, pasif) -->
+      <div class="tab-item">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"
+            stroke="rgba(255,255,255,0.38)" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+
+      <!-- applications (briefcase dolu, AKTİF #4facfe) -->
+      <div class="tab-item">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="#4facfe">
+          <rect x="2" y="7" width="20" height="14" rx="2" fill="#4facfe"/>
+          <path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2" fill="none"
+            stroke="#4facfe" stroke-width="2" stroke-linecap="round"/>
+          <line x1="12" y1="12" x2="12" y2="17" stroke="rgba(13,13,20,0.6)" stroke-width="1.5" stroke-linecap="round"/>
+          <line x1="9" y1="14.5" x2="15" y2="14.5" stroke="rgba(13,13,20,0.6)" stroke-width="1.5" stroke-linecap="round"/>
+        </svg>
+      </div>
+
+      <!-- index / home (center pill, outline ikon, pasif) -->
+      <div class="tab-item">
+        <div class="center-pill">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path d="M3 12L12 3l9 9" stroke="rgba(255,255,255,0.38)" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M9 21V12h6v9" stroke="rgba(255,255,255,0.38)" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M5 10v11h14V10" stroke="rgba(255,255,255,0.38)" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </div>
+
+      <!-- alerts (notifications-outline, pasif) -->
+      <div class="tab-item">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"
+            stroke="rgba(255,255,255,0.38)" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M13.73 21a2 2 0 0 1-3.46 0"
+            stroke="rgba(255,255,255,0.38)" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+
+      <!-- profile (person-outline, pasif) -->
+      <div class="tab-item">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"
+            stroke="rgba(255,255,255,0.38)" stroke-width="2" stroke-linecap="round"/>
+          <circle cx="12" cy="7" r="4"
+            stroke="rgba(255,255,255,0.38)" stroke-width="2"/>
+        </svg>
+      </div>
+
+    </div>
+  </div>
+</div>
+</body>
+</html>

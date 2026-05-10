@@ -1,0 +1,45 @@
+{
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "remote"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "ios": {
+        "simulator": true
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.jobreel.app/api",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://kppwccarzjktqxfnehqb.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtwcHdjY2FyemprdHF4Zm5laHFiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NTA5MzcsImV4cCI6MjA5MjQyNjkzN30.S7hg08DvEIQBYPxbf3ZneUht_OKM0HX-42r4uh0Zk1w",
+        "EXPO_PUBLIC_MIXPANEL_TOKEN": "b535c0cd5a02d683844b9eddb84cd679",
+        "EXPO_PUBLIC_LINKEDIN_CLIENT_ID": "774y10qf1no82y"
+      }
+    },
+    "production": {
+      "autoIncrement": true,
+      "distribution": "store",
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://api.jobreel.app/api",
+        "EXPO_PUBLIC_SUPABASE_URL": "https://kppwccarzjktqxfnehqb.supabase.co",
+        "EXPO_PUBLIC_SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtwcHdjY2FyemprdHF4Zm5laHFiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY4NTA5MzcsImV4cCI6MjA5MjQyNjkzN30.S7hg08DvEIQBYPxbf3ZneUht_OKM0HX-42r4uh0Zk1w",
+        "EXPO_PUBLIC_MIXPANEL_TOKEN": "b535c0cd5a02d683844b9eddb84cd679",
+        "EXPO_PUBLIC_LINKEDIN_CLIENT_ID": "774y10qf1no82y"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "dogankapikiran@gmail.com",
+        "ascAppId": "6767315019",
+        "appleTeamId": "YKG52A6QZ9"
+      }
+    }
+  }
+}

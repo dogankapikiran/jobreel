@@ -5,7 +5,7 @@ import { Interaction, UserProfile } from '@/types';
 
 const DEFAULT_PREFERENCES: UserProfile['preferences'] = {
   sectors: [],
-  seniority: 'mid',
+  seniority: [],
   workType: 'any',
   location: 'İstanbul',
   salaryMin: 0,
@@ -32,7 +32,6 @@ interface UserState {
   setPreferences: (partial: Partial<UserProfile['preferences']>) => void;
   addInteraction: (interaction: Interaction) => void;
   completeOnboarding: () => void;
-  resetOnboarding: () => void;
 }
 
 export const useUserStore = create<UserState>()(
@@ -59,9 +58,6 @@ export const useUserStore = create<UserState>()(
         })),
 
       completeOnboarding: () => set({ hasCompletedOnboarding: true }),
-
-      resetOnboarding: () =>
-        set({ hasCompletedOnboarding: false, profile: DEFAULT_PROFILE, interactions: [] }),
     }),
     {
       name: 'jobreel-user',

@@ -1,39 +1,29 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { COLORS, FONT_SIZES, GRADIENTS, RADII, SPACING } from '@/constants/theme';
+import { COLORS, FONT_SIZES, RADII, SPACING } from '@/constants/theme';
 
 interface Props {
-  accentIndex: number;
-  isSaved: boolean;
   isApplied: boolean;
-  onPass: () => void;
-  onSave: () => void;
   onApply: () => void;
+  onExplore: () => void;
 }
 
-export default function ActionButtons({ accentIndex, isSaved, isApplied, onPass, onSave, onApply }: Props) {
-  const gradient = GRADIENTS[accentIndex % GRADIENTS.length];
-
+export default function ActionButtons({ isApplied, onApply, onExplore }: Props) {
   return (
     <View style={styles.row}>
-      <TouchableOpacity style={styles.iconBtn} onPress={onPass} activeOpacity={0.7}>
-        <Text style={styles.passIcon}>✕</Text>
+      <TouchableOpacity style={styles.detayBtn} onPress={onExplore} activeOpacity={0.8}>
+        <Text style={styles.detayText}>Detay</Text>
       </TouchableOpacity>
 
       <TouchableOpacity
-        style={[styles.iconBtn, isSaved && styles.savedBtn]}
-        onPress={onSave}
-        activeOpacity={0.7}
+        style={[styles.applyBtn, isApplied && styles.applyBtnApplied]}
+        onPress={onApply}
+        activeOpacity={0.8}
       >
-        <Text style={styles.saveIcon}>🔖</Text>
+        <Text style={[styles.applyText, isApplied && styles.applyTextApplied]}>
+          {isApplied ? 'Başvuruldu ✓' : 'Başvur →'}
+        </Text>
       </TouchableOpacity>
-
-      <LinearGradient colors={gradient} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.applyGradient}>
-        <TouchableOpacity style={styles.applyInner} onPress={onApply} activeOpacity={0.8}>
-          <Text style={styles.applyText}>{isApplied ? 'Başvuruldu ✓' : 'Başvur →'}</Text>
-        </TouchableOpacity>
-      </LinearGradient>
     </View>
   );
 }
@@ -41,44 +31,43 @@ export default function ActionButtons({ accentIndex, isSaved, isApplied, onPass,
 const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
-    gap: SPACING.sm + 4,
-    marginTop: 'auto',
+    gap: SPACING.sm,
+    alignItems: 'stretch',
   },
-  iconBtn: {
-    width: 56,
-    height: 56,
+  detayBtn: {
+    flex: 1,
     borderRadius: RADII.md,
-    backgroundColor: COLORS.cardBg,
+    backgroundColor: 'rgba(255,255,255,0.1)',
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderColor: 'rgba(255,255,255,0.14)',
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 15,
   },
-  savedBtn: {
-    backgroundColor: 'rgba(255,193,7,0.12)',
-    borderColor: 'rgba(255,193,7,0.3)',
-  },
-  passIcon: {
-    fontSize: 20,
-    color: COLORS.textMuted,
-  },
-  saveIcon: {
-    fontSize: 20,
-  },
-  applyGradient: {
-    flex: 1,
-    borderRadius: RADII.md,
-    height: 56,
-  },
-  applyInner: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  applyText: {
+  detayText: {
     color: COLORS.white,
     fontSize: FONT_SIZES.md,
+    fontWeight: '600',
+  },
+  applyBtn: {
+    flex: 1.4,
+    borderRadius: RADII.md,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 15,
+  },
+  applyBtnApplied: {
+    backgroundColor: 'rgba(46,204,113,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(46,204,113,0.4)',
+  },
+  applyText: {
+    color: '#0d0d14',
+    fontSize: FONT_SIZES.md,
     fontWeight: '700',
-    letterSpacing: 0.3,
+  },
+  applyTextApplied: {
+    color: '#4ade80',
   },
 });

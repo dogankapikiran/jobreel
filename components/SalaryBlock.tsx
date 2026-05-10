@@ -1,13 +1,13 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { COLORS, FONT_SIZES, GRADIENTS, RADII, SPACING } from '@/constants/theme';
+import { COLORS, FONT_SIZES, RADII, SPACING } from '@/constants/theme';
 
 interface Props {
   salaryMin?: number;
   salaryMax?: number;
   currency: string;
   period: string;
-  accentIndex: number;
+  accent: string;
 }
 
 function fmt(n: number): string {
@@ -16,10 +16,9 @@ function fmt(n: number): string {
   return n.toLocaleString('tr-TR');
 }
 
-export default function SalaryBlock({ salaryMin, salaryMax, currency, period, accentIndex }: Props) {
+export default function SalaryBlock({ salaryMin, salaryMax, currency, period, accent }: Props) {
   if (!salaryMin && !salaryMax) return null;
 
-  const accentColor = GRADIENTS[accentIndex % GRADIENTS.length][0];
   const label =
     salaryMin && salaryMax
       ? `${currency}${fmt(salaryMin)} – ${currency}${fmt(salaryMax)}`
@@ -31,7 +30,7 @@ export default function SalaryBlock({ salaryMin, salaryMax, currency, period, ac
     <View style={styles.container}>
       <Text style={styles.label}>Maaş Aralığı</Text>
       <View style={styles.row}>
-        <Text style={[styles.amount, { color: accentColor }]}>{label}</Text>
+        <Text style={[styles.amount, { color: accent }]}>{label}</Text>
         <Text style={styles.period}> / {period}</Text>
       </View>
     </View>

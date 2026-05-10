@@ -1,23 +1,64 @@
-import React from 'react';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import React, { useEffect, useRef } from 'react';
+import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { COLORS, FONT_SIZES, GRADIENTS, RADII, SPACING } from '@/constants/theme';
+import { ACCENT_GRADIENT, COLORS, FONT_SIZES, GRADIENTS, RADII, SPACING } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 const FEATURES = [
-  { icon: '⚡', title: 'Hızlı Keşfet', desc: 'Yukarı kaydır, ilanlar akar.' },
-  { icon: '🎯', title: 'Sana Özel', desc: 'Algoritma seni tanır, doğru ilanları getirir.' },
-  { icon: '🔖', title: 'Kaydet & Başvur', desc: 'Beğendiklerini kaydet, tek dokunuşla başvur.' },
+  {
+    icon: '⚡',
+    title: 'Hızlı Keşfet',
+    desc: 'Yukarı kaydır, ilanlar akar.',
+    gradient: true,
+  },
+  {
+    icon: '🎯',
+    title: 'Sana Özel',
+    desc: 'Algoritma seni tanır, doğru ilanları getirir.',
+    gradient: false,
+  },
+  {
+    icon: '🔖',
+    title: 'Kaydet & Başvur',
+    desc: 'Beğendiklerini kaydet, tek dokunuşla başvur.',
+    gradient: false,
+  },
 ];
 
 export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
+  const { bg } = useTheme();
+
+  const logoAnim  = useRef(new Animated.Value(0)).current;
+  const featAnim  = useRef(new Animated.Value(0)).current;
+  const ctaAnim   = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.stagger(180, [
+      Animated.spring(logoAnim, { toValue: 1, useNativeDriver: true, tension: 60, friction: 10 }),
+      Animated.spring(featAnim, { toValue: 1, useNativeDriver: true, tension: 60, friction: 10 }),
+      Animated.spring(ctaAnim,  { toValue: 1, useNativeDriver: true, tension: 60, friction: 10 }),
+    ]).start();
+  }, []);
+
+  const makeStyle = (anim: Animated.Value) => ({
+    opacity: anim,
+    transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) }],
+  });
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top, paddingBottom: insets.bottom + SPACING.lg }]}>
+    <View style={[styles.screen, { paddingTop: insets.top, paddingBottom: insets.bottom + SPACING.lg, backgroundColor: bg }]}>
+      {/* Arka plan gradient */}
+      <LinearGradient
+        colors={['#1a0f35', '#0d0d14', '#0d0d14']}
+        locations={[0, 0.45, 1]}
+        style={StyleSheet.absoluteFillObject}
+      />
+
       {/* Logo */}
-      <View style={styles.logoSection}>
+      <Animated.View style={[styles.logoSection, makeStyle(logoAnim)]}>
         <LinearGradient colors={GRADIENTS[0]} style={styles.logoIcon}>
           <Text style={styles.logoIconText}>J</Text>
         </LinearGradient>
@@ -25,39 +66,45 @@ export default function WelcomeScreen() {
           Job<Text style={styles.logoAccent}>Reel</Text>
         </Text>
         <Text style={styles.tagline}>İş bulmak artık Reels kadar kolay.</Text>
-      </View>
+      </Animated.View>
 
       {/* Feature list */}
-      <View style={styles.features}>
-        {FEATURES.map((f) => (
-          <View key={f.icon} style={styles.featureRow}>
-            <View style={styles.featureIcon}>
-              <Text style={styles.featureEmoji}>{f.icon}</Text>
-            </View>
+      <Animated.View style={[styles.features, makeStyle(featAnim)]}>
+        {FEATURES.map((f, i) => (
+          <View key={f.icon} style={styles.featureCard}>
+            {f.gradient ? (
+              <LinearGradient colors={ACCENT_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.featureIcon}>
+                <Text style={styles.featureEmoji}>{f.icon}</Text>
+              </LinearGradient>
+            ) : (
+              <View style={[styles.featureIcon, styles.featureIconMuted]}>
+                <Text style={styles.featureEmoji}>{f.icon}</Text>
+              </View>
+            )}
             <View style={styles.featureText}>
               <Text style={styles.featureTitle}>{f.title}</Text>
               <Text style={styles.featureDesc}>{f.desc}</Text>
             </View>
           </View>
         ))}
-      </View>
+      </Animated.View>
 
       {/* CTA */}
-      <View style={styles.cta}>
-        <LinearGradient colors={GRADIENTS[0]} style={styles.primaryBtn}>
-          <TouchableOpacity
-            style={styles.btnInner}
-            onPress={() => router.push('/onboarding/preferences')}
-            activeOpacity={0.85}
-          >
+      <Animated.View style={[styles.cta, makeStyle(ctaAnim)]}>
+        <TouchableOpacity
+          onPress={() => router.push('/onboarding/preferences')}
+          activeOpacity={0.85}
+          style={styles.primaryBtnWrapper}
+        >
+          <LinearGradient colors={ACCENT_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.primaryBtn}>
             <Text style={styles.primaryBtnText}>Başla →</Text>
-          </TouchableOpacity>
-        </LinearGradient>
+          </LinearGradient>
+        </TouchableOpacity>
 
         <Text style={styles.disclaimer}>
           Kayıt gerekmez. Tamamen ücretsiz.
         </Text>
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -65,7 +112,6 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: COLORS.bg,
     justifyContent: 'space-between',
     padding: SPACING.xl,
   },
@@ -101,23 +147,28 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   features: {
-    gap: SPACING.lg,
+    gap: SPACING.sm + 2,
   },
-  featureRow: {
+  featureCard: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.md,
+    backgroundColor: COLORS.cardBg,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.07)',
+    borderRadius: RADII.lg,
+    padding: SPACING.md,
   },
   featureIcon: {
     width: 48,
     height: 48,
     borderRadius: RADII.md,
-    backgroundColor: COLORS.cardBg,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+  },
+  featureIconMuted: {
+    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   featureEmoji: {
     fontSize: 22,
@@ -140,13 +191,13 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
     alignItems: 'center',
   },
-  primaryBtn: {
+  primaryBtnWrapper: {
     width: '100%',
     borderRadius: RADII.full,
-    height: 56,
+    overflow: 'hidden',
   },
-  btnInner: {
-    flex: 1,
+  primaryBtn: {
+    height: 56,
     alignItems: 'center',
     justifyContent: 'center',
   },
