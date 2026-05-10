@@ -23,6 +23,14 @@ import CompanyLogo from '@/components/CompanyLogo';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+function safeOpenURL(url: string): void {
+  try {
+    const { protocol } = new URL(url);
+    if (protocol !== 'https:' && protocol !== 'http:') return;
+    Linking.openURL(url).catch(() => {});
+  } catch { /* geçersiz URL */ }
+}
+
 function hexAlpha(hex: string, alpha: number): string {
   const r = parseInt(hex.slice(1, 3), 16);
   const g = parseInt(hex.slice(3, 5), 16);
@@ -147,7 +155,7 @@ function SavedCard({ job, onRemove, onPress }: CardProps) {
             <Ionicons name="close" size={13} color="rgba(255,255,255,0.4)" />
           </TouchableOpacity>
           <TouchableOpacity
-            onPress={() => Linking.openURL(job.url).catch(() => {})}
+            onPress={() => safeOpenURL(job.url)}
             style={styles.applyBtn}
             activeOpacity={0.8}
           >

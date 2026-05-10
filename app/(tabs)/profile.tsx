@@ -144,8 +144,8 @@ export default function ProfileScreen() {
         'CV Yüklendi',
         `${parsed.skills?.length || 0} yetenek çıkarıldı. Feed eşleşme skorunuz güncellendi.`,
       );
-    } catch (e: any) {
-      Alert.alert('Hata', e?.message || 'CV yüklenemedi. Tekrar deneyin.');
+    } catch {
+      Alert.alert('Hata', 'CV yüklenemedi. Tekrar deneyin.');
     } finally {
       setCvLoading(false);
     }

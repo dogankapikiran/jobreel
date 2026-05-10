@@ -24,6 +24,14 @@ import { useBrandColor } from '@/hooks/useBrandColor';
 import CompanyLogo from '@/components/CompanyLogo';
 import TagBadge from '@/components/TagBadge';
 
+function safeOpenURL(url: string): void {
+  try {
+    const { protocol } = new URL(url);
+    if (protocol !== 'https:' && protocol !== 'http:') return;
+    Linking.openURL(url).catch(() => {});
+  } catch { /* geçersiz URL */ }
+}
+
 type DescItem =
   | { kind: 'head'; text: string }
   | { kind: 'bullet'; text: string }
@@ -134,7 +142,7 @@ export default function JobDetailScreen() {
   const wt       = workTypeLabel(job.workType);
 
   function handleApply() {
-    Linking.openURL(job!.url).catch(() => {});
+    safeOpenURL(job!.url);
     if (applied) return;
 
     let confirmed = false;

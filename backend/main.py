@@ -3,22 +3,41 @@ import io
 import json
 import os
 import random
+import re
 from collections import Counter
 from contextlib import asynccontextmanager
 from typing import Optional
+from urllib.parse import urlparse
 
 import groq
 import httpx
 import pdfplumber
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from dotenv import load_dotenv
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import RedirectResponse
+from pydantic import BaseModel
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 from supabase import create_client, Client
 
 from auth import get_current_user, get_optional_user
 from jobspy_service import fetch_jobs, get_job_description, PAGE_SIZE
+
+limiter = Limiter(key_func=get_remote_address)
+
+ALLOWED_OAUTH_ERRORS = {"access_denied", "invalid_request", "unauthorized_client", "invalid_scope"}
+
+def _is_safe_url(url: str | None) -> bool:
+    if not url:
+        return False
+    try:
+        parsed = urlparse(url)
+        return parsed.scheme in ("http", "https") and bool(parsed.netloc)
+    except Exception:
+        return False
 
 load_dotenv()
 
@@ -173,10 +192,12 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="JobReel API", lifespan=lifespan)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://jobreel.app", "https://www.jobreel.app"],
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Authorization", "Content-Type"],
 )
@@ -420,7 +441,9 @@ async def _score_jobs_background(jobs: list[dict], cv_parsed: dict) -> None:
 # ── Feed & Job ────────────────────────────────────────────────────────────────
 
 @app.get("/api/feed")
+@limiter.limit("30/minute")
 async def feed(
+    request: Request,
     location: str = Query(default="Istanbul, Turkey"),
     keyword: str = Query(default=""),
     sectors: str = Query(default=""),
@@ -555,10 +578,21 @@ async def get_profile(user: dict = Depends(get_current_user)):
     return res.data or {}
 
 
+class ProfileUpdate(BaseModel):
+    display_name: str | None = None
+    title: str | None = None
+    preferences: dict | None = None
+    skills: list[str] | None = None
+    avatar_url: str | None = None
+    cv_url: str | None = None
+    cv_parsed: dict | None = None
+
 @app.put("/api/profile")
-async def update_profile(body: dict, user: dict = Depends(get_current_user)):
+@limiter.limit("30/minute")
+async def update_profile(request: Request, body: ProfileUpdate, user: dict = Depends(get_current_user)):
     db = get_supabase()
-    db.table("profiles").upsert({"user_id": user["sub"], **body}, on_conflict="user_id").execute()
+    update_data = body.model_dump(exclude_none=True)
+    db.table("profiles").upsert({"user_id": user["sub"], **update_data}, on_conflict="user_id").execute()
     return {"success": True}
 
 
@@ -615,7 +649,8 @@ async def cv_signed_url(user: dict = Depends(get_current_user)):
 
 
 @app.post("/api/profile/cv-parse")
-async def parse_cv(user: dict = Depends(get_current_user)):
+@limiter.limit("5/hour")
+async def parse_cv(request: Request, user: dict = Depends(get_current_user)):
     """Download user's CV from storage, parse with pdfplumber + Claude Haiku, save to profile."""
     if not GROQ_API_KEY:
         raise HTTPException(status_code=503, detail="AI parse not configured")
@@ -633,7 +668,8 @@ async def parse_cv(user: dict = Depends(get_current_user)):
     try:
         parsed = await _parse_cv_with_groq(text)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Parse hatası: {e}")
+        print(f"[CV Parse] error for {user['sub'][:8]}: {e}")
+        raise HTTPException(status_code=500, detail="CV parse işlemi başarısız oldu")
 
     public_url = f"{SUPABASE_URL}/storage/v1/object/public/cvs/{path}"
     db.table("profiles").upsert({
@@ -647,13 +683,21 @@ async def parse_cv(user: dict = Depends(get_current_user)):
 
 # ── Interactions ──────────────────────────────────────────────────────────────
 
+ALLOWED_ACTIONS = {"view", "save", "apply", "skip", "unsave"}
+
 @app.post("/api/interactions")
-async def post_interaction(body: dict, user: dict = Depends(get_current_user)):
+@limiter.limit("60/minute")
+async def post_interaction(request: Request, body: dict, user: dict = Depends(get_current_user)):
+    action = body.get("action", "")
+    if action not in ALLOWED_ACTIONS:
+        raise HTTPException(status_code=400, detail="Geçersiz aksiyon")
+    raw_url = body.get("job_url")
+    safe_url = raw_url[:2048] if raw_url and _is_safe_url(raw_url) else None
     db = get_supabase()
     db.table("interactions").insert({
         "user_id": user["sub"],
         "job_id": body.get("job_id"),
-        "action": body.get("action"),
+        "action": action,
         "duration_seconds": body.get("duration_seconds"),
         "job_title": body.get("job_title"),
         "job_company": body.get("job_company"),
@@ -661,7 +705,7 @@ async def post_interaction(body: dict, user: dict = Depends(get_current_user)):
         "job_sector": body.get("job_sector"),
         "job_work_type": body.get("job_work_type"),
         "job_seniority": body.get("job_seniority"),
-        "job_url": body.get("job_url"),
+        "job_url": safe_url,
     }).execute()
     return {"success": True}
 
@@ -867,10 +911,16 @@ async def disconnect_linkedin(user: dict = Depends(get_current_user)):
 # ── LinkedIn Callback ─────────────────────────────────────────────────────────
 
 @app.get("/linkedin/callback")
-async def linkedin_callback(code: str = Query(default=""), error: str = Query(default="")):
+async def linkedin_callback(
+    code: str = Query(default=""),
+    error: str = Query(default=""),
+    state: str = Query(default=""),
+):
+    safe_state = re.sub(r"[^a-zA-Z0-9_-]", "", state)[:64]
     if error:
-        return RedirectResponse(url=f"jobreel://linkedin-callback?error={error}")
-    return RedirectResponse(url=f"jobreel://linkedin-callback?code={code}")
+        safe_error = error if error in ALLOWED_OAUTH_ERRORS else "unknown_error"
+        return RedirectResponse(url=f"jobreel://linkedin-callback?error={safe_error}&state={safe_state}")
+    return RedirectResponse(url=f"jobreel://linkedin-callback?code={code}&state={safe_state}")
 
 
 # ── Health ────────────────────────────────────────────────────────────────────

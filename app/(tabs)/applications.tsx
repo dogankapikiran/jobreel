@@ -21,6 +21,14 @@ import CompanyLogo from '@/components/CompanyLogo';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+function safeOpenURL(url: string): void {
+  try {
+    const { protocol } = new URL(url);
+    if (protocol !== 'https:' && protocol !== 'http:') return;
+    Linking.openURL(url).catch(() => {});
+  } catch { /* geçersiz URL */ }
+}
+
 function hexAlpha(hex: string, alpha: number): string {
   const r = parseInt(hex.slice(1, 3), 16);
   const g = parseInt(hex.slice(3, 5), 16);
@@ -56,7 +64,7 @@ function ApplicationCard({ job }: { job: Job }) {
 
   return (
     <TouchableOpacity
-      onPress={() => Linking.openURL(job.url).catch(() => {})}
+      onPress={() => safeOpenURL(job.url)}
       activeOpacity={0.78}
       style={styles.card}
     >

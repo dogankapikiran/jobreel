@@ -9,19 +9,18 @@ import {
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import * as Linking from 'expo-linking';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUserStore } from '@/store/userStore';
 import { api } from '@/services/api';
 import { COLORS, FONT_SIZES, RADII, SPACING } from '@/constants/theme';
 
 const LINKEDIN_CLIENT_ID = process.env.EXPO_PUBLIC_LINKEDIN_CLIENT_ID ?? '';
 const LINKEDIN_REDIRECT_URI = 'https://api.jobreel.app/linkedin/callback';
+const OAUTH_STATE_KEY = '@linkedin_oauth_state';
 
-const AUTH_URL =
-  `https://www.linkedin.com/oauth/v2/authorization?` +
-  `response_type=code` +
-  `&client_id=${LINKEDIN_CLIENT_ID}` +
-  `&redirect_uri=${encodeURIComponent(LINKEDIN_REDIRECT_URI)}` +
-  `&scope=openid%20profile%20email`;
+function generateState(): string {
+  return Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+}
 
 export default function LinkedInConnectModal() {
   const [connecting, setConnecting] = useState(false);
@@ -32,8 +31,19 @@ export default function LinkedInConnectModal() {
     setError(null);
     setConnecting(true);
     try {
+      const state = generateState();
+      await AsyncStorage.setItem(OAUTH_STATE_KEY, state);
+
+      const authUrl =
+        `https://www.linkedin.com/oauth/v2/authorization?` +
+        `response_type=code` +
+        `&client_id=${LINKEDIN_CLIENT_ID}` +
+        `&redirect_uri=${encodeURIComponent(LINKEDIN_REDIRECT_URI)}` +
+        `&scope=openid%20profile%20email` +
+        `&state=${state}`;
+
       const result = await WebBrowser.openAuthSessionAsync(
-        AUTH_URL,
+        authUrl,
         'jobreel://linkedin-callback'
       );
 
@@ -42,7 +52,17 @@ export default function LinkedInConnectModal() {
         return;
       }
 
-      const code = Linking.parse(result.url).queryParams?.code as string | undefined;
+      const params = Linking.parse(result.url).queryParams ?? {};
+      const returnedState = params.state as string | undefined;
+      const savedState = await AsyncStorage.getItem(OAUTH_STATE_KEY);
+      await AsyncStorage.removeItem(OAUTH_STATE_KEY);
+
+      if (!returnedState || returnedState !== savedState) {
+        setError('Güvenlik doğrulaması başarısız. Tekrar deneyin.');
+        return;
+      }
+
+      const code = params.code as string | undefined;
       if (!code) {
         setError('LinkedIn bağlantısı kurulamadı. Tekrar deneyin.');
         return;
