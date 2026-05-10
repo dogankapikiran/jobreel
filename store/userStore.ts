@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { persist } from 'zustand/middleware';
 import { Interaction, UserProfile } from '@/types';
+import { safeJSONStorage } from './safeStorage';
 
 const DEFAULT_PREFERENCES: UserProfile['preferences'] = {
   sectors: [],
@@ -61,7 +61,7 @@ export const useUserStore = create<UserState>()(
     }),
     {
       name: 'jobreel-user',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: safeJSONStorage,
     }
   )
 );

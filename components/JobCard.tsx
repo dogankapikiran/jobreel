@@ -28,6 +28,14 @@ interface Props {
   onNext?: () => void;
 }
 
+function safeOpenURL(url: string): void {
+  try {
+    const { protocol } = new URL(url);
+    if (protocol !== 'https:' && protocol !== 'http:') return;
+    Linking.openURL(url).catch(() => {});
+  } catch {}
+}
+
 function workTypeShort(wt: Job['workType']): string {
   switch (wt) {
     case 'remote': return 'UZAKTAN';
@@ -126,7 +134,7 @@ const JobCard = React.memo(function JobCard({ job, cardHeight }: Props) {
   }, [job]);
 
   const handleApply = useCallback(() => {
-    Linking.openURL(job.url).catch(() => {});
+    safeOpenURL(job.url);
     if (applied) return;
 
     let confirmed = false;

@@ -15,7 +15,9 @@ export default function Index() {
 
   useEffect(() => {
     const unsub = useUserStore.persist.onFinishHydration(() => setUserHydrated(true));
-    return () => unsub();
+    // Safety net: if hydration hangs (e.g. corrupted storage), unblock after 5s
+    const timeout = setTimeout(() => setUserHydrated(true), 5000);
+    return () => { unsub(); clearTimeout(timeout); };
   }, []);
 
   useEffect(() => {

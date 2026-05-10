@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { persist } from 'zustand/middleware';
 import { Job } from '@/types';
+import { safeJSONStorage } from './safeStorage';
 
 interface FeedState {
   jobs: Job[];
@@ -102,7 +102,7 @@ export const useFeedStore = create<FeedState>()(
     }),
     {
       name: 'jobreel-feed-v2',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: safeJSONStorage,
       partialize: (state) => ({
         savedJobs: state.savedJobs,
         savedTimestamps: state.savedTimestamps,

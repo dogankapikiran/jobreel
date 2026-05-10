@@ -1,6 +1,6 @@
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { persist } from 'zustand/middleware';
+import { safeJSONStorage } from './safeStorage';
 
 interface CompanyState {
   following: string[];
@@ -33,7 +33,7 @@ export const useCompanyStore = create<CompanyState>()(
     }),
     {
       name: 'jobreel-companies',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: safeJSONStorage,
     }
   )
 );

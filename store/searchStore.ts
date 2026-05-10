@@ -1,7 +1,7 @@
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { persist } from 'zustand/middleware';
 import { Seniority, WorkType } from '@/types';
+import { safeJSONStorage } from './safeStorage';
 
 export interface SavedSearch {
   id: string;
@@ -53,7 +53,7 @@ export const useSearchStore = create<SearchState>()(
     }),
     {
       name: 'jobreel-searches-v1',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: safeJSONStorage,
     }
   )
 );
