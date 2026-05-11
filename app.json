@@ -19,6 +19,8 @@
         "NSPhotoLibraryUsageDescription": "Profil fotoğrafı seçmek için galeri erişimine izin verin.",
         "CFBundleLocalizations": [
           "tr",
+          "en",
+          "tr",
           "en"
         ],
         "CFBundleDevelopmentRegion": "tr"
@@ -31,6 +33,7 @@
       },
       "package": "com.jobreel.app",
       "permissions": [
+        "android.permission.RECORD_AUDIO",
         "android.permission.RECORD_AUDIO"
       ]
     },
@@ -44,7 +47,7 @@
         "expo-splash-screen",
         {
           "image": "./assets/splash.png",
-          "resizeMode": "cover",
+          "resizeMode": "contain",
           "backgroundColor": "#0d0d14"
         }
       ],
@@ -54,6 +57,7 @@
           "photosPermission": "Profil fotoğrafı seçmek için galeri erişimine izin verin."
         }
       ],
+      "expo-document-picker",
       "expo-web-browser",
       [
         "expo-notifications",
@@ -74,6 +78,12 @@
         "projectId": "8d8216ba-e91e-41c1-a445-006f0c027430"
       }
     },
-    "owner": "dogankapikiran"
+    "owner": "dogankapikiran",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/8d8216ba-e91e-41c1-a445-006f0c027430"
+    }
   }
 }

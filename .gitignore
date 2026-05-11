@@ -33,3 +33,12 @@ npm-debug.*
 
 # Expo generated
 expo-env.d.ts
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Backup files
+*.bak
+*.orig

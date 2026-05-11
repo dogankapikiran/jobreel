@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -30,6 +30,11 @@ const FEATURES = [
 export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
   const { bg } = useTheme();
+  const { width } = useWindowDimensions();
+
+  const logoIconSize = Math.min(Math.round(width * 0.2), 100);
+  const logoFontSize = Math.min(Math.round(width * 0.096), 44);
+  const logoIconFontSize = Math.round(logoIconSize * 0.5);
 
   const logoAnim  = useRef(new Animated.Value(0)).current;
   const featAnim  = useRef(new Animated.Value(0)).current;
@@ -59,10 +64,13 @@ export default function WelcomeScreen() {
 
       {/* Logo */}
       <Animated.View style={[styles.logoSection, makeStyle(logoAnim)]}>
-        <LinearGradient colors={GRADIENTS[0]} style={styles.logoIcon}>
-          <Text style={styles.logoIconText}>J</Text>
+        <LinearGradient
+          colors={GRADIENTS[0]}
+          style={[styles.logoIcon, { width: logoIconSize, height: logoIconSize }]}
+        >
+          <Text style={[styles.logoIconText, { fontSize: logoIconFontSize }]}>J</Text>
         </LinearGradient>
-        <Text style={styles.logoText}>
+        <Text style={[styles.logoText, { fontSize: logoFontSize }]}>
           Job<Text style={styles.logoAccent}>Reel</Text>
         </Text>
         <Text style={styles.tagline}>İş bulmak artık Reels kadar kolay.</Text>
@@ -121,20 +129,16 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
   },
   logoIcon: {
-    width: 72,
-    height: 72,
     borderRadius: RADII.xl,
     alignItems: 'center',
     justifyContent: 'center',
   },
   logoIconText: {
     color: COLORS.white,
-    fontSize: 36,
     fontWeight: '800',
   },
   logoText: {
     color: COLORS.white,
-    fontSize: 36,
     fontWeight: '800',
     letterSpacing: -1,
   },

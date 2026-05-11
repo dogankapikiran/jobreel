@@ -62,6 +62,24 @@ export const useUserStore = create<UserState>()(
     {
       name: 'jobreel-user',
       storage: safeJSONStorage,
+      merge: (persisted: unknown, current: UserState): UserState => {
+        const p = persisted as Partial<UserState> | null;
+        return {
+          ...current,
+          ...p,
+          profile: {
+            ...current.profile,
+            ...(p?.profile ?? {}),
+            skills: p?.profile?.skills ?? current.profile.skills,
+            experience: p?.profile?.experience ?? current.profile.experience,
+            education: p?.profile?.education ?? current.profile.education,
+            preferences: {
+              ...current.profile.preferences,
+              ...(p?.profile?.preferences ?? {}),
+            },
+          },
+        };
+      },
     }
   )
 );

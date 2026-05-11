@@ -12,8 +12,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
-import * as DocumentPicker from 'expo-document-picker';
 import * as WebBrowser from 'expo-web-browser';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
@@ -81,7 +79,7 @@ export default function ProfileScreen() {
   function startEdit() {
     setDraftName(profile.name || '');
     setDraftTitle(profile.title || '');
-    setDraftLocation(profile.preferences.location || '');
+    setDraftLocation(prefs.location || '');
     setEditing(true);
   }
 
@@ -96,16 +94,23 @@ export default function ProfileScreen() {
       title: draftTitle,
       preferences: {
         location: draftLocation,
-        work_type: profile.preferences.workType,
-        seniority: profile.preferences.seniority,
-        salary_min: profile.preferences.salaryMin,
-        sectors: profile.preferences.sectors,
-        skills: profile.preferences.skills,
+        work_type: prefs.workType,
+        seniority: prefs.seniority,
+        salary_min: prefs.salaryMin,
+        sectors: prefs.sectors,
+        skills: prefs.skills,
       },
     }).catch(() => {});
   }
 
   async function handlePickCv() {
+    let DocumentPicker: typeof import('expo-document-picker');
+    try {
+      DocumentPicker = await import('expo-document-picker');
+    } catch {
+      Alert.alert('Hata', 'Doküman seçici bu cihazda desteklenmiyor.');
+      return;
+    }
     const result = await DocumentPicker.getDocumentAsync({
       type: 'application/pdf',
       copyToCacheDirectory: true,
@@ -117,25 +122,29 @@ export default function ProfileScreen() {
       const file = result.assets[0];
       const { signedUrl } = await api.getCvUploadUrl();
 
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('PUT', signedUrl);
-        xhr.setRequestHeader('Content-Type', 'application/pdf');
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) resolve();
-          else reject(new Error(`Upload HTTP ${xhr.status}: ${xhr.responseText}`));
-        };
-        xhr.onerror = () => reject(new Error('Ağ hatası'));
-        xhr.ontimeout = () => reject(new Error('Zaman aşımı'));
-        xhr.timeout = 30000;
-        xhr.send({ uri: file.uri, type: 'application/pdf', name: 'cv.pdf' } as any);
-      });
+      const fileResponse = await fetch(file.uri);
+      const blob = await fileResponse.blob();
+      const controller = new AbortController();
+      const uploadTimeout = setTimeout(() => controller.abort(), 30000);
+      try {
+        const uploadRes = await fetch(signedUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/pdf' },
+          body: blob,
+          signal: controller.signal,
+        });
+        clearTimeout(uploadTimeout);
+        if (!uploadRes.ok) throw new Error(`Upload HTTP ${uploadRes.status}`);
+      } catch (e) {
+        clearTimeout(uploadTimeout);
+        throw e;
+      }
 
       const { parsed } = await api.parseCv();
       setCvParsed(parsed);
 
       if (parsed.skills && parsed.skills.length > 0) {
-        const merged = Array.from(new Set([...profile.skills, ...parsed.skills]));
+        const merged = Array.from(new Set([...skills, ...parsed.skills]));
         setProfile({ skills: merged });
         api.updateProfile({ skills: merged }).catch(() => {});
       }
@@ -170,13 +179,20 @@ export default function ProfileScreen() {
   }
 
   async function handlePickAvatar() {
+    let ImagePicker: typeof import('expo-image-picker');
+    try {
+      ImagePicker = await import('expo-image-picker');
+    } catch {
+      Alert.alert('Hata', 'Fotoğraf seçici bu cihazda desteklenmiyor.');
+      return;
+    }
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('İzin Gerekli', 'Fotoğraf seçmek için galeri iznine ihtiyaç var.');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'] as ImagePicker.MediaType[],
+      mediaTypes: ['images'] as any,
       allowsEditing: true,
       aspect: [1, 1],
       quality: 0.7,
@@ -204,15 +220,18 @@ export default function ProfileScreen() {
     }
   }
 
+  const skills = profile.skills ?? [];
+  const prefs = profile.preferences ?? { sectors: [], seniority: [], workType: 'any', location: '', salaryMin: 0, skills: [] };
+
   const completionItems = [
     { label: 'Ad Soyad', points: 15, done: !!profile.name },
     { label: 'Ünvan', points: 10, done: !!profile.title },
-    { label: 'Yetenek (en az 3)', points: 20, done: profile.skills.length >= 3 },
-    { label: 'Sektör tercihleri', points: 15, done: profile.preferences.sectors.length > 0 },
+    { label: 'Yetenek (en az 3)', points: 20, done: skills.length >= 3 },
+    { label: 'Sektör tercihleri', points: 15, done: (prefs.sectors ?? []).length > 0 },
     { label: 'Fotoğraf', points: 10, done: !!profile.avatarUrl },
     { label: 'LinkedIn bağla', points: 15, done: !!profile.linkedInConnected },
     { label: 'CV Yükle', points: 10, done: !!cvParsed },
-    { label: 'Konum', points: 5, done: !!profile.preferences.location },
+    { label: 'Konum', points: 5, done: !!prefs.location },
   ];
   const completionScore = completionItems.filter((i) => i.done).reduce((sum, i) => sum + i.points, 0);
   const firstMissing = completionItems.find((i) => !i.done);
@@ -221,12 +240,12 @@ export default function ProfileScreen() {
   const initial = displayName.charAt(0).toUpperCase();
 
   const workTypeLabel =
-    profile.preferences.workType === 'any' ? 'Farketmez' :
-    profile.preferences.workType === 'remote' ? 'Remote' :
-    profile.preferences.workType === 'hybrid' ? 'Hibrit' : 'Ofis';
+    prefs.workType === 'any' ? 'Farketmez' :
+    prefs.workType === 'remote' ? 'Remote' :
+    prefs.workType === 'hybrid' ? 'Hibrit' : 'Ofis';
 
   const seniorityLabelMap: Record<string, string> = { junior: 'Junior', mid: 'Mid-Level', senior: 'Senior', lead: 'Lead' };
-  const seniorityLabel = (Array.isArray(profile.preferences.seniority) ? profile.preferences.seniority : [])
+  const seniorityLabel = (Array.isArray(prefs.seniority) ? prefs.seniority : [])
     .map(s => seniorityLabelMap[s] ?? s).join(', ') || 'Belirtilmemiş';
 
   return (
@@ -308,8 +327,8 @@ export default function ProfileScreen() {
               <>
                 <Text style={styles.name}>{displayName}</Text>
                 {profile.title ? <Text style={styles.jobTitle}>{profile.title}</Text> : null}
-                {profile.preferences.location ? (
-                  <Text style={styles.location}>📍 {profile.preferences.location}</Text>
+                {prefs.location ? (
+                  <Text style={styles.location}>📍 {prefs.location}</Text>
                 ) : null}
               </>
             )}
@@ -344,7 +363,7 @@ export default function ProfileScreen() {
             <View style={styles.statDivider} />
             <StatCard value={appliedJobs.length} label="Başvurulan" colors={colors} />
             <View style={styles.statDivider} />
-            <StatCard value={profile.skills.length} label="Yetenek" colors={colors} />
+            <StatCard value={skills.length} label="Yetenek" colors={colors} />
           </View>
 
           {/* Preferences summary */}
@@ -371,18 +390,18 @@ export default function ProfileScreen() {
                 <Text style={styles.infoIcon}>🏙️</Text>
                 <View style={styles.infoContent}>
                   <Text style={styles.infoLabel}>Şehir</Text>
-                  <Text style={styles.infoValue}>{profile.preferences.location || 'Belirtilmemiş'}</Text>
+                  <Text style={styles.infoValue}>{prefs.location || 'Belirtilmemiş'}</Text>
                 </View>
               </View>
             </View>
           </View>
 
           {/* Skills */}
-          {profile.skills.length > 0 && (
+          {skills.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Yetenekler</Text>
               <View style={styles.skillsWrap}>
-                {profile.skills.map((skill) => (
+                {skills.map((skill) => (
                   <View key={skill} style={styles.skillChip}>
                     <Text style={styles.skillText}>{skill}</Text>
                   </View>
