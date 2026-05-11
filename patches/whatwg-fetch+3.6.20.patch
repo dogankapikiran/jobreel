@@ -1,0 +1,21 @@
+diff --git a/node_modules/whatwg-fetch/dist/fetch.umd.js b/node_modules/whatwg-fetch/dist/fetch.umd.js
+index 7a0d852..148f5e7 100644
+--- a/node_modules/whatwg-fetch/dist/fetch.umd.js
++++ b/node_modules/whatwg-fetch/dist/fetch.umd.js
+@@ -558,7 +558,15 @@
+         options.url = 'responseURL' in xhr ? xhr.responseURL : options.headers.get('X-Request-URL');
+         var body = 'response' in xhr ? xhr.response : xhr.responseText;
+         setTimeout(function() {
+-          resolve(new Response(body, options));
++          if (options.status === 0) {
++            reject(new TypeError('Network request failed'));
++          } else {
++            try {
++              resolve(new Response(body, options));
++            } catch (e) {
++              reject(new TypeError('Network request failed'));
++            }
++          }
+         }, 0);
+       };
+ 

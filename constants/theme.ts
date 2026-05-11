@@ -2,7 +2,30 @@ import { Dimensions } from 'react-native';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-export const COLORS = {
+export interface ThemeColors {
+  bg: string;
+  bgDeep: string;
+  accent: string;
+  accentLight: string;
+  success: string;
+  successLight: string;
+  warning: string;
+  danger: string;
+  white: string;
+  black: string;
+  text: string;
+  textMuted: string;
+  textDim: string;
+  cardBorder: string;
+  cardBg: string;
+  navBg: string;
+  navBorder: string;
+  headerBtnBg: string;
+  headerBtnBorder: string;
+  isDark: boolean;
+}
+
+export const DARK_COLORS: ThemeColors = {
   bg: '#0d0d14',
   bgDeep: '#0a0a0f',
   accent: '#7c6dfa',
@@ -13,19 +36,57 @@ export const COLORS = {
   danger: '#ff4444',
 
   white: '#ffffff',
+  black: '#000000',
   text: 'rgba(255,255,255,0.9)',
   textMuted: 'rgba(255,255,255,0.5)',
   textDim: 'rgba(255,255,255,0.35)',
 
   cardBorder: 'rgba(255,255,255,0.07)',
-  cardBg: 'rgba(255,255,255,0.04)',
+  cardBg: 'rgba(255,255,255,0.05)',
 
-  navBg: 'rgba(13,13,20,0.97)',
+  navBg: 'rgba(10,10,18,0.97)',
   navBorder: 'rgba(255,255,255,0.06)',
 
   headerBtnBg: 'rgba(255,255,255,0.08)',
   headerBtnBorder: 'rgba(255,255,255,0.1)',
+  isDark: true,
 };
+
+export const LIGHT_COLORS: ThemeColors = {
+  bg: '#f2f2f7',
+  bgDeep: '#ffffff',
+  accent: '#6c5ce7',
+  accentLight: '#8b7ff5',
+  success: '#2ecc71',
+  successLight: '#5ddb8f',
+  warning: '#f59e0b',
+  danger: '#ef4444',
+
+  white: '#ffffff',
+  black: '#000000',
+  text: 'rgba(0,0,0,0.88)',
+  textMuted: 'rgba(0,0,0,0.5)',
+  textDim: 'rgba(0,0,0,0.3)',
+
+  cardBorder: 'rgba(0,0,0,0.08)',
+  cardBg: 'rgba(0,0,0,0.04)',
+
+  navBg: 'rgba(242,242,247,0.95)',
+  navBorder: 'rgba(0,0,0,0.1)',
+
+  headerBtnBg: 'rgba(0,0,0,0.06)',
+  headerBtnBorder: 'rgba(0,0,0,0.1)',
+  isDark: false,
+};
+
+export const COLORS = DARK_COLORS;
+
+export const ACCENT_GRADIENT: [string, string] = ['#7c6dfa', '#4facfe'];
+
+export const ACCENT_GRADIENT_OPACITY = (opacity: number): [string, string] => [
+  `rgba(124,109,250,${opacity})`,
+  `rgba(79,172,254,${opacity})`,
+];
 
 // Per-company gradient pairs [from, to]
 export const GRADIENTS: [string, string][] = [

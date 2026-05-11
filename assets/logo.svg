@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0D0D1A"/>
+      <stop offset="100%" stop-color="#1A1040"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#A855F7"/>
+      <stop offset="100%" stop-color="#6366F1"/>
+    </linearGradient>
+    <linearGradient id="accentH" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#A855F7"/>
+      <stop offset="100%" stop-color="#6366F1"/>
+    </linearGradient>
+    <linearGradient id="hubGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#C084FC"/>
+      <stop offset="100%" stop-color="#818CF8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background rounded square -->
+  <rect width="1024" height="1024" rx="200" ry="200" fill="url(#bg)"/>
+
+  <!-- Ambient glow -->
+  <circle cx="512" cy="570" r="340" fill="#7C3AED" opacity="0.07"/>
+
+  <!-- Briefcase handle -->
+  <path d="M 392 318 L 392 232 Q 392 182 442 182 L 582 182 Q 632 182 632 232 L 632 318"
+        fill="none"
+        stroke="url(#accentH)"
+        stroke-width="52"
+        stroke-linecap="round"
+        stroke-linejoin="round"/>
+
+  <!-- Handle inner cutout (depth effect) -->
+  <path d="M 418 318 L 418 242 Q 418 212 448 212 L 576 212 Q 606 212 606 242 L 606 318"
+        fill="none"
+        stroke="#0D0D1A"
+        stroke-width="20"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        opacity="0.5"/>
+
+  <!-- Outer reel ring -->
+  <circle cx="512" cy="568" r="268" fill="#0D0D1A" stroke="url(#accent)" stroke-width="44"/>
+
+  <!-- Inner decorative ring -->
+  <circle cx="512" cy="568" r="178" fill="none" stroke="url(#accent)" stroke-width="10" opacity="0.22"/>
+
+  <!-- Reel holes — 3 at 120° intervals, radius 128 from center -->
+  <!-- Top: (512, 440) -->
+  <circle cx="512" cy="440" r="32" fill="#0D0D1A" stroke="url(#accent)" stroke-width="12"/>
+  <!-- Bottom-right: cos(-30°)=0.866, sin(-30°)=-0.5 → (623, 632) -->
+  <circle cx="623" cy="632" r="32" fill="#0D0D1A" stroke="url(#accent)" stroke-width="12"/>
+  <!-- Bottom-left: cos(210°)=-0.866, sin(210°)=-0.5 → (401, 632) -->
+  <circle cx="401" cy="632" r="32" fill="#0D0D1A" stroke="url(#accent)" stroke-width="12"/>
+
+  <!-- Center hub -->
+  <circle cx="512" cy="568" r="54" fill="url(#hubGrad)"/>
+  <circle cx="512" cy="568" r="26" fill="#0D0D1A" opacity="0.45"/>
+
+  <!-- Play triangle (sits on top of hub) -->
+  <polygon points="470,500 470,636 612,568" fill="white" opacity="0.93"/>
+</svg>

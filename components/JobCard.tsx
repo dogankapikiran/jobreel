@@ -1,18 +1,23 @@
-import React, { useRef } from 'react';
-import { Linking, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback } from 'react';
+import { Alert, AppState, Linking, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Job } from '@/types';
+import { Ionicons } from '@expo/vector-icons';
+import { router } from 'expo-router';
+import { EmploymentType, Job, Seniority } from '@/types';
 import {
-  CARD_BACKGROUNDS,
   COLORS,
   FONT_SIZES,
-  GRADIENTS,
   RADII,
   SPACING,
 } from '@/constants/theme';
-import { timeAgo } from '@/services/adzuna';
+import { timeAgo } from '@/services/api';
 import { useFeedStore } from '@/store/feedStore';
 import { useUserStore } from '@/store/userStore';
+import { useCompanyStore } from '@/store/companyStore';
+import { api } from '@/services/api';
+import { track } from '@/services/analytics';
+import { useBrandColor } from '@/hooks/useBrandColor';
+import CompanyLogo from './CompanyLogo';
 import TagBadge from './TagBadge';
 import SalaryBlock from './SalaryBlock';
 import ActionButtons from './ActionButtons';
@@ -23,262 +28,503 @@ interface Props {
   onNext?: () => void;
 }
 
-function workTypeInfo(wt: Job['workType']): { icon: string; label: string } {
-  switch (wt) {
-    case 'remote':  return { icon: '🌍', label: 'Remote' };
-    case 'hybrid':  return { icon: '🏠', label: 'Hibrit' };
-    case 'office':  return { icon: '🏢', label: 'Ofis' };
-    default:        return { icon: '📍', label: 'Belirtilmemiş' };
-  }
+function safeOpenURL(url: string): void {
+  try {
+    const { protocol } = new URL(url);
+    if (protocol !== 'https:' && protocol !== 'http:') return;
+    Linking.openURL(url).catch(() => {});
+  } catch {}
 }
 
-function seniorityLabel(s: Job['seniority']): string {
-  switch (s) {
-    case 'junior': return 'Junior';
-    case 'mid':    return 'Mid-Level';
-    case 'senior': return 'Senior';
-    case 'lead':   return 'Lead';
+function workTypeShort(wt: Job['workType']): string {
+  switch (wt) {
+    case 'remote': return 'UZAKTAN';
+    case 'hybrid': return 'HİBRİT';
+    case 'office': return 'OFİS';
     default:       return '';
   }
 }
 
-export default function JobCard({ job, cardHeight, onNext }: Props) {
+function workTypeLabel(wt: Job['workType']): string {
+  switch (wt) {
+    case 'remote': return 'Uzaktan';
+    case 'hybrid': return 'Hibrit';
+    case 'office': return 'Ofis';
+    default:       return '';
+  }
+}
+
+function employmentLabel(e: EmploymentType): string | null {
+  switch (e) {
+    case 'fulltime':   return 'Tam Zamanlı';
+    case 'parttime':   return 'Yarı Zamanlı';
+    case 'contract':   return 'Sözleşmeli';
+    case 'internship': return 'Staj';
+    default:           return null;
+  }
+}
+
+function seniorityLabel(s: Seniority): string {
+  switch (s) {
+    case 'junior': return 'JUNIOR';
+    case 'mid':    return 'MİD';
+    case 'senior': return 'SENİOR';
+    case 'lead':   return 'LEAD';
+    default:       return '';
+  }
+}
+
+function scoreColor(score: number): string {
+  if (score >= 80) return '#4ade80';
+  if (score >= 60) return '#fbbf24';
+  return '#94a3b8';
+}
+
+/** Hex rengi belirli bir opaklıkta rgba string'e dönüştürür */
+function hexAlpha(hex: string, alpha: number): string {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
+
+const JobCard = React.memo(function JobCard({ job, cardHeight }: Props) {
   const { saveJob, unsaveJob, isSaved, markApplied, isApplied } = useFeedStore();
   const { addInteraction } = useUserStore();
-  const viewStart = useRef(Date.now());
+  const { isFollowing, follow, unfollow } = useCompanyStore();
 
-  const saved   = isSaved(job.id);
-  const applied = isApplied(job.id);
-  const wt      = workTypeInfo(job.workType);
-  const sl      = seniorityLabel(job.seniority);
+  const followed = isFollowing(job.company);
+  const saved    = isSaved(job.id);
+  const applied  = isApplied(job.id);
 
-  const cardBg    = CARD_BACKGROUNDS[job.accentIndex % CARD_BACKGROUNDS.length];
-  const gradient  = GRADIENTS[job.accentIndex % GRADIENTS.length];
-  const accent    = gradient[0];
+  const handleToggleFollow = useCallback(() => {
+    if (followed) {
+      unfollow(job.company);
+      api.unfollowCompany(job.company).catch(() => {});
+    } else {
+      follow(job.company);
+      api.followCompany(job.company).catch(() => {});
+    }
+  }, [followed, job.company, follow, unfollow]);
 
-  function handlePass() {
-    const dur = Math.round((Date.now() - viewStart.current) / 1000);
-    addInteraction({ jobId: job.id, action: 'skip', durationSeconds: dur, timestamp: Date.now() });
-    onNext?.();
-  }
+  const { cardBg, gradient, accent } = useBrandColor(job.company);
 
-  function handleSave() {
+  const sl   = seniorityLabel(job.seniority);
+  const wts  = workTypeShort(job.workType);
+  const wtl  = workTypeLabel(job.workType);
+  const el   = employmentLabel(job.employmentType);
+  const city = job.location.split(',')[0]?.trim() || '';
+
+  const chipParts = [sl, wts].filter(Boolean);
+
+  const handleSave = useCallback(() => {
     if (saved) {
       unsaveJob(job.id);
+      api.unsaveJob(job.id).catch(() => {});
     } else {
       saveJob(job);
       addInteraction({ jobId: job.id, action: 'save', timestamp: Date.now() });
+      api.postInteraction(job.id, 'save', job).catch(() => {});
+      track('Job Saved', { job_id: job.id, company: job.company, title: job.title, score: job.score });
     }
-  }
+  }, [saved, job, saveJob, unsaveJob, addInteraction]);
 
-  function handleApply() {
-    if (!applied) {
-      markApplied(job.id);
-      addInteraction({ jobId: job.id, action: 'apply', timestamp: Date.now() });
-    }
-    Linking.openURL(job.url).catch(() => {});
-  }
+  const handleShare = useCallback(() => {
+    Share.share({ message: `${job.title} – ${job.company}\n${job.url}` });
+  }, [job]);
+
+  const handleApply = useCallback(() => {
+    safeOpenURL(job.url);
+    if (applied) return;
+
+    let confirmed = false;
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && !confirmed) {
+        confirmed = true;
+        sub.remove();
+        setTimeout(() => {
+          Alert.alert(
+            'Başvuru tamamlandı mı?',
+            `${job.company} pozisyonuna başvurdunuz mu?`,
+            [
+              {
+                text: 'Evet, başvurdum',
+                onPress: () => {
+                  markApplied(job);
+                  addInteraction({ jobId: job.id, action: 'apply', timestamp: Date.now() });
+                  api.postInteraction(job.id, 'apply', job).catch(() => {});
+                  track('Job Applied', { job_id: job.id, company: job.company, title: job.title, score: job.score });
+                },
+              },
+              { text: 'Hayır', style: 'cancel' },
+            ]
+          );
+        }, 400);
+      }
+    });
+  }, [applied, job, markApplied, addInteraction]);
+
+  const handleExplore = useCallback(() => {
+    addInteraction({ jobId: job.id, action: 'view', timestamp: Date.now() });
+    api.postInteraction(job.id, 'view', job).catch(() => {});
+    track('Job Detail Viewed', { job_id: job.id, company: job.company, title: job.title, score: job.score });
+    router.push(`/job/${job.id}`);
+  }, [job, addInteraction]);
 
   return (
-    <View style={[styles.card, { height: cardHeight }]}>
-      {/* Background gradient */}
-      <LinearGradient
-        colors={cardBg}
-        locations={[0, 0.5, 1]}
-        start={{ x: 0.2, y: 0 }}
-        end={{ x: 0.8, y: 1 }}
-        style={StyleSheet.absoluteFillObject}
-      />
+    <View style={[styles.outer, { height: cardHeight }]}>
+      <View style={styles.inner}>
+        {/* Arka plan: koyu tinted base */}
+        <LinearGradient
+          colors={cardBg}
+          locations={[0, 0.55, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+        {/* Sağ üst köşe radial taklidi — CSS radial-gradient(at 90% 10%) approx */}
+        <LinearGradient
+          colors={[hexAlpha(gradient[0], 0.65), hexAlpha(gradient[0], 0.18), 'transparent']}
+          locations={[0, 0.42, 0.75]}
+          start={{ x: 1, y: 0 }}
+          end={{ x: 0.05, y: 0.95 }}
+          style={StyleSheet.absoluteFillObject}
+        />
+        {/* Sol alt köşe hafif ambient — CSS radial-gradient(at -10% 110%) approx */}
+        <LinearGradient
+          colors={['transparent', hexAlpha(accent, 0.10), hexAlpha(accent, 0.20)]}
+          locations={[0.45, 0.78, 1]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
+          style={StyleSheet.absoluteFillObject}
+        />
 
-      {/* Decorative glow circle */}
-      <View style={[styles.bgCircle, { backgroundColor: accent }]} />
+        {/* Şirket satırı */}
+        <View style={styles.companyRow}>
+          {/* Sol: logo + isim + tarih */}
+          <TouchableOpacity onPress={handleToggleFollow} activeOpacity={0.7} style={styles.companyLeft}>
+            <CompanyLogo
+              company={job.company}
+              gradient={gradient}
+              size={42}
+              borderRadius={RADII.md}
+            />
+            <View style={styles.companyMeta}>
+              <View style={styles.companyNameRow}>
+                <Text style={styles.companyName}>{job.company}</Text>
+                <Text style={[styles.followBadge, followed && styles.followBadgeActive]}>
+                  {followed ? '★' : '☆'}
+                </Text>
+              </View>
+              <Text style={styles.postedAt}>{timeAgo(job.postedAt)}</Text>
+            </View>
+          </TouchableOpacity>
 
-      {/* Company row */}
-      <View style={styles.companyRow}>
-        <LinearGradient colors={gradient} style={styles.logo}>
-          <Text style={styles.logoLetter}>{job.company.charAt(0).toUpperCase()}</Text>
-        </LinearGradient>
+          {/* Sağ: ikon çifti + eşleşme skoru */}
+          <View style={styles.rightColumn}>
+            <View style={styles.iconPair}>
+              <TouchableOpacity
+                onPress={handleSave}
+                activeOpacity={0.7}
+                style={[styles.iconBtn, saved && styles.iconBtnSaved]}
+              >
+                <Ionicons
+                  name={saved ? 'bookmark' : 'bookmark-outline'}
+                  size={16}
+                  color={saved ? '#f59e0b' : 'rgba(255,255,255,0.6)'}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity onPress={handleShare} activeOpacity={0.7} style={styles.iconBtn}>
+                <Ionicons name="share-outline" size={16} color="rgba(255,255,255,0.6)" />
+              </TouchableOpacity>
+            </View>
 
-        <View style={styles.companyMeta}>
-          <Text style={styles.companyName}>{job.company}</Text>
-          <View style={styles.metaLine}>
-            <View style={styles.onlineDot} />
-            <Text style={styles.metaText}>{job.location} · {timeAgo(job.postedAt)}</Text>
+            {job.score !== undefined && (
+              <View style={styles.scoreBlock}>
+                <Text style={[styles.scoreLabel, { color: scoreColor(job.score) }]}>EŞLEŞME</Text>
+                <View style={styles.scoreNumberRow}>
+                  <Text style={styles.scoreNumber}>{job.score}</Text>
+                  <Text style={styles.scorePercent}>%</Text>
+                </View>
+                <View style={styles.scoreBarBg}>
+                  <View
+                    style={[
+                      styles.scoreBarFill,
+                      { width: `${job.score}%` as any, backgroundColor: scoreColor(job.score) },
+                    ]}
+                  />
+                </View>
+              </View>
+            )}
           </View>
         </View>
 
-        <View style={[styles.newBadge, { backgroundColor: `${accent}22`, borderColor: `${accent}55` }]}>
-          <Text style={[styles.newBadgeText, { color: accent }]}>YENİ</Text>
+        {/* Seniority + WorkType chip — brand rengiyle */}
+        {chipParts.length > 0 && (
+          <View style={[
+            styles.seniorityChip,
+            { borderColor: hexAlpha(accent, 0.45), backgroundColor: hexAlpha(accent, 0.14) },
+          ]}>
+            <Text style={[styles.seniorityChipText, { color: accent }]}>
+              {chipParts.join(' · ')}
+            </Text>
+          </View>
+        )}
+
+        {/* Başlık */}
+        <Text style={styles.title} numberOfLines={2}>{job.title}</Text>
+
+        {/* Konum pill */}
+        <View style={styles.locationPill}>
+          <View style={[styles.locationIconBox, { backgroundColor: hexAlpha(accent, 0.18) }]}>
+            <Ionicons name="location-outline" size={13} color={accent} />
+          </View>
+          <View>
+            <Text style={styles.locationCity}>{city || job.location}</Text>
+            {(wtl || el) ? (
+              <Text style={styles.locationSub}>{[wtl, el].filter(Boolean).join(' · ')}</Text>
+            ) : null}
+          </View>
         </View>
+
+        {/* Skill tag chips */}
+        {job.skills && job.skills.length > 0 && (
+          <View style={styles.tags}>
+            {job.skills.slice(0, 5).map((tag) => (
+              <TagBadge key={tag} label={tag} />
+            ))}
+          </View>
+        )}
+
+        {/* Maaş */}
+        <SalaryBlock
+          salaryMin={job.salaryMin}
+          salaryMax={job.salaryMax}
+          currency={job.salaryCurrency}
+          period={job.salaryPeriod}
+          accent={accent}
+        />
+
+        {/* Coaching Pill */}
+        {job.missingSkills && job.missingSkills.length > 0 && (
+          <View style={[styles.coachingPill, { borderColor: hexAlpha(accent, 0.3), backgroundColor: hexAlpha(accent, 0.1) }]}>
+            <Text style={[styles.coachingIcon, { color: accent }]}>✦</Text>
+            <Text style={[styles.coachingText, { color: accent }]} numberOfLines={1}>
+              {`${job.missingSkills.slice(0, 2).join(', ')}${job.missingSkills.length > 2 ? ` +${job.missingSkills.length - 2}` : ''} ekle${job.potentialScore ? ` → %${job.potentialScore}` : ''}`}
+            </Text>
+          </View>
+        )}
+
+        <View style={{ flex: 1 }} />
+
+        <ActionButtons
+          isApplied={applied}
+          onApply={handleApply}
+          onExplore={handleExplore}
+        />
       </View>
-
-      {/* Title */}
-      <Text style={styles.title}>{job.title}</Text>
-      <Text style={styles.subtitle}>{job.sector}</Text>
-
-      {/* Tags */}
-      <View style={styles.tags}>
-        <TagBadge label={`${wt.icon} ${wt.label}`} variant={job.workType} />
-        <TagBadge label="Tam Zamanlı" />
-        {sl ? <TagBadge label={sl} variant={job.seniority} /> : null}
-      </View>
-
-      {/* Salary */}
-      <SalaryBlock
-        salaryMin={job.salaryMin}
-        salaryMax={job.salaryMax}
-        currency={job.salaryCurrency}
-        period={job.salaryPeriod}
-        accentIndex={job.accentIndex}
-      />
-
-      {/* Info pills */}
-      <View style={styles.pills}>
-        <View style={styles.pill}>
-          <Text style={styles.pillIcon}>{wt.icon}</Text>
-          <Text style={styles.pillPrimary}>{wt.label}</Text>
-          <Text style={styles.pillSub}>Çalışma tipi</Text>
-        </View>
-        <View style={styles.pill}>
-          <Text style={styles.pillIcon}>⚡</Text>
-          <Text style={styles.pillPrimary}>Hızlı</Text>
-          <Text style={styles.pillSub}>Yanıt</Text>
-        </View>
-        <View style={styles.pill}>
-          <Text style={styles.pillIcon}>👥</Text>
-          <Text style={styles.pillPrimary}>{job.companySize ?? '?'}</Text>
-          <Text style={styles.pillSub}>Çalışan</Text>
-        </View>
-      </View>
-
-      {/* Actions */}
-      <ActionButtons
-        accentIndex={job.accentIndex}
-        isSaved={saved}
-        isApplied={applied}
-        onPass={handlePass}
-        onSave={handleSave}
-        onApply={handleApply}
-      />
     </View>
   );
-}
+});
+
+export default JobCard;
 
 const styles = StyleSheet.create({
-  card: {
+  /* Outer wrapper: tam yükseklik + kenar boşlukları */
+  outer: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  /* İç kart: yuvarlatılmış köşe + kenarlık */
+  inner: {
+    flex: 1,
+    borderRadius: 28,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    overflow: 'hidden',
     padding: SPACING.lg,
     paddingBottom: SPACING.md,
-    overflow: 'hidden',
-  },
-  bgCircle: {
-    position: 'absolute',
-    top: -60,
-    right: -60,
-    width: 280,
-    height: 280,
-    borderRadius: 140,
-    opacity: 0.06,
   },
   companyRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm + 4,
-    marginBottom: SPACING.lg + 4,
+    alignItems: 'flex-start',
+    marginBottom: SPACING.md,
+    gap: SPACING.sm,
   },
-  logo: {
-    width: 52,
-    height: 52,
-    borderRadius: RADII.md,
+  companyLeft: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoLetter: {
-    color: COLORS.white,
-    fontSize: FONT_SIZES.xl,
-    fontWeight: '800',
+    gap: SPACING.sm + 2,
   },
   companyMeta: {
     flex: 1,
+  },
+  companyNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    marginBottom: 3,
   },
   companyName: {
     color: COLORS.white,
     fontSize: FONT_SIZES.md,
     fontWeight: '700',
-    marginBottom: 3,
   },
-  metaLine: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs + 2,
-  },
-  onlineDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: COLORS.success,
-  },
-  metaText: {
-    fontSize: FONT_SIZES.xs,
+  followBadge: {
+    fontSize: 14,
     color: COLORS.textDim,
   },
-  newBadge: {
-    paddingHorizontal: SPACING.sm + 2,
-    paddingVertical: SPACING.xs,
-    borderRadius: RADII.full,
-    borderWidth: 1,
+  followBadgeActive: {
+    color: '#f59e0b',
   },
-  newBadgeText: {
-    fontSize: 11,
+  postedAt: {
+    fontSize: FONT_SIZES.xs,
+    color: 'rgba(255,255,255,0.5)',
+  },
+  rightColumn: {
+    alignItems: 'flex-end',
+    gap: 8,
+    flexShrink: 0,
+  },
+  iconPair: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.10)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconBtnSaved: {
+    backgroundColor: 'rgba(245,158,11,0.18)',
+    borderColor: 'rgba(245,158,11,0.45)',
+  },
+  scoreBlock: {
+    alignItems: 'flex-end',
+  },
+  scoreLabel: {
+    fontSize: 9,
+    fontWeight: '600',
+    letterSpacing: 1,
+    textTransform: 'uppercase',
+    marginBottom: 2,
+  },
+  scoreNumberRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 1,
+  },
+  scoreNumber: {
+    color: COLORS.white,
+    fontSize: 28,
     fontWeight: '700',
-    letterSpacing: 0.3,
+    letterSpacing: -0.5,
+    lineHeight: 30,
+  },
+  scorePercent: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  scoreBarBg: {
+    marginTop: 4,
+    width: 70,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    overflow: 'hidden',
+  },
+  scoreBarFill: {
+    height: 3,
+    borderRadius: 2,
+  },
+  seniorityChip: {
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderRadius: RADII.full,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    marginTop: SPACING.md,
+    marginBottom: SPACING.sm,
+  },
+  seniorityChipText: {
+    fontSize: 10.5,
+    fontWeight: '600',
+    letterSpacing: 0.12 * 10,
+    textTransform: 'uppercase',
   },
   title: {
     color: COLORS.white,
-    fontSize: FONT_SIZES.title,
-    fontWeight: '800',
-    letterSpacing: -0.8,
-    lineHeight: 36,
-    marginBottom: SPACING.xs + 2,
+    fontSize: 36,
+    fontWeight: '700',
+    letterSpacing: -1.4,
+    lineHeight: 38,
+    marginTop: 10,
+    marginBottom: SPACING.md + 4,
   },
-  subtitle: {
+  locationPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'stretch',
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.08)',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: SPACING.md,
+    gap: 10,
+  },
+  locationIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 9,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  locationCity: {
+    color: COLORS.white,
     fontSize: FONT_SIZES.sm,
-    color: COLORS.textDim,
-    marginBottom: SPACING.lg + 4,
+    fontWeight: '600',
+  },
+  locationSub: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: FONT_SIZES.xs,
+    marginTop: 2,
   },
   tags: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: SPACING.sm,
-    marginBottom: SPACING.lg + 4,
+    gap: SPACING.xs + 2,
+    marginBottom: SPACING.md,
   },
-  pills: {
+  coachingPill: {
     flexDirection: 'row',
-    gap: SPACING.sm + 2,
-    marginBottom: SPACING.lg,
-  },
-  pill: {
-    flex: 1,
-    backgroundColor: COLORS.cardBg,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-    borderRadius: RADII.md,
-    padding: SPACING.sm + 4,
     alignItems: 'center',
+    gap: SPACING.xs,
+    marginTop: SPACING.sm,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderRadius: 14,
+    paddingHorizontal: 13,
+    paddingVertical: 10,
+    alignSelf: 'stretch',
   },
-  pillIcon: {
-    fontSize: 18,
-    marginBottom: SPACING.xs,
-  },
-  pillPrimary: {
-    color: COLORS.text,
+  coachingIcon: {
     fontSize: 12,
-    fontWeight: '500',
-    textAlign: 'center',
+    flexShrink: 0,
   },
-  pillSub: {
-    color: COLORS.textMuted,
-    fontSize: FONT_SIZES.xs,
-    textAlign: 'center',
-    lineHeight: 14,
+  coachingText: {
+    fontSize: FONT_SIZES.xs + 0.5,
+    fontWeight: '500',
+    flex: 1,
+    lineHeight: 16,
   },
 });

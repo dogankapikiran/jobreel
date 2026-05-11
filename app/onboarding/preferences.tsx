@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
+  ActivityIndicator,
   ScrollView,
   StyleSheet,
   Text,
@@ -8,11 +9,13 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUserStore } from '@/store/userStore';
+import { api } from '@/services/api';
 import { Seniority, WorkType } from '@/types';
-import { COLORS, FONT_SIZES, GRADIENTS, RADII, SPACING } from '@/constants/theme';
+import { FONT_SIZES, GRADIENTS, RADII, SPACING, ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 const SECTORS = [
   'Yazılım & Teknoloji', 'E-ticaret', 'Fintech', 'Gaming',
@@ -35,13 +38,20 @@ const SENIORITY_OPTIONS: { value: Seniority; label: string; desc: string }[] = [
 
 export default function PreferencesScreen() {
   const insets = useSafeAreaInsets();
+  const colors = useTheme();
   const { profile, setPreferences } = useUserStore();
   const prefs = profile.preferences;
+  const { edit } = useLocalSearchParams<{ edit?: string }>();
+  const isEditMode = edit === '1';
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [sectors, setSectors] = useState<string[]>(prefs.sectors);
   const [workType, setWorkType] = useState<WorkType | 'any'>(prefs.workType);
-  const [seniority, setSeniority] = useState<Seniority>(prefs.seniority);
+  const [seniority, setSeniority] = useState<Seniority[]>(
+    Array.isArray(prefs.seniority) ? prefs.seniority : prefs.seniority ? [prefs.seniority as unknown as Seniority] : []
+  );
   const [location, setLocation] = useState(prefs.location || 'İstanbul');
+  const [saving, setSaving] = useState(false);
 
   function toggleSector(s: string) {
     setSectors((prev) =>
@@ -49,9 +59,24 @@ export default function PreferencesScreen() {
     );
   }
 
-  function handleContinue() {
+  async function handleContinue() {
     setPreferences({ sectors, workType, seniority, location });
-    router.push('/onboarding/cv');
+    if (isEditMode) {
+      setSaving(true);
+      api.updateProfile({
+        preferences: {
+          sectors,
+          work_type: workType,
+          seniority,
+          location,
+          salary_min: prefs.salaryMin,
+          skills: prefs.skills,
+        },
+      }).catch(() => {}).finally(() => setSaving(false));
+      router.back();
+    } else {
+      router.push('/onboarding/cv');
+    }
   }
 
   return (
@@ -61,10 +86,15 @@ export default function PreferencesScreen() {
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>
-        <View style={styles.progress}>
-          <View style={[styles.progressBar, { width: '50%', backgroundColor: COLORS.accent }]} />
-        </View>
-        <Text style={styles.step}>1/2</Text>
+        {!isEditMode && (
+          <>
+            <View style={styles.progress}>
+              <View style={[styles.progressBar, { width: '50%', backgroundColor: colors.accent }]} />
+            </View>
+            <Text style={styles.step}>1/2</Text>
+          </>
+        )}
+        {isEditMode && <Text style={styles.editTitle}>Tercihlerimi Düzenle</Text>}
       </View>
 
       <ScrollView
@@ -120,15 +150,17 @@ export default function PreferencesScreen() {
 
         {/* Kıdem */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>Kıdem Seviyesi</Text>
+          <Text style={styles.sectionLabel}>Kıdem Seviyesi (Çoklu Seçim)</Text>
           <View style={styles.seniorityList}>
             {SENIORITY_OPTIONS.map((opt) => {
-              const active = seniority === opt.value;
+              const active = seniority.includes(opt.value);
               return (
                 <TouchableOpacity
                   key={opt.value}
                   style={[styles.seniorityRow, active && styles.seniorityActive]}
-                  onPress={() => setSeniority(opt.value)}
+                  onPress={() => setSeniority(prev =>
+                    prev.includes(opt.value) ? prev.filter(x => x !== opt.value) : [...prev, opt.value]
+                  )}
                   activeOpacity={0.8}
                 >
                   <View style={styles.seniorityInfo}>
@@ -137,8 +169,8 @@ export default function PreferencesScreen() {
                     </Text>
                     <Text style={styles.seniorityDesc}>{opt.desc}</Text>
                   </View>
-                  <View style={[styles.radio, active && styles.radioActive]}>
-                    {active && <View style={styles.radioInner} />}
+                  <View style={[styles.checkbox, active && styles.checkboxActive]}>
+                    {active && <Text style={styles.checkmark}>✓</Text>}
                   </View>
                 </TouchableOpacity>
               );
@@ -154,7 +186,7 @@ export default function PreferencesScreen() {
             value={location}
             onChangeText={setLocation}
             placeholder="İstanbul, Ankara, Remote..."
-            placeholderTextColor={COLORS.textDim}
+            placeholderTextColor={colors.textDim}
           />
         </View>
       </ScrollView>
@@ -162,8 +194,11 @@ export default function PreferencesScreen() {
       {/* CTA */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + SPACING.md }]}>
         <LinearGradient colors={GRADIENTS[0]} style={styles.ctaBtn}>
-          <TouchableOpacity style={styles.ctaInner} onPress={handleContinue} activeOpacity={0.85}>
-            <Text style={styles.ctaText}>Devam →</Text>
+          <TouchableOpacity style={styles.ctaInner} onPress={handleContinue} activeOpacity={0.85} disabled={saving}>
+            {saving
+              ? <ActivityIndicator color="#fff" />
+              : <Text style={styles.ctaText}>{isEditMode ? 'Kaydet ✓' : 'Devam →'}</Text>
+            }
           </TouchableOpacity>
         </LinearGradient>
       </View>
@@ -171,10 +206,10 @@ export default function PreferencesScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: COLORS.bg,
+    backgroundColor: colors.bg,
   },
   header: {
     flexDirection: 'row',
@@ -190,13 +225,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   backIcon: {
-    color: COLORS.white,
+    color: colors.text,
     fontSize: 22,
   },
   progress: {
     flex: 1,
     height: 3,
-    backgroundColor: COLORS.cardBg,
+    backgroundColor: colors.cardBg,
     borderRadius: 2,
     overflow: 'hidden',
   },
@@ -205,11 +240,17 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   step: {
-    color: COLORS.textDim,
+    color: colors.textDim,
     fontSize: FONT_SIZES.xs,
     fontWeight: '600',
     width: 28,
     textAlign: 'right',
+  },
+  editTitle: {
+    flex: 1,
+    color: colors.text,
+    fontSize: FONT_SIZES.lg,
+    fontWeight: '700',
   },
   content: {
     padding: SPACING.lg,
@@ -217,13 +258,13 @@ const styles = StyleSheet.create({
     gap: SPACING.xl,
   },
   title: {
-    color: COLORS.white,
+    color: colors.text,
     fontSize: FONT_SIZES.title,
     fontWeight: '800',
     letterSpacing: -0.8,
   },
   subtitle: {
-    color: COLORS.textMuted,
+    color: colors.textMuted,
     fontSize: FONT_SIZES.md,
     marginTop: -SPACING.md,
   },
@@ -231,7 +272,7 @@ const styles = StyleSheet.create({
     gap: SPACING.sm + 4,
   },
   sectionLabel: {
-    color: COLORS.textMuted,
+    color: colors.textMuted,
     fontSize: FONT_SIZES.xs,
     fontWeight: '700',
     textTransform: 'uppercase',
@@ -246,21 +287,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.sm + 4,
     paddingVertical: SPACING.xs + 4,
     borderRadius: RADII.full,
-    backgroundColor: COLORS.cardBg,
+    backgroundColor: colors.cardBg,
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderColor: colors.cardBorder,
   },
   chipActive: {
-    backgroundColor: `${COLORS.accent}22`,
-    borderColor: `${COLORS.accent}66`,
+    backgroundColor: `${colors.accent}22`,
+    borderColor: `${colors.accent}66`,
   },
   chipText: {
-    color: COLORS.textMuted,
+    color: colors.textMuted,
     fontSize: FONT_SIZES.sm,
     fontWeight: '500',
   },
   chipTextActive: {
-    color: COLORS.accentLight,
+    color: colors.accentLight,
   },
   optionGrid: {
     flexDirection: 'row',
@@ -268,29 +309,29 @@ const styles = StyleSheet.create({
   },
   option: {
     flex: 1,
-    backgroundColor: COLORS.cardBg,
+    backgroundColor: colors.cardBg,
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderColor: colors.cardBorder,
     borderRadius: RADII.md,
     padding: SPACING.sm + 4,
     alignItems: 'center',
     gap: SPACING.xs,
   },
   optionActive: {
-    backgroundColor: `${COLORS.accent}18`,
-    borderColor: `${COLORS.accent}55`,
+    backgroundColor: `${colors.accent}18`,
+    borderColor: `${colors.accent}55`,
   },
   optionIcon: {
     fontSize: 20,
   },
   optionLabel: {
-    color: COLORS.textMuted,
+    color: colors.textMuted,
     fontSize: FONT_SIZES.xs,
     fontWeight: '500',
     textAlign: 'center',
   },
   optionLabelActive: {
-    color: COLORS.accentLight,
+    color: colors.accentLight,
   },
   seniorityList: {
     gap: SPACING.sm,
@@ -298,57 +339,57 @@ const styles = StyleSheet.create({
   seniorityRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.cardBg,
+    backgroundColor: colors.cardBg,
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderColor: colors.cardBorder,
     borderRadius: RADII.md,
     padding: SPACING.md,
     justifyContent: 'space-between',
   },
   seniorityActive: {
-    backgroundColor: `${COLORS.accent}18`,
-    borderColor: `${COLORS.accent}55`,
+    backgroundColor: `${colors.accent}18`,
+    borderColor: `${colors.accent}55`,
   },
   seniorityInfo: {
     gap: 2,
   },
   seniorityLabel: {
-    color: COLORS.textMuted,
+    color: colors.textMuted,
     fontSize: FONT_SIZES.md,
     fontWeight: '600',
   },
   seniorityLabelActive: {
-    color: COLORS.white,
+    color: colors.text,
   },
   seniorityDesc: {
-    color: COLORS.textDim,
+    color: colors.textDim,
     fontSize: FONT_SIZES.xs,
   },
-  radio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
     borderWidth: 2,
-    borderColor: COLORS.cardBorder,
+    borderColor: colors.cardBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  radioActive: {
-    borderColor: COLORS.accent,
+  checkboxActive: {
+    borderColor: colors.accent,
+    backgroundColor: colors.accent,
   },
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: COLORS.accent,
+  checkmark: {
+    color: colors.white,
+    fontSize: 13,
+    fontWeight: '800',
   },
   input: {
-    backgroundColor: COLORS.cardBg,
+    backgroundColor: colors.cardBg,
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderColor: colors.cardBorder,
     borderRadius: RADII.md,
     padding: SPACING.md,
-    color: COLORS.white,
+    color: colors.text,
     fontSize: FONT_SIZES.md,
   },
   footer: {
@@ -365,7 +406,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   ctaText: {
-    color: COLORS.white,
+    color: colors.white,
     fontSize: FONT_SIZES.lg,
     fontWeight: '800',
   },

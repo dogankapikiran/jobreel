@@ -13,6 +13,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUserStore } from '@/store/userStore';
+import { api } from '@/services/api';
 import { COLORS, FONT_SIZES, GRADIENTS, RADII, SPACING } from '@/constants/theme';
 
 const SUGGESTED_SKILLS = [
@@ -50,6 +51,17 @@ export default function CvScreen() {
     setProfile({ name, title, summary, skills });
     setPreferences({ skills });
     completeOnboarding();
+    api.updateProfile({
+      display_name: name,
+      title,
+      preferences: {
+        sectors: profile.preferences.sectors,
+        work_type: profile.preferences.workType,
+        seniority: profile.preferences.seniority,
+        location: profile.preferences.location,
+        skills,
+      },
+    }).catch(() => {});
     router.replace('/(tabs)');
   }
 

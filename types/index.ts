@@ -1,5 +1,6 @@
 export type WorkType = 'remote' | 'hybrid' | 'office' | 'unknown';
 export type Seniority = 'junior' | 'mid' | 'senior' | 'lead' | 'unknown';
+export type EmploymentType = 'fulltime' | 'parttime' | 'contract' | 'internship' | '';
 export type InteractionAction = 'view' | 'save' | 'apply' | 'skip';
 
 export interface Job {
@@ -13,6 +14,7 @@ export interface Job {
   salaryCurrency: string;
   salaryPeriod: string;
   workType: WorkType;
+  employmentType: EmploymentType;
   seniority: Seniority;
   sector: string;
   description: string;
@@ -21,12 +23,17 @@ export interface Job {
   companySize?: string;
   skills: string[];
   score?: number;
+  aiReason?: string;
+  matchedSkills?: string[];
+  missingSkills?: string[];
+  potentialScore?: number;
   accentIndex: number;
+  isClosed?: boolean;
 }
 
 export interface UserPreferences {
   sectors: string[];
-  seniority: Seniority;
+  seniority: Seniority[];
   workType: WorkType | 'any';
   location: string;
   salaryMin: number;
@@ -60,6 +67,11 @@ export interface UserProfile {
   experience: WorkExperience[];
   education: Education[];
   preferences: UserPreferences;
+  avatarUrl?: string;
+  linkedInConnected?: boolean;
+  linkedInName?: string;
+  linkedInHeadline?: string;
+  linkedInPhotoUrl?: string;
 }
 
 export interface Interaction {
@@ -67,18 +79,4 @@ export interface Interaction {
   action: InteractionAction;
   durationSeconds?: number;
   timestamp: number;
-}
-
-export interface AdzunaJob {
-  id: string;
-  title: string;
-  company: { display_name: string };
-  location: { display_name: string };
-  salary_min?: number;
-  salary_max?: number;
-  contract_time?: string;
-  category: { label: string };
-  description: string;
-  redirect_url: string;
-  created: string;
 }

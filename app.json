@@ -4,17 +4,38 @@
     "slug": "jobreel",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
     "scheme": "jobreel",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.jobreel.app"
+      "bundleIdentifier": "com.jobreel.app",
+      "buildNumber": "1",
+      "entitlements": {
+        "aps-environment": "development"
+      },
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSPhotoLibraryUsageDescription": "Profil fotoğrafı seçmek için galeri erişimine izin verin.",
+        "CFBundleLocalizations": [
+          "tr",
+          "en",
+          "tr",
+          "en"
+        ],
+        "CFBundleDevelopmentRegion": "tr"
+      }
     },
     "android": {
       "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#0d0d14"
       },
-      "package": "com.jobreel.app"
+      "package": "com.jobreel.app",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "bundler": "metro",
@@ -25,12 +46,44 @@
       [
         "expo-splash-screen",
         {
+          "image": "./assets/splash.png",
+          "resizeMode": "contain",
           "backgroundColor": "#0d0d14"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Profil fotoğrafı seçmek için galeri erişimine izin verin."
+        }
+      ],
+      "expo-document-picker",
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#6C63FF",
+          "sounds": [],
+          "iosDisplayInForeground": true
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "8d8216ba-e91e-41c1-a445-006f0c027430"
+      }
+    },
+    "owner": "dogankapikiran",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/8d8216ba-e91e-41c1-a445-006f0c027430"
     }
   }
 }

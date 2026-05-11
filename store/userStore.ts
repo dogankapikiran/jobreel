@@ -1,11 +1,11 @@
 import { create } from 'zustand';
-import { createJSONStorage, persist } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { persist } from 'zustand/middleware';
 import { Interaction, UserProfile } from '@/types';
+import { safeJSONStorage } from './safeStorage';
 
 const DEFAULT_PREFERENCES: UserProfile['preferences'] = {
   sectors: [],
-  seniority: 'mid',
+  seniority: [],
   workType: 'any',
   location: 'İstanbul',
   salaryMin: 0,
@@ -32,7 +32,6 @@ interface UserState {
   setPreferences: (partial: Partial<UserProfile['preferences']>) => void;
   addInteraction: (interaction: Interaction) => void;
   completeOnboarding: () => void;
-  resetOnboarding: () => void;
 }
 
 export const useUserStore = create<UserState>()(
@@ -59,13 +58,28 @@ export const useUserStore = create<UserState>()(
         })),
 
       completeOnboarding: () => set({ hasCompletedOnboarding: true }),
-
-      resetOnboarding: () =>
-        set({ hasCompletedOnboarding: false, profile: DEFAULT_PROFILE, interactions: [] }),
     }),
     {
       name: 'jobreel-user',
-      storage: createJSONStorage(() => AsyncStorage),
+      storage: safeJSONStorage,
+      merge: (persisted: unknown, current: UserState): UserState => {
+        const p = persisted as Partial<UserState> | null;
+        return {
+          ...current,
+          ...p,
+          profile: {
+            ...current.profile,
+            ...(p?.profile ?? {}),
+            skills: p?.profile?.skills ?? current.profile.skills,
+            experience: p?.profile?.experience ?? current.profile.experience,
+            education: p?.profile?.education ?? current.profile.education,
+            preferences: {
+              ...current.profile.preferences,
+              ...(p?.profile?.preferences ?? {}),
+            },
+          },
+        };
+      },
     }
   )
 );

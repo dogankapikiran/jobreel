@@ -1,0 +1,568 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>JobReel — Kaydettiklerim Mockup</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700;800&display=swap"/>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body {
+  height: 100%; overflow: hidden;
+  background: #111113;
+  display: flex; align-items: center; justify-content: center; gap: 48px;
+  font-family: 'Geist', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Phone frame ────────────────────────────────────────── */
+.phone {
+  width: 390px; height: 844px; border-radius: 54px; padding: 12px;
+  background: linear-gradient(180deg, #1a1a22 0%, #0d0d12 100%);
+  box-shadow: 0 0 0 2px #2a2a35, 0 40px 80px -20px rgba(0,0,0,0.8);
+  position: relative; flex-shrink: 0;
+}
+.phone-inner {
+  width: 100%; height: 100%; border-radius: 42px;
+  overflow: hidden; position: relative;
+  background: #05060c; color: #fff;
+  display: flex; flex-direction: column;
+}
+.dynamic-island {
+  position: absolute; top: 11px; left: 50%; transform: translateX(-50%);
+  width: 120px; height: 34px; border-radius: 22px;
+  background: #000; z-index: 50; pointer-events: none;
+}
+.status-bar {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 40;
+  height: 54px; display: flex; align-items: flex-end;
+  justify-content: space-between; padding: 0 28px 10px;
+  pointer-events: none;
+}
+.sb-time { font-size: 15px; font-weight: 590; color: #fff; font-family: -apple-system, system-ui; }
+.sb-icons { display: flex; align-items: center; gap: 7px; }
+.home-indicator {
+  position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+  width: 134px; height: 5px; border-radius: 3px;
+  background: rgba(255,255,255,0.4); z-index: 60; pointer-events: none;
+}
+
+/* ── App shell ──────────────────────────────────────────── */
+.app {
+  position: absolute; inset: 0; padding-top: 54px;
+  display: flex; flex-direction: column; overflow: hidden;
+}
+
+/* ── Header ─────────────────────────────────────────────── */
+.header { padding: 6px 18px 0; flex-shrink: 0; }
+.header-row {
+  display: flex; align-items: baseline;
+  justify-content: space-between; gap: 12px;
+}
+.header-title {
+  font-size: 30px; font-weight: 700; letter-spacing: -0.035em; color: #fff;
+}
+.header-count {
+  font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.55);
+  letter-spacing: 0.02em;
+}
+.filter-row {
+  display: flex; gap: 6px; margin-top: 14px; overflow-x: auto;
+  scrollbar-width: none;
+}
+.filter-row::-webkit-scrollbar { display: none; }
+.filter-chip {
+  padding: 6px 11px; border-radius: 999px; cursor: pointer;
+  font-size: 12px; font-weight: 600; white-space: nowrap;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.05); color: rgba(255,255,255,0.7);
+  transition: all 0.14s;
+  -webkit-user-select: none; user-select: none;
+  letter-spacing: -0.005em;
+}
+.filter-chip.active {
+  background: #fff; border-color: #fff; color: #0a0b12;
+}
+
+/* ── List ───────────────────────────────────────────────── */
+.list {
+  flex: 1; overflow-y: auto; padding: 8px 14px 108px;
+  scrollbar-width: none;
+}
+.list::-webkit-scrollbar { display: none; }
+
+/* ── Date group ─────────────────────────────────────────── */
+.date-group {
+  display: flex; align-items: center; gap: 10px; padding: 10px 4px 0;
+}
+.date-label {
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.12em;
+  text-transform: uppercase; color: rgba(255,255,255,0.4);
+  white-space: nowrap;
+}
+.date-line { flex: 1; height: 1px; background: rgba(255,255,255,0.06); }
+
+/* ── Saved card ─────────────────────────────────────────── */
+.saved-card {
+  position: relative; padding: 14px; border-radius: 18px;
+  border: 1px solid rgba(255,255,255,0.07);
+  display: flex; gap: 12px; align-items: flex-start;
+  margin-top: 10px; overflow: hidden;
+  cursor: pointer; transition: opacity 0.14s;
+}
+.saved-card:hover { opacity: 0.88; }
+.card-tint {
+  position: absolute; inset: 0; pointer-events: none;
+  /* set via --hue */
+  background:
+    radial-gradient(80% 100% at 100% 0%, oklch(0.32 0.10 var(--hue) / 0.42) 0%, transparent 70%),
+    linear-gradient(180deg, rgba(255,255,255,0.04) 0%, rgba(255,255,255,0.02) 100%);
+}
+
+/* Logo */
+.logo {
+  width: 44px; height: 44px; border-radius: 12px;
+  background: #fff; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 800; letter-spacing: -0.02em;
+  /* text color: oklch(0.30 0.15 var(--hue)) — set inline */
+  position: relative; z-index: 1;
+}
+/* logo shadow: brand glow — set inline as box-shadow */
+
+/* Card body */
+.card-body { flex: 1; min-width: 0; position: relative; z-index: 1; }
+.card-title {
+  font-size: 14px; font-weight: 600; color: #fff;
+  line-height: 1.25; letter-spacing: -0.015em;
+}
+.card-sub {
+  font-size: 11.5px; color: rgba(255,255,255,0.6); margin-top: 4px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.meta-row {
+  display: flex; align-items: center; gap: 8px; margin-top: 9px;
+  flex-wrap: wrap;
+}
+/* Match pill */
+.match-pill {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 7px 3px 6px; border-radius: 999px;
+  border: 1px solid;
+}
+.match-dot { width: 5px; height: 5px; border-radius: 3px; flex-shrink: 0; }
+.match-text { font-size: 10.5px; font-weight: 700; letter-spacing: 0.01em; }
+/* Meta tags */
+.meta-tag { font-size: 10.5px; font-weight: 500; color: rgba(255,255,255,0.55); }
+.meta-sep { width: 2px; height: 2px; border-radius: 1px; background: rgba(255,255,255,0.25); flex-shrink: 0; }
+
+/* Card actions */
+.card-actions {
+  display: flex; flex-direction: column; align-items: flex-end;
+  gap: 6px; flex-shrink: 0; position: relative; z-index: 1;
+}
+.remove-btn {
+  width: 28px; height: 28px; border-radius: 8px; border: none;
+  background: transparent; color: rgba(255,255,255,0.4);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; font-size: 13px; transition: color 0.12s;
+}
+.remove-btn:hover { color: rgba(255,255,255,0.75); }
+.apply-btn {
+  padding: 8px 14px; border-radius: 11px; border: none;
+  background: #fff; color: #0a0b12; cursor: pointer;
+  font-family: inherit; font-size: 12.5px; font-weight: 700;
+  letter-spacing: -0.005em;
+  display: inline-flex; align-items: center; gap: 5px;
+  transition: opacity 0.12s;
+}
+.apply-btn:hover { opacity: 0.9; }
+
+/* ── Empty state ─────────────────────────────────────────── */
+.empty {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; flex: 1;
+  padding: 0 32px; gap: 14px; text-align: center;
+}
+.empty-icon {
+  width: 72px; height: 72px; border-radius: 22px;
+  background: linear-gradient(135deg, #7c6dfa, #4facfe);
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 6px;
+}
+.empty-title { font-size: 20px; font-weight: 700; color: #fff; letter-spacing: -0.025em; }
+.empty-desc { font-size: 14px; color: rgba(255,255,255,0.5); line-height: 1.5; max-width: 240px; }
+.empty-cta {
+  margin-top: 6px; padding: 14px 28px; border-radius: 999px; border: none;
+  background: linear-gradient(135deg, #7c6dfa, #4facfe);
+  color: #fff; font-family: inherit; font-size: 14px; font-weight: 700;
+  cursor: pointer; letter-spacing: -0.01em;
+}
+
+/* ── Tab bar ─────────────────────────────────────────────── */
+.tab-bar {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  bottom: 22px;
+  display: flex; align-items: center; gap: 4px;
+  padding: 5px;
+  border-radius: 999px;
+  background: rgba(15,16,24,0.72);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 12px 40px -10px rgba(0,0,0,0.6), inset 0 1px 0 rgba(255,255,255,0.06);
+  z-index: 30;
+}
+.tab-item {
+  width: 42px; height: 42px; border-radius: 21px;
+  display: flex; align-items: center; justify-content: center;
+  color: rgba(255,255,255,0.5);
+}
+.tab-item.active { background: #fff; color: #0a0b12; }
+
+/* ── Undo toast ──────────────────────────────────────────── */
+.undo-toast {
+  position: absolute; left: 14px; right: 14px; bottom: 84px;
+  background: rgba(30,30,40,0.95);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 14px; padding: 12px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  z-index: 40;
+  transition: opacity 0.22s, transform 0.22s;
+}
+.undo-toast.hidden { opacity: 0; transform: translateY(8px); pointer-events: none; }
+.undo-text { font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.85); }
+.undo-btn {
+  font-size: 13px; font-weight: 700;
+  color: #a78bfa; border: none; background: none;
+  font-family: inherit; cursor: pointer; padding: 0 2px;
+}
+
+/* ── Canvas label ────────────────────────────────────────── */
+.phone-label {
+  text-align: center; margin-top: 14px;
+  font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.35);
+  letter-spacing: 0.04em; text-transform: uppercase;
+}
+</style>
+</head>
+<body>
+
+<!-- Phone 1: Yüklü durum -->
+<div>
+  <div class="phone" id="phone1">
+    <div class="phone-inner">
+      <div class="dynamic-island"></div>
+      <div class="status-bar">
+        <span class="sb-time">15:01</span>
+        <div class="sb-icons">
+          <!-- Signal -->
+          <svg width="19" height="12" viewBox="0 0 19 12"><rect x="0" y="7.5" width="3.2" height="4.5" rx=".7" fill="#fff"/><rect x="4.8" y="5" width="3.2" height="7" rx=".7" fill="#fff"/><rect x="9.6" y="2.5" width="3.2" height="9.5" rx=".7" fill="#fff"/><rect x="14.4" y="0" width="3.2" height="12" rx=".7" fill="#fff"/></svg>
+          <!-- WiFi -->
+          <svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 9.5a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm-3.5-3C5.8 5.3 6.85 4.7 8 4.7s2.2.6 3.5 1.8l1.1-1.1C11.1 4 9.6 3.2 8 3.2S4.9 4 3.4 5.4L4.5 6.5zm-3.5-3C3.3 1.9 5.55.7 8 .7s4.7 1.2 6.5 2.8L15.6 2.4C13.5.9 10.85 0 8 0S2.5.9.4 2.4L1.5 3.5z" fill="#fff" opacity=".9"/></svg>
+          <!-- Battery -->
+          <svg width="25" height="13" viewBox="0 0 25 13"><rect x=".5" y=".5" width="21" height="12" rx="3.5" stroke="rgba(255,255,255,0.35)" fill="none"/><rect x="2" y="2" width="17" height="9" rx="2" fill="#fff"/><path d="M23 4.5V8.5c.8-.3 1.5-1.3 1.5-2s-.7-1.7-1.5-2z" fill="rgba(255,255,255,0.4)"/></svg>
+        </div>
+      </div>
+      <div class="app">
+        <!-- Header -->
+        <div class="header">
+          <div class="header-row">
+            <span class="header-title">Kaydettiklerim</span>
+            <span class="header-count" id="count1">6 ilan</span>
+          </div>
+          <div class="filter-row" id="filters1">
+            <div class="filter-chip active" data-filter="Tümü">Tümü</div>
+            <div class="filter-chip" data-filter="Hibrit">Hibrit</div>
+            <div class="filter-chip" data-filter="Uzaktan">Uzaktan</div>
+            <div class="filter-chip" data-filter="Bu hafta">Bu hafta</div>
+          </div>
+        </div>
+
+        <!-- List -->
+        <div class="list" id="list1"></div>
+
+        <!-- Tab bar -->
+        <div class="tab-bar">
+          <!-- Saved (active) -->
+          <div class="tab-item active">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="none">
+              <path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-3.5L6 21Z"/>
+            </svg>
+          </div>
+          <!-- Jobs -->
+          <div class="tab-item">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="7" width="18" height="14" rx="2.5"/><path d="M8 7V5a4 4 0 0 1 8 0v2"/>
+            </svg>
+          </div>
+          <!-- Home -->
+          <div class="tab-item">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="m3 11 9-8 9 8v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M9 22v-7h6v7"/>
+            </svg>
+          </div>
+          <!-- Bell -->
+          <div class="tab-item">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 9a6 6 0 1 1 12 0c0 5 2 7 2 7H4s2-2 2-7Z"/><path d="M10 21a2 2 0 0 0 4 0"/>
+            </svg>
+          </div>
+          <!-- User -->
+          <div class="tab-item">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Undo toast -->
+        <div class="undo-toast hidden" id="toast1">
+          <span class="undo-text">Kaydedilenlerden kaldırıldı</span>
+          <button class="undo-btn" id="undoBtn1">Geri Al</button>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+  <div class="phone-label">Yüklü Durum · Filtreli / Grup</div>
+</div>
+
+<!-- Phone 2: Boş durum -->
+<div>
+  <div class="phone">
+    <div class="phone-inner">
+      <div class="dynamic-island"></div>
+      <div class="status-bar">
+        <span class="sb-time">15:01</span>
+        <div class="sb-icons">
+          <svg width="19" height="12" viewBox="0 0 19 12"><rect x="0" y="7.5" width="3.2" height="4.5" rx=".7" fill="#fff"/><rect x="4.8" y="5" width="3.2" height="7" rx=".7" fill="#fff"/><rect x="9.6" y="2.5" width="3.2" height="9.5" rx=".7" fill="#fff"/><rect x="14.4" y="0" width="3.2" height="12" rx=".7" fill="#fff"/></svg>
+          <svg width="16" height="12" viewBox="0 0 16 12"><path d="M8 9.5a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm-3.5-3C5.8 5.3 6.85 4.7 8 4.7s2.2.6 3.5 1.8l1.1-1.1C11.1 4 9.6 3.2 8 3.2S4.9 4 3.4 5.4L4.5 6.5zm-3.5-3C3.3 1.9 5.55.7 8 .7s4.7 1.2 6.5 2.8L15.6 2.4C13.5.9 10.85 0 8 0S2.5.9.4 2.4L1.5 3.5z" fill="#fff" opacity=".9"/></svg>
+          <svg width="25" height="13" viewBox="0 0 25 13"><rect x=".5" y=".5" width="21" height="12" rx="3.5" stroke="rgba(255,255,255,0.35)" fill="none"/><rect x="2" y="2" width="17" height="9" rx="2" fill="#fff"/><path d="M23 4.5V8.5c.8-.3 1.5-1.3 1.5-2s-.7-1.7-1.5-2z" fill="rgba(255,255,255,0.4)"/></svg>
+        </div>
+      </div>
+      <div class="app">
+        <div class="header">
+          <div class="header-row">
+            <span class="header-title">Kaydettiklerim</span>
+            <span class="header-count">0 ilan</span>
+          </div>
+          <div class="filter-row">
+            <div class="filter-chip active">Tümü</div>
+            <div class="filter-chip">Hibrit</div>
+            <div class="filter-chip">Uzaktan</div>
+            <div class="filter-chip">Bu hafta</div>
+          </div>
+        </div>
+
+        <!-- Empty state -->
+        <div class="empty">
+          <div class="empty-icon">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-3.5L6 21Z"/>
+            </svg>
+          </div>
+          <div class="empty-title">Henüz bir ilan kaydetmedin</div>
+          <div class="empty-desc">Feed'de beğendiğin ilanları kaydet, buradan takip et.</div>
+          <button class="empty-cta">İlanları Keşfet →</button>
+        </div>
+
+        <div class="tab-bar">
+          <div class="tab-item active">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M6 4.5A1.5 1.5 0 0 1 7.5 3h9A1.5 1.5 0 0 1 18 4.5V21l-6-3.5L6 21Z"/></svg>
+          </div>
+          <div class="tab-item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="7" width="18" height="14" rx="2.5"/><path d="M8 7V5a4 4 0 0 1 8 0v2"/></svg></div>
+          <div class="tab-item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="m3 11 9-8 9 8v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"/><path d="M9 22v-7h6v7"/></svg></div>
+          <div class="tab-item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9a6 6 0 1 1 12 0c0 5 2 7 2 7H4s2-2 2-7Z"/><path d="M10 21a2 2 0 0 0 4 0"/></svg></div>
+          <div class="tab-item"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg></div>
+        </div>
+      </div>
+      <div class="home-indicator"></div>
+    </div>
+  </div>
+  <div class="phone-label">Boş Durum</div>
+</div>
+
+<script>
+// ── Data ──────────────────────────────────────────────────────
+const JOBS = [
+  { id:'s1', company:'Boston Scientific', mark:'BOS', hue:320, title:'Business Development Specialist', location:'İstanbul', workMode:'Hibrit', posted:'4 saat önce', bucket:'BUGÜN', match:76 },
+  { id:'s2', company:'OpenText', mark:'OT', hue:145, title:'Account Executive (Digital Operations)', location:'Uzaktan', workMode:'Uzaktan', posted:'1 gün önce', bucket:'DÜN', match:81 },
+  { id:'s3', company:'DAIICHI Electronic', mark:'D', hue:25, title:'Project Manager', location:'İstanbul', workMode:'Ofis', posted:'7 gün önce', bucket:'3 GÜN ÖNCE', match:72 },
+  { id:'s4', company:'GlassHouse Türkiye', mark:'GH', hue:235, title:'Project Manager', location:'Sarıyer, İst.', workMode:'Hibrit', posted:'7 gün önce', bucket:'3 GÜN ÖNCE', match:80 },
+  { id:'s5', company:'Unilever', mark:'U', hue:220, title:'Senior Transformation Project Lead', location:'İstanbul', workMode:'Hibrit', posted:'6 gün önce', bucket:'1 HAFTA ÖNCE', match:88 },
+  { id:'s6', company:'Gartner', mark:'G', hue:350, title:'Business Development Executive', location:'İstanbul', workMode:'Hibrit', posted:'10 gün önce', bucket:'1 HAFTA ÖNCE', match:69 },
+];
+
+const BUCKET_ORDER = ['BUGÜN','DÜN','2 GÜN ÖNCE','3 GÜN ÖNCE','4 GÜN ÖNCE','5 GÜN ÖNCE','6 GÜN ÖNCE','1 HAFTA ÖNCE','DAHA ÖNCE'];
+
+function matchDotColor(s) {
+  if (s >= 85) return '#86efac';
+  if (s >= 70) return '#bef264';
+  if (s >= 55) return '#fde047';
+  return '#fdba74';
+}
+
+// ── State ─────────────────────────────────────────────────────
+let visibleIds = JOBS.map(j => j.id);
+let activeFilter = 'Tümü';
+let undoJob = null;
+let undoTimer = null;
+
+// ── Filter ────────────────────────────────────────────────────
+function filterJobs(filter) {
+  switch (filter) {
+    case 'Hibrit':   return JOBS.filter(j => j.workMode === 'Hibrit');
+    case 'Uzaktan':  return JOBS.filter(j => j.workMode === 'Uzaktan');
+    case 'Bu hafta': return JOBS.filter(j => j.bucket !== 'DAHA ÖNCE');
+    default:         return JOBS;
+  }
+}
+
+// ── Render ────────────────────────────────────────────────────
+function render() {
+  const filtered = filterJobs(activeFilter).filter(j => visibleIds.includes(j.id));
+  document.getElementById('count1').textContent = filtered.length + ' ilan';
+
+  // Group
+  const groups = {};
+  filtered.forEach(j => {
+    (groups[j.bucket] = groups[j.bucket] || []).push(j);
+  });
+
+  const list = document.getElementById('list1');
+  list.innerHTML = '';
+
+  if (filtered.length === 0) {
+    list.innerHTML = `
+      <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 24px;gap:12px;text-align:center">
+        <div style="font-size:32px">🔍</div>
+        <div style="font-size:16px;font-weight:700;color:#fff">Eşleşen ilan yok</div>
+        <div style="font-size:13px;color:rgba(255,255,255,0.5);line-height:1.5">Bu filtre için kaydettiğin ilan bulunmuyor.</div>
+      </div>`;
+    return;
+  }
+
+  BUCKET_ORDER.forEach(bucket => {
+    if (!groups[bucket]) return;
+    const groupEl = document.createElement('div');
+    groupEl.innerHTML = `
+      <div class="date-group">
+        <span class="date-label">${bucket}</span>
+        <div class="date-line"></div>
+      </div>`;
+    list.appendChild(groupEl);
+
+    groups[bucket].forEach(job => {
+      const dotColor = matchDotColor(job.match);
+      const accentColor = `oklch(0.85 0.15 ${job.hue})`;
+      const pillBg = `oklch(0.85 0.15 ${job.hue} / 0.13)`;
+      const pillBorder = `oklch(0.85 0.15 ${job.hue} / 0.25)`;
+      const logoText = `oklch(0.28 0.15 ${job.hue})`;
+      const logoShadow = `0 6px 20px -8px oklch(0.55 0.20 ${job.hue} / 0.5)`;
+      const applyShadow = `0 6px 16px -6px oklch(0.55 0.20 ${job.hue} / 0.4)`;
+
+      const card = document.createElement('div');
+      card.className = 'saved-card';
+      card.dataset.id = job.id;
+      card.style.setProperty('--hue', job.hue);
+      card.innerHTML = `
+        <div class="card-tint"></div>
+        <div class="logo" style="color:${logoText};box-shadow:${logoShadow}">${job.mark}</div>
+        <div class="card-body">
+          <div class="card-title">${job.title}</div>
+          <div class="card-sub">${job.company} · ${job.location}</div>
+          <div class="meta-row">
+            <div class="match-pill" style="background:${pillBg};border-color:${pillBorder}">
+              <div class="match-dot" style="background:${dotColor}"></div>
+              <span class="match-text" style="color:${accentColor}">%${job.match}</span>
+            </div>
+            <span class="meta-tag">${job.workMode}</span>
+            <div class="meta-sep"></div>
+            <span class="meta-tag">${job.posted}</span>
+          </div>
+        </div>
+        <div class="card-actions">
+          <button class="remove-btn" data-id="${job.id}" title="Kaldır">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+              <path d="M6 6l12 12M18 6 6 18"/>
+            </svg>
+          </button>
+          <button class="apply-btn" style="box-shadow:${applyShadow}">
+            Başvur
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#0a0b12" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 12h14M13 6l6 6-6 6"/>
+            </svg>
+          </button>
+        </div>`;
+      list.appendChild(card);
+    });
+  });
+
+  // Bind remove buttons
+  list.querySelectorAll('.remove-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      handleRemove(btn.dataset.id);
+    });
+  });
+}
+
+// ── Remove + Undo ─────────────────────────────────────────────
+function handleRemove(id) {
+  // Commit previous undo if pending
+  if (undoJob) {
+    clearTimeout(undoTimer);
+    undoJob = null;
+  }
+
+  undoJob = JOBS.find(j => j.id === id);
+  visibleIds = visibleIds.filter(i => i !== id);
+  render();
+  showToast();
+
+  undoTimer = setTimeout(() => {
+    undoJob = null;
+    hideToast();
+  }, 3000);
+}
+
+function showToast() {
+  const t = document.getElementById('toast1');
+  t.classList.remove('hidden');
+}
+function hideToast() {
+  const t = document.getElementById('toast1');
+  t.classList.add('hidden');
+}
+
+document.getElementById('undoBtn1').addEventListener('click', () => {
+  if (!undoJob) return;
+  clearTimeout(undoTimer);
+  visibleIds.push(undoJob.id);
+  // Restore original order
+  visibleIds.sort((a, b) => JOBS.findIndex(j=>j.id===a) - JOBS.findIndex(j=>j.id===b));
+  undoJob = null;
+  render();
+  hideToast();
+});
+
+// ── Filter chips ──────────────────────────────────────────────
+document.getElementById('filters1').addEventListener('click', e => {
+  const chip = e.target.closest('.filter-chip');
+  if (!chip) return;
+  activeFilter = chip.dataset.filter;
+  document.querySelectorAll('#filters1 .filter-chip').forEach(c => c.classList.remove('active'));
+  chip.classList.add('active');
+  render();
+});
+
+// ── Init ──────────────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>
