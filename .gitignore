@@ -2,6 +2,12 @@ node_modules/
 .expo/
 dist/
 build/
+
+# iOS native (CocoaPods & build artifacts)
+ios/Pods/
+ios/build/
+ios/DerivedData/
+ios/**/*.xcuserstate
 *.jks
 *.p8
 *.p12
