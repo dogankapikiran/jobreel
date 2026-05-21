@@ -20,10 +20,9 @@ import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useAuthStore } from '@/store/authStore';
 import { useTheme } from '@/contexts/ThemeContext';
-import { ACCENT_GRADIENT, FONT_SIZES, RADII, SPACING } from '@/constants/theme';
+import { FONT_SIZES, RADII, SPACING } from '@/constants/theme';
 import type { ThemeColors } from '@/constants/theme';
 import { supabase } from '@/services/supabase';
 
@@ -339,12 +338,10 @@ export default function SettingsScreen() {
             autoCorrect={false}
           />
           {emailError ? <Text style={s.errorText}>{emailError}</Text> : null}
-          <TouchableOpacity style={s.sheetBtn} onPress={handleEmailChange} activeOpacity={0.8} disabled={emailLoading}>
-            <LinearGradient colors={ACCENT_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={s.sheetBtnGrad}>
-              {emailLoading
-                ? <ActivityIndicator color="#fff" size="small" />
-                : <Text style={s.sheetBtnText}>Güncelle</Text>}
-            </LinearGradient>
+          <TouchableOpacity style={[s.sheetBtn, s.sheetBtnSolid]} onPress={handleEmailChange} activeOpacity={0.8} disabled={emailLoading}>
+            {emailLoading
+              ? <ActivityIndicator color="#fff" size="small" />
+              : <Text style={s.sheetBtnText}>Güncelle</Text>}
           </TouchableOpacity>
         </View>
       </Modal>
@@ -470,19 +467,27 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   timeBtnValue: { color: colors.accent, fontSize: FONT_SIZES.md, fontWeight: '600' },
   versionText: { color: colors.textMuted, fontSize: FONT_SIZES.sm },
   // Modal/Sheet
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.6)' },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(5,22,80,0.35)' },
   sheet: {
     position: 'absolute',
     bottom: 0, left: 0, right: 0,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#ffffff',
     borderTopLeftRadius: RADII.xl,
     borderTopRightRadius: RADII.xl,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: '#dde1ea',
     padding: SPACING.lg,
     paddingTop: SPACING.md,
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
   },
   sheetHandle: {
     width: 40, height: 4,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: '#dde1ea',
     borderRadius: RADII.full,
     alignSelf: 'center',
     marginBottom: SPACING.lg,
@@ -502,6 +507,16 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   emailInputError: { borderColor: colors.danger },
   errorText: { color: colors.danger, fontSize: FONT_SIZES.xs, marginBottom: SPACING.sm },
   sheetBtn: { borderRadius: RADII.md, overflow: 'hidden', marginTop: SPACING.sm },
-  sheetBtnGrad: { height: 52, alignItems: 'center', justifyContent: 'center' },
+  sheetBtnSolid: {
+    height: 52,
+    backgroundColor: '#051650',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 3,
+  },
   sheetBtnText: { color: '#fff', fontSize: FONT_SIZES.md, fontWeight: '700' },
 });

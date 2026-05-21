@@ -4,6 +4,7 @@ import json
 import os
 import random
 import re
+import traceback
 from collections import Counter
 from contextlib import asynccontextmanager
 from typing import Optional
@@ -248,31 +249,39 @@ async def _get_user_context(user_id: str, db: Client) -> tuple[list[tuple[str, f
     """
     counts: Counter = Counter()
 
-    res = db.table("interactions") \
-        .select("job_title, action") \
-        .eq("user_id", user_id) \
-        .in_("action", ["save", "apply"]) \
-        .order("created_at", desc=True) \
-        .limit(50) \
-        .execute()
+    try:
+        res = db.table("interactions") \
+            .select("job_title, action") \
+            .eq("user_id", user_id) \
+            .in_("action", ["save", "apply"]) \
+            .order("created_at", desc=True) \
+            .limit(50) \
+            .execute()
 
-    for row in (res.data or []):
-        title = (row.get("job_title") or "").strip()
-        if not title:
-            continue
-        weight = 3 if row["action"] == "apply" else 2
-        counts[title.lower()] += weight
-
-    prof = db.table("profiles") \
-        .select("title, linkedin_headline, preferences, cv_parsed") \
-        .eq("user_id", user_id) \
-        .maybe_single() \
-        .execute()
+        for row in (res.data or []):
+            title = (row.get("job_title") or "").strip()
+            if not title:
+                continue
+            weight = 3 if row["action"] == "apply" else 2
+            counts[title.lower()] += weight
+    except Exception as e:
+        print(f"[UserContext] Interactions query failed for {user_id[:8]}: {e}")
 
     prefs: dict = {}
     cv_parsed: dict | None = None
     cv_title = ""
-    if prof.data:
+
+    try:
+        prof = db.table("profiles") \
+            .select("title, linkedin_headline, preferences, cv_parsed") \
+            .eq("user_id", user_id) \
+            .maybe_single() \
+            .execute()
+    except Exception as e:
+        print(f"[UserContext] Profile query failed for {user_id[:8]}: {e}")
+        prof = None
+
+    if prof and prof.data:
         for field in ("title", "linkedin_headline"):
             val = (prof.data.get(field) or "").strip()
             if val:
@@ -452,6 +461,24 @@ async def feed(
     page: int = Query(default=1, ge=1),
     user: dict | None = Depends(get_optional_user),
 ):
+    try:
+        return await _feed_impl(request, location, keyword, sectors, work_type, seniority, page, user)
+    except Exception as e:
+        print(f"[Feed] UNHANDLED ERROR for user={user and user.get('sub','?')[:8]}: {e}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
+async def _feed_impl(
+    request: Request,
+    location: str,
+    keyword: str,
+    sectors: str,
+    work_type: str,
+    seniority: str,
+    page: int,
+    user: dict | None,
+):
     sectors_list = [s.strip() for s in sectors.split(",") if s.strip()]
     seniority_list = [s.strip() for s in seniority.split(",") if s.strip()]
 
@@ -602,7 +629,14 @@ async def save_push_token(body: dict, user: dict = Depends(get_current_user)):
     if not token:
         raise HTTPException(status_code=400, detail="Missing token")
     db = get_supabase()
-    db.table("profiles").upsert({"user_id": user["sub"], "push_token": token}, on_conflict="user_id").execute()
+    try:
+        # Önce UPDATE dene (profil varsa), sonra INSERT
+        result = db.table("profiles").update({"push_token": token}).eq("user_id", user["sub"]).execute()
+        if not result.data:
+            # Profil yok, oluştur
+            db.table("profiles").insert({"user_id": user["sub"], "push_token": token}).execute()
+    except Exception as e:
+        print(f"[PushToken] Upsert failed for {user['sub'][:8]}: {e}")
     return {"success": True}
 
 

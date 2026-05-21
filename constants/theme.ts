@@ -53,10 +53,10 @@ export const DARK_COLORS: ThemeColors = {
 };
 
 export const LIGHT_COLORS: ThemeColors = {
-  bg: '#f2f2f7',
+  bg: '#eef1f8',
   bgDeep: '#ffffff',
-  accent: '#6c5ce7',
-  accentLight: '#8b7ff5',
+  accent: '#051650',
+  accentLight: '#0d2060',
   success: '#2ecc71',
   successLight: '#5ddb8f',
   warning: '#f59e0b',
@@ -64,22 +64,22 @@ export const LIGHT_COLORS: ThemeColors = {
 
   white: '#ffffff',
   black: '#000000',
-  text: 'rgba(0,0,0,0.88)',
-  textMuted: 'rgba(0,0,0,0.5)',
-  textDim: 'rgba(0,0,0,0.3)',
+  text: '#051650',
+  textMuted: '#8a94a6',
+  textDim: 'rgba(5,22,80,0.35)',
 
-  cardBorder: 'rgba(0,0,0,0.08)',
-  cardBg: 'rgba(0,0,0,0.04)',
+  cardBorder: '#dde1ea',
+  cardBg: '#f4f6fb',
 
-  navBg: 'rgba(242,242,247,0.95)',
-  navBorder: 'rgba(0,0,0,0.1)',
+  navBg: 'rgba(255,255,255,0.55)',
+  navBorder: 'rgba(255,255,255,0.6)',
 
-  headerBtnBg: 'rgba(0,0,0,0.06)',
-  headerBtnBorder: 'rgba(0,0,0,0.1)',
+  headerBtnBg: '#ffffff',
+  headerBtnBorder: 'rgba(5,22,80,0.10)',
   isDark: false,
 };
 
-export const COLORS = DARK_COLORS;
+export const COLORS = LIGHT_COLORS;
 
 export const ACCENT_GRADIENT: [string, string] = ['#7c6dfa', '#4facfe'];
 

@@ -17,7 +17,7 @@ import { useRouter } from 'expo-router';
 import { Job } from '@/types';
 import { useFeedStore } from '@/store/feedStore';
 import { api, timeAgo } from '@/services/api';
-import { BOTTOM_NAV_HEIGHT, COLORS, FONT_SIZES, RADII, SPACING } from '@/constants/theme';
+import { BOTTOM_NAV_HEIGHT, FONT_SIZES, RADII, SPACING } from '@/constants/theme';
 import { brandColors } from '@/services/logoService';
 import CompanyLogo from '@/components/CompanyLogo';
 
@@ -39,10 +39,10 @@ function hexAlpha(hex: string, alpha: number): string {
 }
 
 function matchDotColor(score: number): string {
-  if (score >= 85) return '#86efac';
-  if (score >= 70) return '#bef264';
-  if (score >= 55) return '#fde047';
-  return '#fdba74';
+  if (score >= 85) return '#22c55e';
+  if (score >= 70) return '#84cc16';
+  if (score >= 55) return '#f59e0b';
+  return '#f97316';
 }
 
 function workModeLabel(wt: Job['workType']): string {
@@ -104,11 +104,11 @@ function SavedCard({ job, onRemove, onPress }: CardProps) {
 
   return (
     <TouchableOpacity onPress={onPress} activeOpacity={0.78} style={styles.card}>
-      {/* Brand tint — top-right radial approximation */}
+      {/* Subtle brand tint — top-right corner */}
       <LinearGradient
-        colors={[hexAlpha(accent, 0.28), 'transparent']}
+        colors={[hexAlpha(accent, 0.08), 'transparent']}
         start={{ x: 1, y: 0 }}
-        end={{ x: 0.15, y: 0.9 }}
+        end={{ x: 0.2, y: 1 }}
         style={StyleSheet.absoluteFillObject}
       />
 
@@ -130,8 +130,8 @@ function SavedCard({ job, onRemove, onPress }: CardProps) {
           <View style={styles.metaRow}>
             {score > 0 && (
               <View style={[styles.matchPill, {
-                backgroundColor: hexAlpha(accent, 0.13),
-                borderColor: hexAlpha(accent, 0.25),
+                backgroundColor: hexAlpha(accent, 0.10),
+                borderColor: hexAlpha(accent, 0.22),
               }]}>
                 <View style={[styles.matchDot, { backgroundColor: matchDotColor(score) }]} />
                 <Text style={[styles.matchText, { color: accent }]}>%{score}</Text>
@@ -152,7 +152,7 @@ function SavedCard({ job, onRemove, onPress }: CardProps) {
             style={styles.removeBtn}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
-            <Ionicons name="close" size={13} color="rgba(255,255,255,0.4)" />
+            <Ionicons name="close" size={13} color="rgba(5,22,80,0.35)" />
           </TouchableOpacity>
           <TouchableOpacity
             onPress={() => safeOpenURL(job.url)}
@@ -160,7 +160,7 @@ function SavedCard({ job, onRemove, onPress }: CardProps) {
             activeOpacity={0.8}
           >
             <Text style={styles.applyText}>Başvur</Text>
-            <Ionicons name="arrow-forward" size={11} color="#0a0b12" />
+            <Ionicons name="arrow-forward" size={11} color="#ffffff" />
           </TouchableOpacity>
         </View>
       </View>
@@ -229,13 +229,12 @@ export default function SavedScreen() {
   const [loading, setLoading] = useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterKey>('Tümü');
   const [undoJob, setUndoJob] = useState<Job | null>(null);
-  const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const undoTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
   useEffect(() => {
     refresh();
   }, []);
 
-  // Clean up timer on unmount
   useEffect(() => () => clearTimeout(undoTimer.current), []);
 
   async function refresh() {
@@ -251,7 +250,6 @@ export default function SavedScreen() {
   }
 
   const handleRemove = useCallback((job: Job) => {
-    // Commit any in-flight undo without waiting
     if (undoJob) {
       clearTimeout(undoTimer.current);
       api.unsaveJob(undoJob.id).catch(() => {});
@@ -320,7 +318,7 @@ export default function SavedScreen() {
       {/* Loading */}
       {loading && savedJobs.length === 0 ? (
         <View style={styles.center}>
-          <ActivityIndicator color={COLORS.accent} />
+          <ActivityIndicator color="#051650" />
         </View>
       ) : sections.length === 0 ? (
         /* Empty state */
@@ -348,13 +346,7 @@ export default function SavedScreen() {
               activeOpacity={0.8}
               style={styles.emptyCta}
             >
-              <LinearGradient
-                colors={['#7c6dfa', '#4facfe']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={styles.emptyCtaGradient}
-              >
-                <Text style={styles.emptyCtaText}>İlanları Keşfet →</Text>
-              </LinearGradient>
+              <Text style={styles.emptyCtaText}>İlanları Keşfet →</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
@@ -362,13 +354,7 @@ export default function SavedScreen() {
               activeOpacity={0.8}
               style={styles.emptyCta}
             >
-              <LinearGradient
-                colors={['#7c6dfa', '#4facfe']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={styles.emptyCtaGradient}
-              >
-                <Text style={styles.emptyCtaText}>Tümünü Gör</Text>
-              </LinearGradient>
+              <Text style={styles.emptyCtaText}>Tümünü Gör</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -411,7 +397,7 @@ export default function SavedScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: COLORS.bg,
+    backgroundColor: '#eef1f8',
   },
   center: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
@@ -422,6 +408,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingTop: 6,
     paddingBottom: 0,
+    backgroundColor: '#eef1f8',
   },
   headerRow: {
     flexDirection: 'row',
@@ -430,13 +417,13 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   heading: {
-    color: COLORS.white,
+    color: '#051650',
     fontSize: 30,
     fontWeight: '700',
     letterSpacing: -0.8,
   },
   headingCount: {
-    color: 'rgba(255,255,255,0.55)',
+    color: '#8a94a6',
     fontSize: FONT_SIZES.sm,
     fontWeight: '600',
     letterSpacing: 0.2,
@@ -451,24 +438,32 @@ const styles = StyleSheet.create({
   },
   filterChip: {
     paddingVertical: 6,
-    paddingHorizontal: 11,
+    paddingHorizontal: 14,
     borderRadius: RADII.full,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderColor: '#dde1ea',
+    backgroundColor: '#ffffff',
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 1,
   },
   filterChipActive: {
-    backgroundColor: COLORS.white,
-    borderColor: COLORS.white,
+    backgroundColor: '#051650',
+    borderColor: '#051650',
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 3,
   },
   filterText: {
     fontSize: FONT_SIZES.xs + 1,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.7)',
+    color: '#8a94a6',
     letterSpacing: -0.1,
   },
   filterTextActive: {
-    color: '#0a0b12',
+    color: '#ffffff',
   },
 
   // List
@@ -490,21 +485,27 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontWeight: '600',
     letterSpacing: 1.2,
-    color: 'rgba(255,255,255,0.4)',
+    color: '#8a94a6',
   },
   groupLine: {
     flex: 1,
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: '#dde1ea',
   },
 
   // Card
   card: {
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.07)',
+    borderColor: '#dde1ea',
+    backgroundColor: '#ffffff',
     overflow: 'hidden',
     marginTop: 10,
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
+    elevation: 2,
   },
   cardRow: {
     flexDirection: 'row',
@@ -517,14 +518,14 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   cardTitle: {
-    color: COLORS.white,
+    color: '#051650',
     fontSize: 14,
     fontWeight: '600',
     lineHeight: 18,
     letterSpacing: -0.2,
   },
   cardSub: {
-    color: 'rgba(255,255,255,0.6)',
+    color: '#8a94a6',
     fontSize: 11.5,
     marginTop: 4,
   },
@@ -559,13 +560,13 @@ const styles = StyleSheet.create({
   metaTag: {
     fontSize: 10.5,
     fontWeight: '500',
-    color: 'rgba(255,255,255,0.55)',
+    color: '#8a94a6',
   },
   metaSep: {
     width: 2,
     height: 2,
     borderRadius: 1,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: 'rgba(5,22,80,0.18)',
   },
 
   // Card actions
@@ -588,10 +589,15 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 14,
     borderRadius: 11,
-    backgroundColor: COLORS.white,
+    backgroundColor: '#051650',
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 3,
   },
   applyText: {
-    color: '#0a0b12',
+    color: '#ffffff',
     fontSize: 12.5,
     fontWeight: '700',
     letterSpacing: -0.1,
@@ -614,31 +620,33 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   emptyTitle: {
-    color: COLORS.white,
+    color: '#051650',
     fontSize: FONT_SIZES.lg,
     fontWeight: '700',
     textAlign: 'center',
     letterSpacing: -0.3,
   },
   emptyDesc: {
-    color: COLORS.textMuted,
+    color: '#8a94a6',
     fontSize: FONT_SIZES.sm,
     textAlign: 'center',
     lineHeight: 20,
     maxWidth: 260,
   },
   emptyCta: {
-    borderRadius: RADII.full,
-    overflow: 'hidden',
     marginTop: SPACING.xs,
-  },
-  emptyCtaGradient: {
+    backgroundColor: '#051650',
     paddingHorizontal: SPACING.xl,
     paddingVertical: SPACING.sm + 4,
-    alignItems: 'center',
+    borderRadius: RADII.full,
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    elevation: 4,
   },
   emptyCtaText: {
-    color: COLORS.white,
+    color: '#ffffff',
     fontSize: FONT_SIZES.sm,
     fontWeight: '700',
   },
@@ -651,21 +659,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: 'rgba(28,28,38,0.97)',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: '#dde1ea',
     borderRadius: 14,
     paddingVertical: 12,
     paddingHorizontal: 16,
     zIndex: 100,
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.10,
+    shadowRadius: 16,
+    elevation: 6,
   },
   toastText: {
-    color: 'rgba(255,255,255,0.85)',
+    color: '#051650',
     fontSize: FONT_SIZES.sm,
     fontWeight: '500',
   },
   toastUndo: {
-    color: COLORS.accentLight,
+    color: '#7c6dfa',
     fontSize: FONT_SIZES.sm,
     fontWeight: '700',
   },

@@ -205,7 +205,7 @@ export default function JobDetailScreen() {
           <Ionicons
             name={saved ? 'bookmark' : 'bookmark-outline'}
             size={18}
-            color={saved ? '#f59e0b' : 'rgba(255,255,255,0.45)'}
+            color={saved ? '#f59e0b' : '#8a94a6'}
           />
         </TouchableOpacity>
       </View>
@@ -418,20 +418,20 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: RADII.full,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.12)',
+    borderColor: '#dde1ea',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
   saveBtnSaved: {
-    backgroundColor: 'rgba(245,158,11,0.18)',
-    borderColor: 'rgba(245,158,11,0.45)',
+    backgroundColor: 'rgba(245,158,11,0.10)',
+    borderColor: 'rgba(245,158,11,0.35)',
   },
   saveIcon: {
     fontSize: 18,
-    color: 'rgba(255,255,255,0.45)',
+    color: '#8a94a6',
   },
   content: {
     padding: SPACING.lg,
@@ -527,15 +527,15 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     fontWeight: '500',
   },
   matchedChip: {
-    backgroundColor: 'rgba(46,204,113,0.12)',
+    backgroundColor: 'rgba(22,163,74,0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(46,204,113,0.3)',
+    borderColor: 'rgba(22,163,74,0.2)',
     borderRadius: RADII.full,
     paddingHorizontal: SPACING.sm + 4,
     paddingVertical: SPACING.xs + 2,
   },
   matchedChipText: {
-    color: '#2ecc71',
+    color: '#16a34a',
     fontSize: FONT_SIZES.xs,
     fontWeight: '500',
   },
@@ -544,20 +544,20 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     marginTop: SPACING.xs,
   },
   growthHint: {
-    color: '#a5b4fc',
+    color: '#4f46e5',
     fontSize: FONT_SIZES.xs,
     fontWeight: '500',
   },
   growthChip: {
-    backgroundColor: 'rgba(99,102,241,0.1)',
+    backgroundColor: 'rgba(79,70,229,0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(99,102,241,0.25)',
+    borderColor: 'rgba(79,70,229,0.2)',
     borderRadius: RADII.full,
     paddingHorizontal: SPACING.sm + 4,
     paddingVertical: SPACING.xs + 2,
   },
   growthChipText: {
-    color: '#a5b4fc',
+    color: '#4f46e5',
     fontSize: FONT_SIZES.xs,
     fontWeight: '500',
   },

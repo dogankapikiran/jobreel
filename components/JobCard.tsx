@@ -1,11 +1,9 @@
 import React, { useCallback } from 'react';
 import { Alert, AppState, Linking, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { EmploymentType, Job, Seniority } from '@/types';
 import {
-  COLORS,
   FONT_SIZES,
   RADII,
   SPACING,
@@ -18,8 +16,6 @@ import { api } from '@/services/api';
 import { track } from '@/services/analytics';
 import { useBrandColor } from '@/hooks/useBrandColor';
 import CompanyLogo from './CompanyLogo';
-import TagBadge from './TagBadge';
-import SalaryBlock from './SalaryBlock';
 import ActionButtons from './ActionButtons';
 
 interface Props {
@@ -45,25 +41,6 @@ function workTypeShort(wt: Job['workType']): string {
   }
 }
 
-function workTypeLabel(wt: Job['workType']): string {
-  switch (wt) {
-    case 'remote': return 'Uzaktan';
-    case 'hybrid': return 'Hibrit';
-    case 'office': return 'Ofis';
-    default:       return '';
-  }
-}
-
-function employmentLabel(e: EmploymentType): string | null {
-  switch (e) {
-    case 'fulltime':   return 'Tam Zamanlı';
-    case 'parttime':   return 'Yarı Zamanlı';
-    case 'contract':   return 'Sözleşmeli';
-    case 'internship': return 'Staj';
-    default:           return null;
-  }
-}
-
 function seniorityLabel(s: Seniority): string {
   switch (s) {
     case 'junior': return 'JUNIOR';
@@ -74,18 +51,14 @@ function seniorityLabel(s: Seniority): string {
   }
 }
 
-function scoreColor(score: number): string {
-  if (score >= 80) return '#4ade80';
-  if (score >= 60) return '#fbbf24';
-  return '#94a3b8';
-}
-
-/** Hex rengi belirli bir opaklıkta rgba string'e dönüştürür */
-function hexAlpha(hex: string, alpha: number): string {
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return `rgba(${r},${g},${b},${alpha})`;
+function employmentShort(e: EmploymentType): string {
+  switch (e) {
+    case 'fulltime':   return 'TAM ZAMANLI';
+    case 'parttime':   return 'YARI ZAMANLI';
+    case 'contract':   return 'SÖZLEŞMELİ';
+    case 'internship': return 'STAJ';
+    default:           return '';
+  }
 }
 
 const JobCard = React.memo(function JobCard({ job, cardHeight }: Props) {
@@ -107,15 +80,15 @@ const JobCard = React.memo(function JobCard({ job, cardHeight }: Props) {
     }
   }, [followed, job.company, follow, unfollow]);
 
-  const { cardBg, gradient, accent } = useBrandColor(job.company);
+  const { gradient } = useBrandColor(job.company);
 
   const sl   = seniorityLabel(job.seniority);
   const wts  = workTypeShort(job.workType);
-  const wtl  = workTypeLabel(job.workType);
-  const el   = employmentLabel(job.employmentType);
   const city = job.location.split(',')[0]?.trim() || '';
 
-  const chipParts = [sl, wts].filter(Boolean);
+  // seniority ve workType ikisi de bilinmiyorsa employmentType'ı fallback olarak kullan
+  const es = (!sl && !wts) ? employmentShort(job.employmentType) : '';
+  const chipParts = [sl, wts, es].filter(Boolean);
 
   const handleSave = useCallback(() => {
     if (saved) {
@@ -171,38 +144,16 @@ const JobCard = React.memo(function JobCard({ job, cardHeight }: Props) {
     router.push(`/job/${job.id}`);
   }, [job, addInteraction]);
 
+  const showProfileMatch = job.score !== undefined && job.score >= 80;
+
   return (
     <View style={[styles.outer, { height: cardHeight }]}>
       <View style={styles.inner}>
-        {/* Arka plan: koyu tinted base */}
-        <LinearGradient
-          colors={cardBg}
-          locations={[0, 0.55, 1]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
-          style={StyleSheet.absoluteFillObject}
-        />
-        {/* Sağ üst köşe radial taklidi — CSS radial-gradient(at 90% 10%) approx */}
-        <LinearGradient
-          colors={[hexAlpha(gradient[0], 0.65), hexAlpha(gradient[0], 0.18), 'transparent']}
-          locations={[0, 0.42, 0.75]}
-          start={{ x: 1, y: 0 }}
-          end={{ x: 0.05, y: 0.95 }}
-          style={StyleSheet.absoluteFillObject}
-        />
-        {/* Sol alt köşe hafif ambient — CSS radial-gradient(at -10% 110%) approx */}
-        <LinearGradient
-          colors={['transparent', hexAlpha(accent, 0.10), hexAlpha(accent, 0.20)]}
-          locations={[0.45, 0.78, 1]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 0, y: 1 }}
-          style={StyleSheet.absoluteFillObject}
-        />
 
         {/* Şirket satırı */}
         <View style={styles.companyRow}>
-          {/* Sol: logo + isim + tarih */}
-          <TouchableOpacity onPress={handleToggleFollow} activeOpacity={0.7} style={styles.companyLeft}>
+          {/* Sol: logo + isim + takip + tarih */}
+          <View style={styles.companyLeft}>
             <CompanyLogo
               company={job.company}
               gradient={gradient}
@@ -210,17 +161,17 @@ const JobCard = React.memo(function JobCard({ job, cardHeight }: Props) {
               borderRadius={RADII.md}
             />
             <View style={styles.companyMeta}>
-              <View style={styles.companyNameRow}>
+              <TouchableOpacity onPress={handleToggleFollow} activeOpacity={0.7} style={styles.companyNameRow}>
                 <Text style={styles.companyName}>{job.company}</Text>
                 <Text style={[styles.followBadge, followed && styles.followBadgeActive]}>
                   {followed ? '★' : '☆'}
                 </Text>
-              </View>
+              </TouchableOpacity>
               <Text style={styles.postedAt}>{timeAgo(job.postedAt)}</Text>
             </View>
-          </TouchableOpacity>
+          </View>
 
-          {/* Sağ: ikon çifti + eşleşme skoru */}
+          {/* Sağ: ikonlar + eşleşme skoru */}
           <View style={styles.rightColumn}>
             <View style={styles.iconPair}>
               <TouchableOpacity
@@ -231,43 +182,33 @@ const JobCard = React.memo(function JobCard({ job, cardHeight }: Props) {
                 <Ionicons
                   name={saved ? 'bookmark' : 'bookmark-outline'}
                   size={16}
-                  color={saved ? '#f59e0b' : 'rgba(255,255,255,0.6)'}
+                  color={saved ? '#f59e0b' : 'rgba(5,22,80,0.45)'}
                 />
               </TouchableOpacity>
               <TouchableOpacity onPress={handleShare} activeOpacity={0.7} style={styles.iconBtn}>
-                <Ionicons name="share-outline" size={16} color="rgba(255,255,255,0.6)" />
+                <Ionicons name="share-outline" size={16} color="rgba(5,22,80,0.45)" />
               </TouchableOpacity>
             </View>
 
             {job.score !== undefined && (
               <View style={styles.scoreBlock}>
-                <Text style={[styles.scoreLabel, { color: scoreColor(job.score) }]}>EŞLEŞME</Text>
+                <Text style={styles.scoreLabel}>EŞLEŞME</Text>
                 <View style={styles.scoreNumberRow}>
                   <Text style={styles.scoreNumber}>{job.score}</Text>
                   <Text style={styles.scorePercent}>%</Text>
                 </View>
                 <View style={styles.scoreBarBg}>
-                  <View
-                    style={[
-                      styles.scoreBarFill,
-                      { width: `${job.score}%` as any, backgroundColor: scoreColor(job.score) },
-                    ]}
-                  />
+                  <View style={[styles.scoreBarFill, { width: `${job.score}%` as any }]} />
                 </View>
               </View>
             )}
           </View>
         </View>
 
-        {/* Seniority + WorkType chip — brand rengiyle */}
+        {/* Seniority + WorkType chip */}
         {chipParts.length > 0 && (
-          <View style={[
-            styles.seniorityChip,
-            { borderColor: hexAlpha(accent, 0.45), backgroundColor: hexAlpha(accent, 0.14) },
-          ]}>
-            <Text style={[styles.seniorityChipText, { color: accent }]}>
-              {chipParts.join(' · ')}
-            </Text>
+          <View style={styles.seniorityChip}>
+            <Text style={styles.seniorityChipText}>{chipParts.join(' · ')}</Text>
           </View>
         )}
 
@@ -275,44 +216,72 @@ const JobCard = React.memo(function JobCard({ job, cardHeight }: Props) {
         <Text style={styles.title} numberOfLines={2}>{job.title}</Text>
 
         {/* Konum pill */}
-        <View style={styles.locationPill}>
-          <View style={[styles.locationIconBox, { backgroundColor: hexAlpha(accent, 0.18) }]}>
-            <Ionicons name="location-outline" size={13} color={accent} />
-          </View>
-          <View>
+        {(city || job.location) ? (
+          <View style={styles.locationPill}>
+            <View style={styles.locationIconBox}>
+              <Ionicons name="location-outline" size={13} color="#ffffff" />
+            </View>
             <Text style={styles.locationCity}>{city || job.location}</Text>
-            {(wtl || el) ? (
-              <Text style={styles.locationSub}>{[wtl, el].filter(Boolean).join(' · ')}</Text>
-            ) : null}
           </View>
-        </View>
+        ) : null}
 
-        {/* Skill tag chips */}
-        {job.skills && job.skills.length > 0 && (
-          <View style={styles.tags}>
-            {job.skills.slice(0, 5).map((tag) => (
-              <TagBadge key={tag} label={tag} />
-            ))}
-          </View>
-        )}
+        {/* Beceri Analizi */}
+        {(() => {
+          let matched: string[] = [];
+          let missing: string[] = [];
 
-        {/* Maaş */}
-        <SalaryBlock
-          salaryMin={job.salaryMin}
-          salaryMax={job.salaryMax}
-          currency={job.salaryCurrency}
-          period={job.salaryPeriod}
-          accent={accent}
-        />
+          if (job.skills && job.skills.length > 0) {
+            job.skills.slice(0, 5).forEach((s) => {
+              if (job.missingSkills?.includes(s)) missing.push(s);
+              else matched.push(s);
+            });
+          } else {
+            matched = (job.matchedSkills ?? []).slice(0, 3);
+            missing = (job.missingSkills ?? []).slice(0, 2);
+          }
 
-        {/* Coaching Pill */}
-        {job.missingSkills && job.missingSkills.length > 0 && (
-          <View style={[styles.coachingPill, { borderColor: hexAlpha(accent, 0.3), backgroundColor: hexAlpha(accent, 0.1) }]}>
-            <Text style={[styles.coachingIcon, { color: accent }]}>✦</Text>
-            <Text style={[styles.coachingText, { color: accent }]} numberOfLines={1}>
-              {`${job.missingSkills.slice(0, 2).join(', ')}${job.missingSkills.length > 2 ? ` +${job.missingSkills.length - 2}` : ''} ekle${job.potentialScore ? ` → %${job.potentialScore}` : ''}`}
-            </Text>
-          </View>
+          if (matched.length === 0 && missing.length === 0) return null;
+
+          return (
+            <View style={styles.skillAnalysis}>
+              <Text style={styles.skillAnalysisTitle}>Beceri Analizi</Text>
+              {matched.length > 0 && (
+                <View style={styles.skillsWrap}>
+                  {matched.map((s) => (
+                    <View key={s} style={styles.matchedChip}>
+                      <Text style={styles.matchedChipText}>✓ {s}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+              {missing.length > 0 && (
+                <>
+                  <Text style={styles.growthHint}>
+                    {job.potentialScore
+                      ? `Bunları eklersen skorun %${job.potentialScore}'e çıkar:`
+                      : 'Bunları eklersen skorun artar:'}
+                  </Text>
+                  <View style={styles.skillsWrap}>
+                    {missing.map((s) => (
+                      <View key={s} style={styles.growthChip}>
+                        <Text style={styles.growthChipText}>+ {s}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </>
+              )}
+            </View>
+          );
+        })()}
+
+        {/* Profil tam uyumlu CTA */}
+        {showProfileMatch && (
+          <TouchableOpacity style={styles.profileMatchBtn} onPress={handleExplore} activeOpacity={0.85}>
+            <View style={styles.profileMatchPlus}>
+              <Text style={styles.profileMatchPlusText}>+</Text>
+            </View>
+            <Text style={styles.profileMatchLabel}>Profil tam uyumlu</Text>
+          </TouchableOpacity>
         )}
 
         <View style={{ flex: 1 }} />
@@ -330,20 +299,22 @@ const JobCard = React.memo(function JobCard({ job, cardHeight }: Props) {
 export default JobCard;
 
 const styles = StyleSheet.create({
-  /* Outer wrapper: tam yükseklik + kenar boşlukları */
   outer: {
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     paddingVertical: 8,
   },
-  /* İç kart: yuvarlatılmış köşe + kenarlık */
   inner: {
     flex: 1,
-    borderRadius: 28,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderRadius: 24,
+    backgroundColor: '#ffffff',
     overflow: 'hidden',
     padding: SPACING.lg,
     paddingBottom: SPACING.md,
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.10,
+    shadowRadius: 16,
+    elevation: 4,
   },
   companyRow: {
     flexDirection: 'row',
@@ -367,20 +338,20 @@ const styles = StyleSheet.create({
     marginBottom: 3,
   },
   companyName: {
-    color: COLORS.white,
+    color: '#051650',
     fontSize: FONT_SIZES.md,
     fontWeight: '700',
   },
   followBadge: {
     fontSize: 14,
-    color: COLORS.textDim,
+    color: 'rgba(5,22,80,0.30)',
   },
   followBadgeActive: {
     color: '#f59e0b',
   },
   postedAt: {
     fontSize: FONT_SIZES.xs,
-    color: 'rgba(255,255,255,0.5)',
+    color: '#8a94a6',
   },
   rightColumn: {
     alignItems: 'flex-end',
@@ -392,18 +363,15 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.10)',
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#f4f6fb',
     alignItems: 'center',
     justifyContent: 'center',
   },
   iconBtnSaved: {
-    backgroundColor: 'rgba(245,158,11,0.18)',
-    borderColor: 'rgba(245,158,11,0.45)',
+    backgroundColor: 'rgba(245,158,11,0.12)',
   },
   scoreBlock: {
     alignItems: 'flex-end',
@@ -411,9 +379,10 @@ const styles = StyleSheet.create({
   scoreLabel: {
     fontSize: 9,
     fontWeight: '600',
-    letterSpacing: 1,
+    letterSpacing: 0.8,
     textTransform: 'uppercase',
     marginBottom: 2,
+    color: '#8a94a6',
   },
   scoreNumberRow: {
     flexDirection: 'row',
@@ -421,28 +390,29 @@ const styles = StyleSheet.create({
     gap: 1,
   },
   scoreNumber: {
-    color: COLORS.white,
-    fontSize: 28,
-    fontWeight: '700',
+    color: '#051650',
+    fontSize: 30,
+    fontWeight: '800',
     letterSpacing: -0.5,
-    lineHeight: 30,
+    lineHeight: 32,
   },
   scorePercent: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: 13,
+    color: '#051650',
+    fontSize: 14,
     fontWeight: '600',
   },
   scoreBarBg: {
-    marginTop: 4,
+    marginTop: 3,
     width: 70,
     height: 3,
     borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: 'rgba(5,22,80,0.10)',
     overflow: 'hidden',
   },
   scoreBarFill: {
     height: 3,
     borderRadius: 2,
+    backgroundColor: '#051650',
   },
   seniorityChip: {
     alignSelf: 'flex-start',
@@ -452,19 +422,22 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     marginTop: SPACING.md,
     marginBottom: SPACING.sm,
+    backgroundColor: 'rgba(5,22,80,0.07)',
+    borderColor: 'rgba(5,22,80,0.18)',
   },
   seniorityChipText: {
     fontSize: 10.5,
     fontWeight: '600',
-    letterSpacing: 0.12 * 10,
+    letterSpacing: 1.2,
     textTransform: 'uppercase',
+    color: '#051650',
   },
   title: {
-    color: COLORS.white,
-    fontSize: 36,
-    fontWeight: '700',
-    letterSpacing: -1.4,
-    lineHeight: 38,
+    color: '#051650',
+    fontSize: 30,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+    lineHeight: 33,
     marginTop: 10,
     marginBottom: SPACING.md + 4,
   },
@@ -472,59 +445,100 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     alignSelf: 'stretch',
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    backgroundColor: '#f4f6fb',
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
     marginBottom: SPACING.md,
     gap: 10,
   },
   locationIconBox: {
-    width: 28,
-    height: 28,
-    borderRadius: 9,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: '#051650',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
   },
   locationCity: {
-    color: COLORS.white,
+    color: '#051650',
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '700',
+  },
+  skillAnalysis: {
+    gap: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  skillAnalysisTitle: {
+    color: '#051650',
     fontSize: FONT_SIZES.sm,
     fontWeight: '600',
   },
-  locationSub: {
-    color: 'rgba(255,255,255,0.55)',
-    fontSize: FONT_SIZES.xs,
-    marginTop: 2,
-  },
-  tags: {
+  skillsWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: SPACING.xs + 2,
-    marginBottom: SPACING.md,
+    gap: SPACING.sm,
   },
-  coachingPill: {
+  matchedChip: {
+    backgroundColor: 'rgba(46,204,113,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(46,204,113,0.3)',
+    borderRadius: RADII.full,
+    paddingHorizontal: SPACING.sm + 4,
+    paddingVertical: SPACING.xs + 2,
+  },
+  matchedChipText: {
+    color: '#1db860',
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '600',
+  },
+  growthHint: {
+    color: 'rgba(5,22,80,0.45)',
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '500',
+  },
+  growthChip: {
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(5,22,80,0.18)',
+    borderRadius: RADII.full,
+    paddingHorizontal: SPACING.sm + 4,
+    paddingVertical: SPACING.xs + 2,
+    backgroundColor: 'transparent',
+  },
+  growthChipText: {
+    color: 'rgba(5,22,80,0.35)',
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '500',
+  },
+  profileMatchBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.xs,
-    marginTop: SPACING.sm,
-    borderWidth: 1,
-    borderStyle: 'dashed',
+    gap: 10,
+    backgroundColor: '#051650',
     borderRadius: 14,
-    paddingHorizontal: 13,
-    paddingVertical: 10,
-    alignSelf: 'stretch',
+    paddingVertical: 14,
+    paddingHorizontal: 20,
+    marginBottom: SPACING.sm,
   },
-  coachingIcon: {
-    fontSize: 12,
-    flexShrink: 0,
+  profileMatchPlus: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  coachingText: {
-    fontSize: FONT_SIZES.xs + 0.5,
-    fontWeight: '500',
-    flex: 1,
-    lineHeight: 16,
+  profileMatchPlusText: {
+    color: '#ffffff',
+    fontSize: 18,
+    lineHeight: 22,
+    fontWeight: '700',
+  },
+  profileMatchLabel: {
+    color: '#ffffff',
+    fontSize: FONT_SIZES.md,
+    fontWeight: '600',
   },
 });

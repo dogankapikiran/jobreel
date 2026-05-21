@@ -12,7 +12,7 @@ import * as Linking from 'expo-linking';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useUserStore } from '@/store/userStore';
 import { api } from '@/services/api';
-import { COLORS, FONT_SIZES, RADII, SPACING } from '@/constants/theme';
+import { FONT_SIZES, RADII, SPACING } from '@/constants/theme';
 
 const LINKEDIN_CLIENT_ID = process.env.EXPO_PUBLIC_LINKEDIN_CLIENT_ID ?? '';
 const LINKEDIN_REDIRECT_URI = 'https://api.jobreel.app/linkedin/callback';
@@ -108,7 +108,7 @@ export default function LinkedInConnectModal() {
           activeOpacity={0.8}
         >
           {connecting
-            ? <ActivityIndicator color={COLORS.white} />
+            ? <ActivityIndicator color="#ffffff" />
             : <Text style={styles.btnText}>LinkedIn ile Bağlan</Text>
           }
         </TouchableOpacity>
@@ -125,19 +125,23 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    backgroundColor: 'rgba(5,22,80,0.35)',
   },
   sheet: {
-    backgroundColor: COLORS.cardBg,
+    backgroundColor: '#ffffff',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: SPACING.lg,
     paddingBottom: SPACING.xxl,
     gap: SPACING.md,
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
   },
   handle: {
     width: 36, height: 4, borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: '#dde1ea',
     alignSelf: 'center',
     marginBottom: SPACING.sm,
   },
@@ -147,14 +151,14 @@ const styles = StyleSheet.create({
     backgroundColor: '#0A66C2',
     alignItems: 'center', justifyContent: 'center',
   },
-  logoText: { color: COLORS.white, fontWeight: '800', fontSize: 18 },
-  title: { color: COLORS.white, fontSize: FONT_SIZES.lg, fontWeight: '700' },
+  logoText: { color: '#ffffff', fontWeight: '800', fontSize: 18 },
+  title: { color: '#051650', fontSize: FONT_SIZES.lg, fontWeight: '700' },
   description: {
-    color: COLORS.textMuted,
+    color: '#8a94a6',
     fontSize: FONT_SIZES.sm,
     lineHeight: 20,
   },
-  error: { color: '#ff6b6b', fontSize: FONT_SIZES.sm, textAlign: 'center' },
+  error: { color: '#ef4444', fontSize: FONT_SIZES.sm, textAlign: 'center' },
   btn: {
     backgroundColor: '#0A66C2',
     borderRadius: RADII.full,
@@ -162,7 +166,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   btnDisabled: { opacity: 0.6 },
-  btnText: { color: COLORS.white, fontWeight: '700', fontSize: FONT_SIZES.md },
+  btnText: { color: '#ffffff', fontWeight: '700', fontSize: FONT_SIZES.md },
   cancelBtn: { alignItems: 'center', paddingVertical: SPACING.sm },
-  cancelText: { color: COLORS.textDim, fontSize: FONT_SIZES.sm },
+  cancelText: { color: '#8a94a6', fontSize: FONT_SIZES.sm },
 });

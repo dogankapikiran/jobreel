@@ -8,6 +8,8 @@ interface TagStyle {
   bg: string;
   border: string;
   text: string;
+  borderStyle?: 'solid' | 'dashed';
+  fontWeight?: '400' | '700';
 }
 
 function resolveStyle(variant?: TagVariant): TagStyle {
@@ -34,9 +36,26 @@ function resolveStyle(variant?: TagVariant): TagStyle {
 interface Props {
   label: string;
   variant?: TagVariant;
+  matched?: boolean;
 }
 
-export default function TagBadge({ label, variant }: Props) {
+export default function TagBadge({ label, variant, matched }: Props) {
+  if (matched === true) {
+    return (
+      <View style={styles.tagMatched}>
+        <Text style={styles.textMatched}>{label}</Text>
+      </View>
+    );
+  }
+
+  if (matched === false) {
+    return (
+      <View style={styles.tagMissing}>
+        <Text style={styles.textMissing}>{label}</Text>
+      </View>
+    );
+  }
+
   const s = resolveStyle(variant);
   return (
     <View style={[styles.tag, { backgroundColor: s.bg, borderColor: s.border }]}>
@@ -49,11 +68,39 @@ const styles = StyleSheet.create({
   tag: {
     paddingHorizontal: SPACING.sm + 4,
     paddingVertical: SPACING.xs + 2,
-    borderRadius: RADII.sm,
+    borderRadius: RADII.full,
     borderWidth: 1,
   },
   text: {
     fontSize: FONT_SIZES.xs,
     fontWeight: '500',
+  },
+  tagMatched: {
+    paddingHorizontal: SPACING.sm + 4,
+    paddingVertical: SPACING.xs + 2,
+    borderRadius: RADII.full,
+    borderWidth: 1.5,
+    borderStyle: 'solid',
+    borderColor: '#051650',
+    backgroundColor: 'rgba(5,22,80,0.07)',
+  },
+  textMatched: {
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '700',
+    color: '#051650',
+  },
+  tagMissing: {
+    paddingHorizontal: SPACING.sm + 4,
+    paddingVertical: SPACING.xs + 2,
+    borderRadius: RADII.full,
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: 'rgba(5,22,80,0.18)',
+    backgroundColor: 'transparent',
+  },
+  textMissing: {
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '400',
+    color: 'rgba(5,22,80,0.30)',
   },
 });

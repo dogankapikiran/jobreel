@@ -2,9 +2,9 @@
 
 ## Açıklama (Türkçe)
 
-İş ilanlarını kaydırarak keşfet — LinkedIn değil, akış.
+İş ilanlarını kaydırarak keşfet — Akışta kal.
 
-JobReel, binlerce iş ilanını LinkedIn ve Indeed'den çekip sana özel
+JobReel, binlerce iş ilanını sana özel
 bir akışa dönüştürür. Ünvanın, sektörün ve tercihlerine göre sıralanan
 ilanları kaydır; beğendiğini kaydet, tek tuşla başvur,
 ilgilenmediğini geç.

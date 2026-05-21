@@ -230,9 +230,7 @@ export default function FeedScreen() {
           activeOpacity={0.7}
           onPress={() => listRef.current?.scrollToOffset({ offset: 0, animated: true })}
         >
-          <Text style={styles.logo}>
-            Job<Text style={styles.logoAccent}>Reel</Text>
-          </Text>
+          <Text style={styles.logo}>JobReel</Text>
         </TouchableOpacity>
         <View style={styles.headerRight}>
           <TouchableOpacity
@@ -240,14 +238,18 @@ export default function FeedScreen() {
             activeOpacity={0.7}
             onPress={() => setShowSearchBars((v) => !v)}
           >
-            <Ionicons name="search-outline" size={18} color="rgba(255,255,255,0.7)" />
+            <Ionicons name="search-outline" size={18} color={showSearchBars ? '#ffffff' : '#051650'} />
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.headerIconBtn, (filters.workType !== 'any' || filters.seniority.length > 0 || filters.keyword || filters.minScore > 0) && styles.headerIconBtnActive]}
             activeOpacity={0.7}
             onPress={() => setShowFilter(true)}
           >
-            <Ionicons name="options-outline" size={18} color="rgba(255,255,255,0.7)" />
+            <Ionicons
+              name="options-outline"
+              size={18}
+              color={(filters.workType !== 'any' || filters.seniority.length > 0 || filters.keyword || filters.minScore > 0) ? '#ffffff' : '#051650'}
+            />
           </TouchableOpacity>
         </View>
       </View>
@@ -381,7 +383,7 @@ export default function FeedScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: COLORS.bg,
+    backgroundColor: '#eef1f8',
   },
   center: {
     flex: 1,
@@ -395,52 +397,57 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.lg,
-    backgroundColor: COLORS.bg,
+    backgroundColor: '#eef1f8',
   },
   logo: {
-    color: COLORS.white,
+    color: '#051650',
     fontSize: FONT_SIZES.xl,
     fontWeight: '800',
     letterSpacing: -0.5,
   },
-  logoAccent: {
-    color: COLORS.accent,
-  },
+
   headerRight: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.sm,
   },
   headerIconBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#ffffff',
+    borderWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.10,
+    shadowRadius: 6,
+    elevation: 2,
   },
   headerIconBtnActive: {
-    backgroundColor: `${COLORS.accent}22`,
-    borderColor: `${COLORS.accent}55`,
+    backgroundColor: '#051650',
   },
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginHorizontal: SPACING.lg,
     marginBottom: SPACING.sm,
-    height: 40,
-    backgroundColor: COLORS.cardBg,
-    borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-    borderRadius: RADII.full,
+    height: 44,
+    backgroundColor: '#ffffff',
+    borderWidth: 0,
+    borderRadius: 12,
     paddingHorizontal: SPACING.md,
     gap: SPACING.sm,
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
+    elevation: 2,
   },
   searchInput: {
     flex: 1,
-    color: COLORS.white,
+    color: '#051650',
     fontSize: FONT_SIZES.sm,
     height: '100%',
   },
@@ -448,7 +455,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   searchClearText: {
-    color: COLORS.textDim,
+    color: '#8a94a6',
     fontSize: 12,
   },
   dots: {
@@ -461,40 +468,40 @@ const styles = StyleSheet.create({
     width: 4,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(5,22,80,0.15)',
   },
   dotActive: {
     height: 20,
-    backgroundColor: COLORS.accent,
+    backgroundColor: '#051650',
     borderRadius: 2,
   },
   loadingText: {
-    color: COLORS.textMuted,
+    color: '#8a94a6',
     fontSize: FONT_SIZES.sm,
   },
   emptyText: {
-    color: COLORS.textMuted,
+    color: '#051650',
     fontSize: FONT_SIZES.md,
   },
   emptySubText: {
-    color: COLORS.textDim,
+    color: '#8a94a6',
     fontSize: FONT_SIZES.xs,
     textAlign: 'center',
     maxWidth: 240,
   },
   loadingSubText: {
-    color: COLORS.textDim,
+    color: '#8a94a6',
     fontSize: FONT_SIZES.xs,
     marginTop: 4,
   },
   retryBtn: {
-    backgroundColor: COLORS.accent,
+    backgroundColor: '#051650',
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.sm,
     borderRadius: RADII.full,
   },
   retryText: {
-    color: COLORS.white,
+    color: '#ffffff',
     fontWeight: '600',
     fontSize: FONT_SIZES.sm,
   },
@@ -504,24 +511,29 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: SPACING.sm,
     paddingVertical: SPACING.sm,
-    backgroundColor: `${COLORS.accent}18`,
+    backgroundColor: 'rgba(5,22,80,0.06)',
     borderBottomWidth: 1,
-    borderBottomColor: `${COLORS.accent}44`,
+    borderBottomColor: 'rgba(5,22,80,0.10)',
   },
   filteringText: {
-    color: COLORS.accent,
+    color: '#051650',
     fontSize: FONT_SIZES.xs,
     fontWeight: '600',
   },
   recentDropdown: {
     marginHorizontal: SPACING.lg,
     marginTop: -SPACING.xs,
-    backgroundColor: COLORS.cardBg,
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderColor: '#dde1ea',
     borderRadius: RADII.lg,
     overflow: 'hidden',
     zIndex: 100,
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 3,
   },
   recentHeader: {
     flexDirection: 'row',
@@ -530,17 +542,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.cardBorder,
+    borderBottomColor: '#dde1ea',
   },
   recentTitle: {
-    color: COLORS.textDim,
+    color: '#8a94a6',
     fontSize: FONT_SIZES.xs,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   recentClear: {
-    color: COLORS.accent,
+    color: '#051650',
     fontSize: FONT_SIZES.xs,
     fontWeight: '600',
   },
@@ -551,10 +563,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm + 2,
     borderBottomWidth: 1,
-    borderBottomColor: `${COLORS.cardBorder}88`,
+    borderBottomColor: '#f0f2f7',
   },
   recentItemText: {
-    color: COLORS.white,
+    color: '#051650',
     fontSize: FONT_SIZES.sm,
   },
 });

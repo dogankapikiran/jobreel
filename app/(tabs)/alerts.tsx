@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, JobAlert } from '@/services/api';
-import { BOTTOM_NAV_HEIGHT, COLORS, FONT_SIZES, RADII, SPACING } from '@/constants/theme';
+import { BOTTOM_NAV_HEIGHT, FONT_SIZES, RADII, SPACING } from '@/constants/theme';
 
 const WT_OPTIONS = [
   { value: 'any',    label: 'Farketmez' },
@@ -171,7 +171,7 @@ export default function AlertsScreen() {
 
           {loading ? (
             <View style={styles.center}>
-              <ActivityIndicator color={COLORS.accent} />
+              <ActivityIndicator color="#051650" />
             </View>
           ) : alerts.length === 0 ? (
             <TouchableOpacity onPress={openModal} style={styles.emptyCard} activeOpacity={0.75}>
@@ -195,9 +195,9 @@ export default function AlertsScreen() {
                   <Switch
                     value={alert.enabled}
                     onValueChange={(v) => handleToggle(alert.id, v)}
-                    trackColor={{ false: COLORS.cardBorder, true: `${COLORS.accent}88` }}
-                    thumbColor={alert.enabled ? COLORS.accent : COLORS.textDim}
-                    ios_backgroundColor={COLORS.cardBorder}
+                    trackColor={{ false: '#dde1ea', true: 'rgba(5,22,80,0.4)' }}
+                    thumbColor={alert.enabled ? '#051650' : '#aab0bd'}
+                    ios_backgroundColor="#dde1ea"
                   />
                   <TouchableOpacity
                     onPress={() => handleDelete(alert.id)}
@@ -244,7 +244,7 @@ export default function AlertsScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="örn. React Native, Product Manager"
-                placeholderTextColor={COLORS.textDim}
+                placeholderTextColor="rgba(5,22,80,0.35)"
                 value={form.keyword}
                 onChangeText={(v) => setForm((p) => ({ ...p, keyword: v }))}
                 returnKeyType="next"
@@ -256,7 +256,7 @@ export default function AlertsScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="İstanbul, Turkey"
-                placeholderTextColor={COLORS.textDim}
+                placeholderTextColor="rgba(5,22,80,0.35)"
                 value={form.location}
                 onChangeText={(v) => setForm((p) => ({ ...p, location: v }))}
                 returnKeyType="done"
@@ -325,12 +325,15 @@ export default function AlertsScreen() {
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: COLORS.bg },
+  screen: { flex: 1, backgroundColor: '#eef1f8' },
+
+  // Header
   header: {
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
+    backgroundColor: '#eef1f8',
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.cardBorder,
+    borderBottomColor: '#dde1ea',
   },
   headerRow: {
     flexDirection: 'row',
@@ -339,91 +342,117 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   title: {
-    color: COLORS.white,
+    color: '#051650',
     fontSize: FONT_SIZES.xl,
     fontWeight: '800',
     letterSpacing: -0.5,
   },
   subtitle: {
-    color: COLORS.textDim,
+    color: '#8a94a6',
     fontSize: FONT_SIZES.xs,
     marginTop: 2,
   },
   addBtn: {
-    backgroundColor: COLORS.accent,
+    backgroundColor: '#051650',
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.xs + 2,
     borderRadius: RADII.full,
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    elevation: 3,
   },
   addBtnText: {
     color: '#fff',
     fontSize: FONT_SIZES.xs,
     fontWeight: '700',
   },
+
+  // Content
   content: { padding: SPACING.lg, gap: SPACING.lg },
   section: { gap: SPACING.sm },
   sectionTitle: {
-    color: COLORS.textMuted,
+    color: '#8a94a6',
     fontSize: FONT_SIZES.xs,
     fontWeight: '600',
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
+
+  // Alert cards
   alertCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.cardBg,
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderColor: '#dde1ea',
     borderRadius: RADII.lg,
     padding: SPACING.md,
     gap: SPACING.md,
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   alertLeft: { flex: 1 },
   alertLabel: {
-    color: COLORS.white,
+    color: '#051650',
     fontSize: FONT_SIZES.sm,
     fontWeight: '600',
   },
   alertSub: {
-    color: COLORS.textDim,
+    color: '#8a94a6',
     fontSize: FONT_SIZES.xs,
     marginTop: 2,
   },
   alertActions: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
   deleteBtn: { padding: 4 },
-  deleteText: { color: COLORS.textDim, fontSize: 14 },
+  deleteText: { color: '#aab0bd', fontSize: 14 },
+
+  // Loading / empty
   center: { alignItems: 'center', paddingVertical: SPACING.xl },
   emptyCard: {
-    backgroundColor: COLORS.cardBg,
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderColor: '#dde1ea',
     borderRadius: RADII.lg,
     padding: SPACING.xl,
     alignItems: 'center',
     gap: SPACING.sm,
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   emptyIcon: { fontSize: 32 },
-  emptyText: { color: COLORS.textMuted, fontSize: FONT_SIZES.md, fontWeight: '600' },
+  emptyText: { color: '#051650', fontSize: FONT_SIZES.md, fontWeight: '600' },
   emptySubText: {
-    color: COLORS.textDim,
+    color: '#8a94a6',
     fontSize: FONT_SIZES.xs,
     textAlign: 'center',
     maxWidth: 240,
   },
   emptyAddBtn: {
     marginTop: SPACING.sm,
-    backgroundColor: COLORS.accent,
+    backgroundColor: '#051650',
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.sm,
     borderRadius: RADII.full,
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    elevation: 3,
   },
   emptyAddBtnText: { color: '#fff', fontSize: FONT_SIZES.sm, fontWeight: '700' },
 
   // Modal
   modalOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.55)',
+    backgroundColor: 'rgba(5,22,80,0.35)',
   },
   modalWrapper: {
     position: 'absolute',
@@ -432,20 +461,25 @@ const styles = StyleSheet.create({
     right: 0,
   },
   modalSheet: {
-    backgroundColor: '#12121e',
+    backgroundColor: '#ffffff',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
     paddingHorizontal: SPACING.lg,
     paddingTop: SPACING.sm,
     maxHeight: '85%',
     borderTopWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderColor: '#dde1ea',
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 10,
   },
   handle: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: 'rgba(255,255,255,0.15)',
+    backgroundColor: '#dde1ea',
     alignSelf: 'center',
     marginBottom: SPACING.md,
   },
@@ -456,18 +490,18 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.lg,
   },
   modalTitle: {
-    color: COLORS.white,
+    color: '#051650',
     fontSize: FONT_SIZES.lg,
     fontWeight: '800',
     letterSpacing: -0.5,
   },
   modalClose: {
-    color: COLORS.textMuted,
+    color: '#8a94a6',
     fontSize: 17,
     fontWeight: '600',
   },
   fieldLabel: {
-    color: COLORS.textMuted,
+    color: '#8a94a6',
     fontSize: FONT_SIZES.xs,
     fontWeight: '600',
     textTransform: 'uppercase',
@@ -475,13 +509,13 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xs,
   },
   input: {
-    backgroundColor: COLORS.cardBg,
+    backgroundColor: '#f4f6fb',
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderColor: '#dde1ea',
     borderRadius: RADII.md,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm + 2,
-    color: COLORS.white,
+    color: '#051650',
     fontSize: FONT_SIZES.sm,
   },
   chipRow: {
@@ -494,28 +528,33 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xs + 2,
     borderRadius: RADII.full,
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
-    backgroundColor: COLORS.cardBg,
+    borderColor: '#dde1ea',
+    backgroundColor: '#ffffff',
   },
   chipActive: {
-    backgroundColor: `${COLORS.accent}22`,
-    borderColor: `${COLORS.accent}88`,
+    backgroundColor: '#051650',
+    borderColor: '#051650',
   },
   chipText: {
-    color: COLORS.textMuted,
+    color: '#8a94a6',
     fontSize: FONT_SIZES.xs,
     fontWeight: '600',
   },
   chipTextActive: {
-    color: COLORS.accentLight,
+    color: '#ffffff',
   },
   submitBtn: {
     marginTop: SPACING.xl,
     marginBottom: SPACING.sm,
-    backgroundColor: COLORS.accent,
+    backgroundColor: '#051650',
     borderRadius: RADII.lg,
     paddingVertical: SPACING.md,
     alignItems: 'center',
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    elevation: 4,
   },
   submitText: {
     color: '#fff',

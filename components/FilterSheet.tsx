@@ -8,11 +8,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Seniority, WorkType } from '@/types';
 import { SavedSearch, searchLabel, useSearchStore } from '@/store/searchStore';
-import { FONT_SIZES, GRADIENTS, RADII, SPACING, ThemeColors } from '@/constants/theme';
+import { FONT_SIZES, RADII, SPACING, ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 
 const WORK_TYPES: { value: WorkType | 'any'; label: string; icon: string }[] = [
@@ -235,11 +234,9 @@ export default function FilterSheet({ visible, current, onApply, onClose }: Prop
           <TouchableOpacity style={styles.saveBtn} onPress={handleSave} activeOpacity={0.8}>
             <Text style={styles.saveBtnText}>Aramayı Kaydet</Text>
           </TouchableOpacity>
-          <LinearGradient colors={GRADIENTS[0]} style={styles.applyBtn}>
-            <TouchableOpacity style={styles.applyInner} onPress={handleApply} activeOpacity={0.85}>
-              <Text style={styles.applyText}>Uygula</Text>
-            </TouchableOpacity>
-          </LinearGradient>
+          <TouchableOpacity style={styles.applyBtn} onPress={handleApply} activeOpacity={0.85}>
+            <Text style={styles.applyText}>Uygula</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </Modal>
@@ -449,14 +446,12 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     flex: 1,
     borderRadius: RADII.full,
     height: 52,
-  },
-  applyInner: {
-    flex: 1,
+    backgroundColor: colors.accent,
     alignItems: 'center',
     justifyContent: 'center',
   },
   applyText: {
-    color: colors.white,
+    color: '#ffffff',
     fontSize: FONT_SIZES.md,
     fontWeight: '800',
   },

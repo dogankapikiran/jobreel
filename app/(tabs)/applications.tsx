@@ -15,7 +15,7 @@ import { useRouter } from 'expo-router';
 import { Job } from '@/types';
 import { useFeedStore } from '@/store/feedStore';
 import { timeAgo } from '@/services/api';
-import { BOTTOM_NAV_HEIGHT, COLORS, FONT_SIZES, RADII, SPACING } from '@/constants/theme';
+import { BOTTOM_NAV_HEIGHT, FONT_SIZES, RADII, SPACING } from '@/constants/theme';
 import { brandColors } from '@/services/logoService';
 import CompanyLogo from '@/components/CompanyLogo';
 
@@ -69,9 +69,9 @@ function ApplicationCard({ job }: { job: Job }) {
       style={styles.card}
     >
       <LinearGradient
-        colors={[hexAlpha(accent, 0.22), 'transparent']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 0.85, y: 0.9 }}
+        colors={[hexAlpha(accent, 0.08), 'transparent']}
+        start={{ x: 1, y: 0 }}
+        end={{ x: 0.2, y: 1 }}
         style={StyleSheet.absoluteFillObject}
       />
 
@@ -86,13 +86,13 @@ function ApplicationCard({ job }: { job: Job }) {
           <View style={styles.metaRow}>
             {isClosed ? (
               <View style={styles.pillClosed}>
-                <View style={[styles.pillDot, { backgroundColor: '#5a5a7a' }]} />
-                <Text style={[styles.pillText, { color: '#5a5a7a' }]}>İlan Kapalı</Text>
+                <View style={[styles.pillDot, { backgroundColor: '#94a3b8' }]} />
+                <Text style={[styles.pillText, { color: '#64748b' }]}>İlan Kapalı</Text>
               </View>
             ) : (
               <View style={styles.pillApplied}>
-                <View style={[styles.pillDot, { backgroundColor: '#86efac' }]} />
-                <Text style={[styles.pillText, { color: '#2ecc71' }]}>Başvuruldu</Text>
+                <View style={[styles.pillDot, { backgroundColor: '#22c55e' }]} />
+                <Text style={[styles.pillText, { color: '#16a34a' }]}>Başvuruldu</Text>
               </View>
             )}
             <View style={styles.metaSep} />
@@ -205,13 +205,7 @@ export default function ApplicationsScreen() {
               activeOpacity={0.8}
               style={styles.emptyCta}
             >
-              <LinearGradient
-                colors={['#7c6dfa', '#4facfe']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={styles.emptyCtaGradient}
-              >
-                <Text style={styles.emptyCtaText}>İlanları Keşfet →</Text>
-              </LinearGradient>
+              <Text style={styles.emptyCtaText}>İlanları Keşfet →</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity
@@ -219,13 +213,7 @@ export default function ApplicationsScreen() {
               activeOpacity={0.8}
               style={styles.emptyCta}
             >
-              <LinearGradient
-                colors={['#7c6dfa', '#4facfe']}
-                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
-                style={styles.emptyCtaGradient}
-              >
-                <Text style={styles.emptyCtaText}>Tümünü Gör</Text>
-              </LinearGradient>
+              <Text style={styles.emptyCtaText}>Tümünü Gör</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -254,7 +242,7 @@ export default function ApplicationsScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: COLORS.bg,
+    backgroundColor: '#eef1f8',
   },
 
   // Header
@@ -262,6 +250,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingTop: 6,
     paddingBottom: 0,
+    backgroundColor: '#eef1f8',
   },
   headerRow: {
     flexDirection: 'row',
@@ -270,13 +259,13 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   heading: {
-    color: COLORS.white,
+    color: '#051650',
     fontSize: 30,
     fontWeight: '700',
     letterSpacing: -0.8,
   },
   headingCount: {
-    color: 'rgba(255,255,255,0.55)',
+    color: '#8a94a6',
     fontSize: FONT_SIZES.sm,
     fontWeight: '600',
     letterSpacing: 0.2,
@@ -291,24 +280,32 @@ const styles = StyleSheet.create({
   },
   filterChip: {
     paddingVertical: 6,
-    paddingHorizontal: 11,
+    paddingHorizontal: 14,
     borderRadius: RADII.full,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    borderColor: '#dde1ea',
+    backgroundColor: '#ffffff',
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 1,
   },
   filterChipActive: {
-    backgroundColor: COLORS.white,
-    borderColor: COLORS.white,
+    backgroundColor: '#051650',
+    borderColor: '#051650',
+    shadowOpacity: 0.18,
+    shadowRadius: 8,
+    elevation: 3,
   },
   filterText: {
     fontSize: FONT_SIZES.xs + 1,
     fontWeight: '600',
-    color: 'rgba(255,255,255,0.7)',
+    color: '#8a94a6',
     letterSpacing: -0.1,
   },
   filterTextActive: {
-    color: '#0a0b12',
+    color: '#ffffff',
   },
 
   // List
@@ -330,21 +327,27 @@ const styles = StyleSheet.create({
     fontSize: 10.5,
     fontWeight: '600',
     letterSpacing: 1.2,
-    color: 'rgba(255,255,255,0.4)',
+    color: '#8a94a6',
   },
   groupLine: {
     flex: 1,
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: '#dde1ea',
   },
 
   // Card
   card: {
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.07)',
+    borderColor: '#dde1ea',
+    backgroundColor: '#ffffff',
     overflow: 'hidden',
     marginTop: 10,
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
+    elevation: 2,
   },
   cardRow: {
     flexDirection: 'row',
@@ -357,14 +360,14 @@ const styles = StyleSheet.create({
     minWidth: 0,
   },
   cardTitle: {
-    color: COLORS.white,
+    color: '#051650',
     fontSize: 14,
     fontWeight: '600',
     lineHeight: 18,
     letterSpacing: -0.2,
   },
   cardSub: {
-    color: 'rgba(255,255,255,0.6)',
+    color: '#8a94a6',
     fontSize: 11.5,
     marginTop: 4,
   },
@@ -385,8 +388,8 @@ const styles = StyleSheet.create({
     paddingRight: 7,
     borderRadius: RADII.full,
     borderWidth: 1,
-    backgroundColor: 'rgba(46,204,113,0.13)',
-    borderColor: 'rgba(46,204,113,0.28)',
+    backgroundColor: 'rgba(22,163,74,0.10)',
+    borderColor: 'rgba(22,163,74,0.25)',
   },
   pillClosed: {
     flexDirection: 'row',
@@ -398,8 +401,8 @@ const styles = StyleSheet.create({
     paddingRight: 7,
     borderRadius: RADII.full,
     borderWidth: 1,
-    backgroundColor: 'rgba(90,90,122,0.15)',
-    borderColor: 'rgba(90,90,122,0.35)',
+    backgroundColor: 'rgba(100,116,139,0.10)',
+    borderColor: 'rgba(100,116,139,0.25)',
   },
   pillDot: {
     width: 5,
@@ -414,13 +417,13 @@ const styles = StyleSheet.create({
   metaTag: {
     fontSize: 10.5,
     fontWeight: '500',
-    color: 'rgba(255,255,255,0.55)',
+    color: '#8a94a6',
   },
   metaSep: {
     width: 2,
     height: 2,
     borderRadius: 1,
-    backgroundColor: 'rgba(255,255,255,0.25)',
+    backgroundColor: 'rgba(5,22,80,0.18)',
   },
 
   // Detail button
@@ -430,14 +433,17 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 13,
     borderRadius: 11,
-    backgroundColor: 'rgba(124,109,250,0.13)',
-    borderWidth: 1,
-    borderColor: 'rgba(124,109,250,0.28)',
+    backgroundColor: '#051650',
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.22,
+    shadowRadius: 8,
+    elevation: 3,
   },
   detailText: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#a89cfc',
+    color: '#ffffff',
   },
 
   // Empty state
@@ -457,31 +463,33 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
   },
   emptyTitle: {
-    color: COLORS.white,
+    color: '#051650',
     fontSize: FONT_SIZES.lg,
     fontWeight: '700',
     textAlign: 'center',
     letterSpacing: -0.3,
   },
   emptyDesc: {
-    color: COLORS.textMuted,
+    color: '#8a94a6',
     fontSize: FONT_SIZES.sm,
     textAlign: 'center',
     lineHeight: 20,
     maxWidth: 260,
   },
   emptyCta: {
-    borderRadius: RADII.full,
-    overflow: 'hidden',
     marginTop: SPACING.xs,
-  },
-  emptyCtaGradient: {
+    backgroundColor: '#051650',
     paddingHorizontal: SPACING.xl,
     paddingVertical: SPACING.sm + 4,
-    alignItems: 'center',
+    borderRadius: RADII.full,
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    elevation: 4,
   },
   emptyCtaText: {
-    color: COLORS.white,
+    color: '#ffffff',
     fontSize: FONT_SIZES.sm,
     fontWeight: '700',
   },

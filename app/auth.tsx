@@ -10,7 +10,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
@@ -20,17 +19,18 @@ WebBrowser.maybeCompleteAuthSession();
 import { useAuthStore } from '@/store/authStore';
 import { useUserStore } from '@/store/userStore';
 import { supabase } from '@/services/supabase';
-import { ACCENT_GRADIENT, COLORS, FONT_SIZES, RADII, SPACING } from '@/constants/theme';
-import { useTheme } from '@/contexts/ThemeContext';
+import { LinearGradient } from 'expo-linear-gradient';
+import { FONT_SIZES, GRADIENTS, RADII, SPACING } from '@/constants/theme';
 
 export default function AuthScreen() {
-  const { bg } = useTheme();
   const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [forgotSent, setForgotSent] = useState(false);
   const [forgotError, setForgotError] = useState('');
+  const [signupSent, setSignupSent] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
   const [validationError, setValidationError] = useState('');
 
@@ -57,6 +57,8 @@ export default function AuthScreen() {
     setValidationError('');
     setForgotSent(false);
     setForgotError('');
+    setSignupSent(false);
+    setConfirmPassword('');
   }
 
   async function submit() {
@@ -67,9 +69,15 @@ export default function AuthScreen() {
       setValidationError('Geçerli bir e-posta adresi girin.');
       return;
     }
-    if (mode === 'signup' && password.length < 8) {
-      setValidationError('Şifre en az 8 karakter olmalıdır.');
-      return;
+    if (mode === 'signup') {
+      if (password.length < 8) {
+        setValidationError('Şifre en az 8 karakter olmalıdır.');
+        return;
+      }
+      if (password !== confirmPassword) {
+        setValidationError('Şifreler eşleşmiyor.');
+        return;
+      }
     }
     setBusy(true);
     clearError();
@@ -77,27 +85,49 @@ export default function AuthScreen() {
       await signIn(email.trim(), password);
     } else {
       const ok = await signUp(email.trim(), password);
-      if (ok) switchMode('signin');
+      if (ok) setSignupSent(true);
     }
     setBusy(false);
   }
 
-  async function handleOAuthSignIn(provider: 'google' | 'linkedin_oidc') {
+  async function handleGoogleSignIn() {
     try {
       setBusy(true);
       const redirectTo = makeRedirectUri({ scheme: 'jobreel', path: 'auth-callback' });
       const { data, error } = await supabase.auth.signInWithOAuth({
-        provider,
-        options: { redirectTo, skipBrowserRedirect: true },
+        provider: 'google',
+        options: { redirectTo, skipBrowserRedirect: true, queryParams: { prompt: 'select_account' } },
       });
-      if (error || !data.url) throw new Error();
+      if (error || !data.url) throw new Error(error?.message ?? 'OAuth URL alınamadı');
       const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
       if (result.type === 'success') {
-        await supabase.auth.exchangeCodeForSession(result.url);
+        const fragment = result.url.split('#')[1] ?? '';
+        const params = new URLSearchParams(fragment);
+        const access_token = params.get('access_token');
+        const refresh_token = params.get('refresh_token');
+        if (!access_token || !refresh_token) throw new Error('Oturum bilgisi alınamadı');
+        const { data: sessionData, error: sessionError } = await supabase.auth.setSession({ access_token, refresh_token });
+        if (sessionError) throw sessionError;
+
+        const user = sessionData.session?.user;
+        if (user) {
+          const meta = user.user_metadata ?? {};
+          const fullName: string = meta.full_name ?? meta.name ?? '';
+          const avatarUrl: string = meta.avatar_url ?? meta.picture ?? '';
+          if (fullName || avatarUrl) {
+            useUserStore.getState().setProfile({
+              ...(fullName ? { name: fullName } : {}),
+              ...(avatarUrl ? { avatarUrl } : {}),
+            });
+          }
+          if (avatarUrl) {
+            supabase.from('profiles').update({ avatar_url: avatarUrl }).eq('id', user.id).then(() => {});
+          }
+        }
       }
-    } catch {
-      const name = provider === 'google' ? 'Google' : 'LinkedIn';
-      Alert.alert('Hata', `${name} ile giriş başarısız oldu.`);
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Google ile giriş başarısız oldu.';
+      Alert.alert('Hata', msg);
     } finally {
       setBusy(false);
     }
@@ -107,7 +137,8 @@ export default function AuthScreen() {
     if (!email) { setForgotError('E-posta adresinizi girin.'); return; }
     setBusy(true);
     setForgotError('');
-    const { error: err } = await supabase.auth.resetPasswordForEmail(email);
+    const redirectTo = makeRedirectUri({ scheme: 'jobreel', path: 'reset-password' });
+    const { error: err } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
     setBusy(false);
     if (err) { setForgotError(err.message); }
     else { setForgotSent(true); }
@@ -116,18 +147,16 @@ export default function AuthScreen() {
   if (mode === 'forgot') {
     return (
       <KeyboardAvoidingView
-        style={[styles.screen, { backgroundColor: bg }]}
+        style={styles.screen}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <LinearGradient
-          colors={['rgba(124,109,250,0.15)', '#0d0d14', '#0d0d14']}
-          locations={[0, 0.4, 1]}
-          style={StyleSheet.absoluteFillObject}
-        />
         <View style={styles.inner}>
           <View style={styles.heroSection}>
+            <LinearGradient colors={GRADIENTS[0]} style={styles.logoIcon}>
+              <Text style={styles.logoIconText}>J</Text>
+            </LinearGradient>
             <Text style={styles.logo}>
-              Job<Text style={styles.accent}>Reel</Text>
+              JobReel
             </Text>
             <Text style={styles.sub}>Şifre Sıfırlama</Text>
           </View>
@@ -146,7 +175,7 @@ export default function AuthScreen() {
               <TextInput
                 style={[styles.input, focusedField === 'email' && styles.inputFocused]}
                 placeholder="E-posta"
-                placeholderTextColor="rgba(255,255,255,0.35)"
+                placeholderTextColor="rgba(5,22,80,0.35)"
                 value={email}
                 onChangeText={setEmail}
                 onFocus={() => setFocusedField('email')}
@@ -156,10 +185,8 @@ export default function AuthScreen() {
                 autoCorrect={false}
               />
               {forgotError ? <Text style={styles.error}>{forgotError}</Text> : null}
-              <TouchableOpacity onPress={sendForgot} activeOpacity={0.8} disabled={busy} style={styles.gradientBtnWrapper}>
-                <LinearGradient colors={ACCENT_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.gradientBtn}>
-                  {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.btnText}>Bağlantı Gönder</Text>}
-                </LinearGradient>
+              <TouchableOpacity onPress={sendForgot} activeOpacity={0.8} disabled={busy} style={[styles.primaryBtn, busy && { opacity: 0.6 }]}>
+                {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Bağlantı Gönder</Text>}
               </TouchableOpacity>
             </>
           )}
@@ -177,35 +204,24 @@ export default function AuthScreen() {
       style={styles.screen}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
-      <LinearGradient
-        colors={['rgba(124,109,250,0.15)', '#0d0d14', '#0d0d14']}
-        locations={[0, 0.4, 1]}
-        style={StyleSheet.absoluteFillObject}
-      />
       <View style={styles.inner}>
         <View style={styles.heroSection}>
+          <LinearGradient colors={GRADIENTS[0]} style={styles.logoIcon}>
+            <Text style={styles.logoIconText}>J</Text>
+          </LinearGradient>
           <Text style={styles.logo}>
-            Job<Text style={styles.accent}>Reel</Text>
+            JobReel
           </Text>
           <Text style={styles.sub}>Kariyerini keşfet</Text>
         </View>
 
         <TouchableOpacity
           style={styles.googleBtn}
-          onPress={() => handleOAuthSignIn('google')}
+          onPress={handleGoogleSignIn}
           activeOpacity={0.8}
           disabled={busy}
         >
           <Text style={styles.googleBtnText}>G  Google ile Devam Et</Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          style={styles.linkedInAuthBtn}
-          onPress={() => handleOAuthSignIn('linkedin_oidc')}
-          activeOpacity={0.8}
-          disabled={busy}
-        >
-          <Text style={styles.linkedInAuthBtnText}>in  LinkedIn ile Devam Et</Text>
         </TouchableOpacity>
 
         <View style={styles.dividerRow}>
@@ -233,7 +249,7 @@ export default function AuthScreen() {
         <TextInput
           style={[styles.input, focusedField === 'email' && styles.inputFocused]}
           placeholder="✉  E-posta"
-          placeholderTextColor="rgba(255,255,255,0.35)"
+          placeholderTextColor="rgba(5,22,80,0.35)"
           value={email}
           onChangeText={setEmail}
           onFocus={() => setFocusedField('email')}
@@ -245,13 +261,26 @@ export default function AuthScreen() {
         <TextInput
           style={[styles.input, focusedField === 'password' && styles.inputFocused]}
           placeholder="🔒  Şifre"
-          placeholderTextColor="rgba(255,255,255,0.35)"
+          placeholderTextColor="rgba(5,22,80,0.35)"
           value={password}
           onChangeText={setPassword}
           onFocus={() => setFocusedField('password')}
           onBlur={() => setFocusedField(null)}
           secureTextEntry
         />
+
+        {mode === 'signup' && (
+          <TextInput
+            style={[styles.input, focusedField === 'confirmPassword' && styles.inputFocused]}
+            placeholder="🔒  Şifre Tekrar"
+            placeholderTextColor="rgba(5,22,80,0.35)"
+            value={confirmPassword}
+            onChangeText={setConfirmPassword}
+            onFocus={() => setFocusedField('confirmPassword')}
+            onBlur={() => setFocusedField(null)}
+            secureTextEntry
+          />
+        )}
 
         {mode === 'signin' && (
           <TouchableOpacity onPress={() => switchMode('forgot')} style={styles.forgotLink}>
@@ -263,22 +292,39 @@ export default function AuthScreen() {
           <Text style={styles.error}>{validationError || error}</Text>
         )}
 
-        <TouchableOpacity onPress={submit} activeOpacity={0.8} disabled={busy} style={styles.gradientBtnWrapper}>
-          <LinearGradient colors={ACCENT_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.gradientBtn}>
+        {signupSent ? (
+          <View style={styles.successBox}>
+            <Text style={styles.successText}>
+              ✅ Doğrulama e-postası gönderildi{'\n'}{email}{'\n\n'}Gelen kutunuzu kontrol edin ve bağlantıya tıklayın.
+            </Text>
+            <TouchableOpacity onPress={() => switchMode('signin')} style={styles.backLink}>
+              <Text style={styles.backLinkText}>← Giriş ekranına dön</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <TouchableOpacity
+            onPress={submit}
+            activeOpacity={0.8}
+            disabled={busy}
+            style={[styles.primaryBtn, busy && { opacity: 0.6 }]}
+          >
             {busy ? (
               <ActivityIndicator color="#fff" />
             ) : (
-              <Text style={styles.btnText}>{mode === 'signin' ? 'Giriş Yap' : 'Kayıt Ol'}</Text>
+              <Text style={styles.primaryBtnText}>{mode === 'signin' ? 'Giriş Yap' : 'Kayıt Ol'}</Text>
             )}
-          </LinearGradient>
-        </TouchableOpacity>
+          </TouchableOpacity>
+        )}
       </View>
     </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: { flex: 1 },
+  screen: {
+    flex: 1,
+    backgroundColor: '#eef1f8',
+  },
   inner: {
     flex: 1,
     justifyContent: 'center',
@@ -288,26 +334,47 @@ const styles = StyleSheet.create({
   heroSection: {
     alignItems: 'center',
     marginBottom: SPACING.sm,
+    gap: SPACING.sm,
+  },
+  logoIcon: {
+    width: 72,
+    height: 72,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: SPACING.xs,
+  },
+  logoIconText: {
+    color: '#ffffff',
+    fontSize: 34,
+    fontWeight: '800',
   },
   logo: {
-    color: COLORS.white,
+    color: '#051650',
     fontSize: 40,
     fontWeight: '800',
     textAlign: 'center',
     letterSpacing: -1,
     marginBottom: SPACING.xs,
   },
-  accent: { color: COLORS.accent },
+
   sub: {
-    color: 'rgba(255,255,255,0.4)',
+    color: '#8a94a6',
     fontSize: FONT_SIZES.md,
     textAlign: 'center',
   },
   tabs: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#dde1ea',
     borderRadius: RADII.md,
     padding: 4,
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 1,
   },
   tab: {
     flex: 1,
@@ -315,71 +382,86 @@ const styles = StyleSheet.create({
     borderRadius: RADII.sm,
     alignItems: 'center',
   },
-  tabActive: { backgroundColor: COLORS.accent },
-  tabText: { color: 'rgba(255,255,255,0.5)', fontWeight: '600', fontSize: FONT_SIZES.sm },
-  tabTextActive: { color: COLORS.white },
+  tabActive: {
+    backgroundColor: '#051650',
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  tabText: { color: '#8a94a6', fontWeight: '600', fontSize: FONT_SIZES.sm },
+  tabTextActive: { color: '#ffffff' },
   input: {
-    backgroundColor: 'rgba(255,255,255,0.07)',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: '#dde1ea',
     borderRadius: RADII.md,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm + 4,
-    color: COLORS.white,
+    color: '#051650',
     fontSize: FONT_SIZES.md,
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
   },
   inputFocused: {
-    borderColor: COLORS.accent,
+    borderColor: '#051650',
     borderWidth: 1.5,
-    backgroundColor: 'rgba(124,109,250,0.06)',
   },
   forgotLink: {
     alignSelf: 'flex-end',
     marginTop: -SPACING.xs,
   },
   forgotLinkText: {
-    color: COLORS.accent,
+    color: '#051650',
     fontSize: FONT_SIZES.sm,
+    fontWeight: '600',
   },
   forgotDesc: {
-    color: 'rgba(255,255,255,0.5)',
+    color: '#8a94a6',
     fontSize: FONT_SIZES.sm,
     textAlign: 'center',
     lineHeight: 20,
   },
   error: {
-    color: '#ff6b6b',
+    color: '#ef4444',
     fontSize: FONT_SIZES.sm,
     textAlign: 'center',
   },
-  gradientBtnWrapper: {
+  primaryBtn: {
+    backgroundColor: '#051650',
     borderRadius: RADII.full,
-    overflow: 'hidden',
-    marginTop: SPACING.xs,
-  },
-  gradientBtn: {
     paddingVertical: SPACING.md,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: SPACING.xs,
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    elevation: 4,
   },
-  btnText: { color: COLORS.white, fontWeight: '700', fontSize: FONT_SIZES.md },
+  primaryBtnText: { color: '#ffffff', fontWeight: '700', fontSize: FONT_SIZES.md },
   backLink: {
     alignItems: 'center',
     marginTop: SPACING.sm,
   },
   backLinkText: {
-    color: 'rgba(255,255,255,0.4)',
+    color: '#8a94a6',
     fontSize: FONT_SIZES.sm,
   },
   successBox: {
-    backgroundColor: 'rgba(52,199,89,0.12)',
+    backgroundColor: 'rgba(22,163,74,0.08)',
     borderWidth: 1,
-    borderColor: 'rgba(52,199,89,0.3)',
+    borderColor: 'rgba(22,163,74,0.22)',
     borderRadius: RADII.md,
     padding: SPACING.md,
   },
   successText: {
-    color: '#34c759',
+    color: '#16a34a',
     fontSize: FONT_SIZES.sm,
     textAlign: 'center',
     lineHeight: 22,
@@ -389,22 +471,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: SPACING.sm,
   },
-  dividerLine: { flex: 1, height: 1, backgroundColor: 'rgba(255,255,255,0.1)' },
-  dividerText: { color: 'rgba(255,255,255,0.3)', fontSize: FONT_SIZES.xs },
+  dividerLine: { flex: 1, height: 1, backgroundColor: '#dde1ea' },
+  dividerText: { color: '#8a94a6', fontSize: FONT_SIZES.xs },
   googleBtn: {
-    backgroundColor: '#fff',
+    backgroundColor: '#ffffff',
     borderRadius: RADII.full,
     height: 50,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#dde1ea',
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  googleBtnText: { color: '#1a1a1a', fontWeight: '700', fontSize: FONT_SIZES.md },
-  linkedInAuthBtn: {
-    backgroundColor: '#0A66C2',
-    borderRadius: RADII.full,
-    height: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  linkedInAuthBtnText: { color: COLORS.white, fontWeight: '700', fontSize: FONT_SIZES.md },
+  googleBtnText: { color: '#051650', fontWeight: '700', fontSize: FONT_SIZES.md },
 });

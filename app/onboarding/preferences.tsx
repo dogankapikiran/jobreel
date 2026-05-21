@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -8,14 +8,12 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUserStore } from '@/store/userStore';
 import { api } from '@/services/api';
 import { Seniority, WorkType } from '@/types';
-import { FONT_SIZES, GRADIENTS, RADII, SPACING, ThemeColors } from '@/constants/theme';
-import { useTheme } from '@/contexts/ThemeContext';
+import { FONT_SIZES, RADII, SPACING } from '@/constants/theme';
 
 const SECTORS = [
   'Yazılım & Teknoloji', 'E-ticaret', 'Fintech', 'Gaming',
@@ -38,12 +36,10 @@ const SENIORITY_OPTIONS: { value: Seniority; label: string; desc: string }[] = [
 
 export default function PreferencesScreen() {
   const insets = useSafeAreaInsets();
-  const colors = useTheme();
   const { profile, setPreferences } = useUserStore();
   const prefs = profile.preferences;
   const { edit } = useLocalSearchParams<{ edit?: string }>();
   const isEditMode = edit === '1';
-  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [sectors, setSectors] = useState<string[]>(prefs.sectors);
   const [workType, setWorkType] = useState<WorkType | 'any'>(prefs.workType);
@@ -89,7 +85,7 @@ export default function PreferencesScreen() {
         {!isEditMode && (
           <>
             <View style={styles.progress}>
-              <View style={[styles.progressBar, { width: '50%', backgroundColor: colors.accent }]} />
+              <View style={[styles.progressBar, { width: '50%' }]} />
             </View>
             <Text style={styles.step}>1/2</Text>
           </>
@@ -186,30 +182,33 @@ export default function PreferencesScreen() {
             value={location}
             onChangeText={setLocation}
             placeholder="İstanbul, Ankara, Remote..."
-            placeholderTextColor={colors.textDim}
+            placeholderTextColor="rgba(5,22,80,0.35)"
           />
         </View>
       </ScrollView>
 
       {/* CTA */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + SPACING.md }]}>
-        <LinearGradient colors={GRADIENTS[0]} style={styles.ctaBtn}>
-          <TouchableOpacity style={styles.ctaInner} onPress={handleContinue} activeOpacity={0.85} disabled={saving}>
-            {saving
-              ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.ctaText}>{isEditMode ? 'Kaydet ✓' : 'Devam →'}</Text>
-            }
-          </TouchableOpacity>
-        </LinearGradient>
+        <TouchableOpacity
+          style={[styles.ctaBtn, saving && { opacity: 0.7 }]}
+          onPress={handleContinue}
+          activeOpacity={0.85}
+          disabled={saving}
+        >
+          {saving
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={styles.ctaText}>{isEditMode ? 'Kaydet ✓' : 'Devam →'}</Text>
+          }
+        </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-const makeStyles = (colors: ThemeColors) => StyleSheet.create({
+const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: colors.bg,
+    backgroundColor: '#eef1f8',
   },
   header: {
     flexDirection: 'row',
@@ -225,22 +224,23 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     justifyContent: 'center',
   },
   backIcon: {
-    color: colors.text,
+    color: '#051650',
     fontSize: 22,
   },
   progress: {
     flex: 1,
     height: 3,
-    backgroundColor: colors.cardBg,
+    backgroundColor: '#dde1ea',
     borderRadius: 2,
     overflow: 'hidden',
   },
   progressBar: {
     height: '100%',
     borderRadius: 2,
+    backgroundColor: '#051650',
   },
   step: {
-    color: colors.textDim,
+    color: '#8a94a6',
     fontSize: FONT_SIZES.xs,
     fontWeight: '600',
     width: 28,
@@ -248,7 +248,7 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   editTitle: {
     flex: 1,
-    color: colors.text,
+    color: '#051650',
     fontSize: FONT_SIZES.lg,
     fontWeight: '700',
   },
@@ -258,13 +258,13 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     gap: SPACING.xl,
   },
   title: {
-    color: colors.text,
+    color: '#051650',
     fontSize: FONT_SIZES.title,
     fontWeight: '800',
     letterSpacing: -0.8,
   },
   subtitle: {
-    color: colors.textMuted,
+    color: '#8a94a6',
     fontSize: FONT_SIZES.md,
     marginTop: -SPACING.md,
   },
@@ -272,7 +272,7 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     gap: SPACING.sm + 4,
   },
   sectionLabel: {
-    color: colors.textMuted,
+    color: '#8a94a6',
     fontSize: FONT_SIZES.xs,
     fontWeight: '700',
     textTransform: 'uppercase',
@@ -287,21 +287,21 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingHorizontal: SPACING.sm + 4,
     paddingVertical: SPACING.xs + 4,
     borderRadius: RADII.full,
-    backgroundColor: colors.cardBg,
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: colors.cardBorder,
+    borderColor: '#dde1ea',
   },
   chipActive: {
-    backgroundColor: `${colors.accent}22`,
-    borderColor: `${colors.accent}66`,
+    backgroundColor: '#051650',
+    borderColor: '#051650',
   },
   chipText: {
-    color: colors.textMuted,
+    color: '#8a94a6',
     fontSize: FONT_SIZES.sm,
     fontWeight: '500',
   },
   chipTextActive: {
-    color: colors.accentLight,
+    color: '#ffffff',
   },
   optionGrid: {
     flexDirection: 'row',
@@ -309,29 +309,30 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   option: {
     flex: 1,
-    backgroundColor: colors.cardBg,
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: colors.cardBorder,
+    borderColor: '#dde1ea',
     borderRadius: RADII.md,
     padding: SPACING.sm + 4,
     alignItems: 'center',
     gap: SPACING.xs,
   },
   optionActive: {
-    backgroundColor: `${colors.accent}18`,
-    borderColor: `${colors.accent}55`,
+    backgroundColor: 'rgba(5,22,80,0.08)',
+    borderColor: 'rgba(5,22,80,0.3)',
   },
   optionIcon: {
     fontSize: 20,
   },
   optionLabel: {
-    color: colors.textMuted,
+    color: '#8a94a6',
     fontSize: FONT_SIZES.xs,
     fontWeight: '500',
     textAlign: 'center',
   },
   optionLabelActive: {
-    color: colors.accentLight,
+    color: '#051650',
+    fontWeight: '700',
   },
   seniorityList: {
     gap: SPACING.sm,
@@ -339,30 +340,30 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   seniorityRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.cardBg,
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: colors.cardBorder,
+    borderColor: '#dde1ea',
     borderRadius: RADII.md,
     padding: SPACING.md,
     justifyContent: 'space-between',
   },
   seniorityActive: {
-    backgroundColor: `${colors.accent}18`,
-    borderColor: `${colors.accent}55`,
+    backgroundColor: 'rgba(5,22,80,0.06)',
+    borderColor: 'rgba(5,22,80,0.25)',
   },
   seniorityInfo: {
     gap: 2,
   },
   seniorityLabel: {
-    color: colors.textMuted,
+    color: '#8a94a6',
     fontSize: FONT_SIZES.md,
     fontWeight: '600',
   },
   seniorityLabelActive: {
-    color: colors.text,
+    color: '#051650',
   },
   seniorityDesc: {
-    color: colors.textDim,
+    color: '#aab0bd',
     fontSize: FONT_SIZES.xs,
   },
   checkbox: {
@@ -370,26 +371,26 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     height: 22,
     borderRadius: 6,
     borderWidth: 2,
-    borderColor: colors.cardBorder,
+    borderColor: '#dde1ea',
     alignItems: 'center',
     justifyContent: 'center',
   },
   checkboxActive: {
-    borderColor: colors.accent,
-    backgroundColor: colors.accent,
+    borderColor: '#051650',
+    backgroundColor: '#051650',
   },
   checkmark: {
-    color: colors.white,
+    color: '#ffffff',
     fontSize: 13,
     fontWeight: '800',
   },
   input: {
-    backgroundColor: colors.cardBg,
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: colors.cardBorder,
+    borderColor: '#dde1ea',
     borderRadius: RADII.md,
     padding: SPACING.md,
-    color: colors.text,
+    color: '#051650',
     fontSize: FONT_SIZES.md,
   },
   footer: {
@@ -397,16 +398,19 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     paddingTop: SPACING.sm,
   },
   ctaBtn: {
-    borderRadius: RADII.full,
     height: 56,
-  },
-  ctaInner: {
-    flex: 1,
+    backgroundColor: '#051650',
+    borderRadius: RADII.full,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    elevation: 4,
   },
   ctaText: {
-    color: colors.white,
+    color: '#ffffff',
     fontSize: FONT_SIZES.lg,
     fontWeight: '800',
   },

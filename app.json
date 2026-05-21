@@ -12,14 +12,12 @@
       "bundleIdentifier": "com.jobreel.app",
       "buildNumber": "1",
       "entitlements": {
-        "aps-environment": "development"
+        "aps-environment": "production"
       },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "Profil fotoğrafı seçmek için galeri erişimine izin verin.",
         "CFBundleLocalizations": [
-          "tr",
-          "en",
           "tr",
           "en"
         ],
@@ -47,8 +45,9 @@
         "expo-splash-screen",
         {
           "image": "./assets/splash.png",
-          "resizeMode": "contain",
-          "backgroundColor": "#0d0d14"
+          "resizeMode": "cover",
+          "backgroundColor": "#0d0d14",
+          "enableFullScreenImage_legacy": true
         }
       ],
       [
@@ -79,9 +78,7 @@
       }
     },
     "owner": "dogankapikiran",
-    "runtimeVersion": {
-      "policy": "appVersion"
-    },
+    "runtimeVersion": "1.0.0",
     "updates": {
       "url": "https://u.expo.dev/8d8216ba-e91e-41c1-a445-006f0c027430"
     }

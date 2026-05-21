@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { COLORS, FONT_SIZES, RADII, SPACING } from '@/constants/theme';
+import { FONT_SIZES, RADII, SPACING } from '@/constants/theme';
 
 interface Props {
   isApplied: boolean;
@@ -37,37 +37,37 @@ const styles = StyleSheet.create({
   detayBtn: {
     flex: 1,
     borderRadius: RADII.md,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: 'transparent',
+    borderWidth: 1.5,
+    borderColor: '#dde1ea',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 15,
   },
   detayText: {
-    color: COLORS.white,
+    color: '#051650',
     fontSize: FONT_SIZES.md,
     fontWeight: '600',
   },
   applyBtn: {
     flex: 1.4,
     borderRadius: RADII.md,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#051650',
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 15,
   },
   applyBtnApplied: {
-    backgroundColor: 'rgba(46,204,113,0.2)',
+    backgroundColor: 'rgba(46,204,113,0.15)',
     borderWidth: 1,
     borderColor: 'rgba(46,204,113,0.4)',
   },
   applyText: {
-    color: '#0d0d14',
+    color: '#ffffff',
     fontSize: FONT_SIZES.md,
     fontWeight: '700',
   },
   applyTextApplied: {
-    color: '#4ade80',
+    color: '#2ecc71',
   },
 });

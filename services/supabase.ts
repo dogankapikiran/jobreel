@@ -17,6 +17,6 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: false,
   },
   global: {
-    fetch: (...args: Parameters<typeof fetch>) => fetch(...args),
+    fetch: fetch.bind(globalThis),
   },
 });

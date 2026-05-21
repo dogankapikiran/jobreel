@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Job } from '@/types';
 import { safeJSONStorage } from './safeStorage';
 
@@ -23,6 +24,7 @@ interface FeedState {
   markApplied: (job: Job) => void;
   isApplied: (jobId: string) => boolean;
   markJobClosed: (jobId: string) => void;
+  reset: () => void;
 }
 
 export const useFeedStore = create<FeedState>()(
@@ -99,6 +101,19 @@ export const useFeedStore = create<FeedState>()(
             j.id === jobId ? { ...j, isClosed: true } : j
           ),
         })),
+
+      reset: () => {
+        AsyncStorage.removeItem('jobreel-feed-v2').catch(() => {});
+        set({
+          jobs: [],
+          savedJobs: [],
+          savedTimestamps: {},
+          appliedJobs: [],
+          appliedTimestamps: {},
+          currentIndex: 0,
+          isLoading: false,
+        });
+      },
     }),
     {
       name: 'jobreel-feed-v2',

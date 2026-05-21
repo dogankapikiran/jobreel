@@ -3,42 +3,25 @@ import { Animated, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions
 import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { ACCENT_GRADIENT, COLORS, FONT_SIZES, GRADIENTS, RADII, SPACING } from '@/constants/theme';
-import { useTheme } from '@/contexts/ThemeContext';
+import { FONT_SIZES, GRADIENTS, RADII, SPACING } from '@/constants/theme';
 
 const FEATURES = [
-  {
-    icon: '⚡',
-    title: 'Hızlı Keşfet',
-    desc: 'Yukarı kaydır, ilanlar akar.',
-    gradient: true,
-  },
-  {
-    icon: '🎯',
-    title: 'Sana Özel',
-    desc: 'Algoritma seni tanır, doğru ilanları getirir.',
-    gradient: false,
-  },
-  {
-    icon: '🔖',
-    title: 'Kaydet & Başvur',
-    desc: 'Beğendiklerini kaydet, tek dokunuşla başvur.',
-    gradient: false,
-  },
+  { icon: '⚡', title: 'Hızlı Keşfet', desc: 'Yukarı kaydır, ilanlar akar.' },
+  { icon: '🎯', title: 'Sana Özel', desc: 'Algoritma seni tanır, doğru ilanları getirir.' },
+  { icon: '🔖', title: 'Kaydet & Başvur', desc: 'Beğendiklerini kaydet, tek dokunuşla başvur.' },
 ];
 
 export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
-  const { bg } = useTheme();
   const { width } = useWindowDimensions();
 
   const logoIconSize = Math.min(Math.round(width * 0.2), 100);
   const logoFontSize = Math.min(Math.round(width * 0.096), 44);
   const logoIconFontSize = Math.round(logoIconSize * 0.5);
 
-  const logoAnim  = useRef(new Animated.Value(0)).current;
-  const featAnim  = useRef(new Animated.Value(0)).current;
-  const ctaAnim   = useRef(new Animated.Value(0)).current;
+  const logoAnim = useRef(new Animated.Value(0)).current;
+  const featAnim = useRef(new Animated.Value(0)).current;
+  const ctaAnim  = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.stagger(180, [
@@ -54,14 +37,7 @@ export default function WelcomeScreen() {
   });
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top, paddingBottom: insets.bottom + SPACING.lg, backgroundColor: bg }]}>
-      {/* Arka plan gradient */}
-      <LinearGradient
-        colors={['#1a0f35', '#0d0d14', '#0d0d14']}
-        locations={[0, 0.45, 1]}
-        style={StyleSheet.absoluteFillObject}
-      />
-
+    <View style={[styles.screen, { paddingTop: insets.top, paddingBottom: insets.bottom + SPACING.lg }]}>
       {/* Logo */}
       <Animated.View style={[styles.logoSection, makeStyle(logoAnim)]}>
         <LinearGradient
@@ -71,24 +47,18 @@ export default function WelcomeScreen() {
           <Text style={[styles.logoIconText, { fontSize: logoIconFontSize }]}>J</Text>
         </LinearGradient>
         <Text style={[styles.logoText, { fontSize: logoFontSize }]}>
-          Job<Text style={styles.logoAccent}>Reel</Text>
+          JobReel
         </Text>
         <Text style={styles.tagline}>İş bulmak artık Reels kadar kolay.</Text>
       </Animated.View>
 
       {/* Feature list */}
       <Animated.View style={[styles.features, makeStyle(featAnim)]}>
-        {FEATURES.map((f, i) => (
+        {FEATURES.map((f) => (
           <View key={f.icon} style={styles.featureCard}>
-            {f.gradient ? (
-              <LinearGradient colors={ACCENT_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.featureIcon}>
-                <Text style={styles.featureEmoji}>{f.icon}</Text>
-              </LinearGradient>
-            ) : (
-              <View style={[styles.featureIcon, styles.featureIconMuted]}>
-                <Text style={styles.featureEmoji}>{f.icon}</Text>
-              </View>
-            )}
+            <View style={styles.featureIcon}>
+              <Text style={styles.featureEmoji}>{f.icon}</Text>
+            </View>
             <View style={styles.featureText}>
               <Text style={styles.featureTitle}>{f.title}</Text>
               <Text style={styles.featureDesc}>{f.desc}</Text>
@@ -102,16 +72,11 @@ export default function WelcomeScreen() {
         <TouchableOpacity
           onPress={() => router.push('/onboarding/preferences')}
           activeOpacity={0.85}
-          style={styles.primaryBtnWrapper}
+          style={styles.primaryBtn}
         >
-          <LinearGradient colors={ACCENT_GRADIENT} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.primaryBtn}>
-            <Text style={styles.primaryBtnText}>Başla →</Text>
-          </LinearGradient>
+          <Text style={styles.primaryBtnText}>Başla →</Text>
         </TouchableOpacity>
-
-        <Text style={styles.disclaimer}>
-          Kayıt gerekmez. Tamamen ücretsiz.
-        </Text>
+        <Text style={styles.disclaimer}>Kayıt gerekmez. Tamamen ücretsiz.</Text>
       </Animated.View>
     </View>
   );
@@ -120,6 +85,7 @@ export default function WelcomeScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
+    backgroundColor: '#eef1f8',
     justifyContent: 'space-between',
     padding: SPACING.xl,
   },
@@ -134,19 +100,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logoIconText: {
-    color: COLORS.white,
+    color: '#ffffff',
     fontWeight: '800',
   },
   logoText: {
-    color: COLORS.white,
+    color: '#051650',
     fontWeight: '800',
     letterSpacing: -1,
   },
-  logoAccent: {
-    color: COLORS.accent,
-  },
+
   tagline: {
-    color: COLORS.textMuted,
+    color: '#8a94a6',
     fontSize: FONT_SIZES.md,
     textAlign: 'center',
   },
@@ -157,22 +121,25 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: SPACING.md,
-    backgroundColor: COLORS.cardBg,
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.07)',
+    borderColor: '#dde1ea',
     borderRadius: RADII.lg,
     padding: SPACING.md,
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 1,
   },
   featureIcon: {
     width: 48,
     height: 48,
     borderRadius: RADII.md,
+    backgroundColor: 'rgba(5,22,80,0.06)',
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
-  },
-  featureIconMuted: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
   },
   featureEmoji: {
     fontSize: 22,
@@ -181,13 +148,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   featureTitle: {
-    color: COLORS.white,
+    color: '#051650',
     fontSize: FONT_SIZES.md,
     fontWeight: '700',
     marginBottom: 2,
   },
   featureDesc: {
-    color: COLORS.textMuted,
+    color: '#8a94a6',
     fontSize: FONT_SIZES.sm,
     lineHeight: 18,
   },
@@ -195,24 +162,27 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
     alignItems: 'center',
   },
-  primaryBtnWrapper: {
-    width: '100%',
-    borderRadius: RADII.full,
-    overflow: 'hidden',
-  },
   primaryBtn: {
+    width: '100%',
     height: 56,
+    backgroundColor: '#051650',
+    borderRadius: RADII.full,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    elevation: 4,
   },
   primaryBtnText: {
-    color: COLORS.white,
+    color: '#ffffff',
     fontSize: FONT_SIZES.lg,
     fontWeight: '800',
     letterSpacing: 0.3,
   },
   disclaimer: {
-    color: COLORS.textDim,
+    color: '#8a94a6',
     fontSize: FONT_SIZES.xs,
   },
 });

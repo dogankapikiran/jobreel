@@ -9,12 +9,11 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUserStore } from '@/store/userStore';
 import { api } from '@/services/api';
-import { COLORS, FONT_SIZES, GRADIENTS, RADII, SPACING } from '@/constants/theme';
+import { FONT_SIZES, RADII, SPACING } from '@/constants/theme';
 
 const SUGGESTED_SKILLS = [
   'JavaScript', 'TypeScript', 'React', 'React Native', 'Node.js',
@@ -77,7 +76,7 @@ export default function CvScreen() {
             <Text style={styles.backIcon}>←</Text>
           </TouchableOpacity>
           <View style={styles.progress}>
-            <View style={[styles.progressBar, { width: '100%', backgroundColor: COLORS.accent }]} />
+            <View style={[styles.progressBar, { width: '100%' }]} />
           </View>
           <Text style={styles.step}>2/2</Text>
         </View>
@@ -90,7 +89,6 @@ export default function CvScreen() {
           <Text style={styles.title}>Kendini tanıt</Text>
           <Text style={styles.subtitle}>Bu bilgiler algoritmanın seni daha iyi tanımasını sağlar.</Text>
 
-          {/* Ad Soyad */}
           <View style={styles.section}>
             <Text style={styles.label}>Ad Soyad</Text>
             <TextInput
@@ -98,12 +96,11 @@ export default function CvScreen() {
               value={name}
               onChangeText={setName}
               placeholder="Adın Soyadın"
-              placeholderTextColor={COLORS.textDim}
+              placeholderTextColor="rgba(5,22,80,0.35)"
               autoCapitalize="words"
             />
           </View>
 
-          {/* Ünvan */}
           <View style={styles.section}>
             <Text style={styles.label}>Mevcut / Hedef Ünvan</Text>
             <TextInput
@@ -111,11 +108,10 @@ export default function CvScreen() {
               value={title}
               onChangeText={setTitle}
               placeholder="Örn: Senior Frontend Developer"
-              placeholderTextColor={COLORS.textDim}
+              placeholderTextColor="rgba(5,22,80,0.35)"
             />
           </View>
 
-          {/* Özet */}
           <View style={styles.section}>
             <Text style={styles.label}>Kısa Özet (opsiyonel)</Text>
             <TextInput
@@ -123,24 +119,22 @@ export default function CvScreen() {
               value={summary}
               onChangeText={setSummary}
               placeholder="Birkaç cümleyle kendini anlat..."
-              placeholderTextColor={COLORS.textDim}
+              placeholderTextColor="rgba(5,22,80,0.35)"
               multiline
               numberOfLines={3}
               textAlignVertical="top"
             />
           </View>
 
-          {/* Yetenekler */}
           <View style={styles.section}>
             <Text style={styles.label}>Yeteneklerin</Text>
-
             <View style={styles.skillInputRow}>
               <TextInput
                 style={[styles.input, styles.skillInput]}
                 value={customSkill}
                 onChangeText={setCustomSkill}
                 placeholder="Yetenek ekle..."
-                placeholderTextColor={COLORS.textDim}
+                placeholderTextColor="rgba(5,22,80,0.35)"
                 onSubmitEditing={addCustomSkill}
                 returnKeyType="done"
               />
@@ -181,11 +175,9 @@ export default function CvScreen() {
 
         {/* CTA */}
         <View style={[styles.footer, { paddingBottom: insets.bottom + SPACING.md }]}>
-          <LinearGradient colors={GRADIENTS[0]} style={styles.ctaBtn}>
-            <TouchableOpacity style={styles.ctaInner} onPress={handleFinish} activeOpacity={0.85}>
-              <Text style={styles.ctaText}>İlan Akışına Geç →</Text>
-            </TouchableOpacity>
-          </LinearGradient>
+          <TouchableOpacity style={styles.ctaBtn} onPress={handleFinish} activeOpacity={0.85}>
+            <Text style={styles.ctaText}>İlan Akışına Geç →</Text>
+          </TouchableOpacity>
           <TouchableOpacity onPress={handleFinish} activeOpacity={0.7}>
             <Text style={styles.skipText}>Şimdilik atla</Text>
           </TouchableOpacity>
@@ -196,12 +188,10 @@ export default function CvScreen() {
 }
 
 const styles = StyleSheet.create({
-  wrapper: {
-    flex: 1,
-  },
+  wrapper: { flex: 1 },
   screen: {
     flex: 1,
-    backgroundColor: COLORS.bg,
+    backgroundColor: '#eef1f8',
   },
   header: {
     flexDirection: 'row',
@@ -217,22 +207,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   backIcon: {
-    color: COLORS.white,
+    color: '#051650',
     fontSize: 22,
   },
   progress: {
     flex: 1,
     height: 3,
-    backgroundColor: COLORS.cardBg,
+    backgroundColor: '#dde1ea',
     borderRadius: 2,
     overflow: 'hidden',
   },
   progressBar: {
     height: '100%',
     borderRadius: 2,
+    backgroundColor: '#051650',
   },
   step: {
-    color: COLORS.textDim,
+    color: '#8a94a6',
     fontSize: FONT_SIZES.xs,
     fontWeight: '600',
     width: 28,
@@ -244,33 +235,31 @@ const styles = StyleSheet.create({
     gap: SPACING.xl,
   },
   title: {
-    color: COLORS.white,
+    color: '#051650',
     fontSize: FONT_SIZES.title,
     fontWeight: '800',
     letterSpacing: -0.8,
   },
   subtitle: {
-    color: COLORS.textMuted,
+    color: '#8a94a6',
     fontSize: FONT_SIZES.md,
     marginTop: -SPACING.md,
   },
-  section: {
-    gap: SPACING.sm,
-  },
+  section: { gap: SPACING.sm },
   label: {
-    color: COLORS.textMuted,
+    color: '#8a94a6',
     fontSize: FONT_SIZES.xs,
     fontWeight: '700',
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   input: {
-    backgroundColor: COLORS.cardBg,
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderColor: '#dde1ea',
     borderRadius: RADII.md,
     padding: SPACING.md,
-    color: COLORS.white,
+    color: '#051650',
     fontSize: FONT_SIZES.md,
   },
   textArea: {
@@ -281,18 +270,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: SPACING.sm,
   },
-  skillInput: {
-    flex: 1,
-  },
+  skillInput: { flex: 1 },
   addBtn: {
     width: 52,
-    backgroundColor: COLORS.accent,
+    backgroundColor: '#051650',
     borderRadius: RADII.md,
     alignItems: 'center',
     justifyContent: 'center',
   },
   addBtnText: {
-    color: COLORS.white,
+    color: '#ffffff',
     fontSize: 24,
     fontWeight: '300',
   },
@@ -305,21 +292,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.sm + 4,
     paddingVertical: SPACING.xs + 4,
     borderRadius: RADII.full,
-    backgroundColor: COLORS.cardBg,
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: COLORS.cardBorder,
+    borderColor: '#dde1ea',
   },
   chipActive: {
-    backgroundColor: `${COLORS.accent}22`,
-    borderColor: `${COLORS.accent}66`,
+    backgroundColor: '#051650',
+    borderColor: '#051650',
   },
   chipText: {
-    color: COLORS.textMuted,
+    color: '#8a94a6',
     fontSize: FONT_SIZES.sm,
     fontWeight: '500',
   },
   chipTextActive: {
-    color: COLORS.accentLight,
+    color: '#ffffff',
   },
   footer: {
     padding: SPACING.lg,
@@ -329,21 +316,24 @@ const styles = StyleSheet.create({
   },
   ctaBtn: {
     width: '100%',
-    borderRadius: RADII.full,
     height: 56,
-  },
-  ctaInner: {
-    flex: 1,
+    backgroundColor: '#051650',
+    borderRadius: RADII.full,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.28,
+    shadowRadius: 14,
+    elevation: 4,
   },
   ctaText: {
-    color: COLORS.white,
+    color: '#ffffff',
     fontSize: FONT_SIZES.lg,
     fontWeight: '800',
   },
   skipText: {
-    color: COLORS.textDim,
+    color: '#8a94a6',
     fontSize: FONT_SIZES.sm,
   },
 });

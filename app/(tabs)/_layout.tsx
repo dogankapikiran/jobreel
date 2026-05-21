@@ -1,13 +1,11 @@
 import React from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Tabs, useRouter } from 'expo-router';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/authStore';
 import { useEffect } from 'react';
-import { ACCENT_GRADIENT } from '@/constants/theme';
 import { track } from '@/services/analytics';
 
 const SCREEN_NAMES: Record<string, string> = {
@@ -36,7 +34,7 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
     <View style={styles.container}>
       <BlurView
         intensity={55}
-        tint="dark"
+        tint="light"
         style={StyleSheet.absoluteFillObject}
       />
       <View style={styles.topBorder} />
@@ -60,8 +58,8 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
           };
 
           const iconColor = focused
-            ? (cfg.center ? '#ffffff' : (cfg.color || '#7c6dfa'))
-            : 'rgba(255,255,255,0.38)';
+            ? (cfg.center ? '#ffffff' : '#051650')
+            : 'rgba(5,22,80,0.30)';
 
           return (
             <TouchableOpacity
@@ -72,16 +70,11 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
             >
               {cfg.center ? (
                 focused ? (
-                  <LinearGradient
-                    colors={ACCENT_GRADIENT}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.centerPill}
-                  >
+                  <View style={[styles.centerPill, { backgroundColor: '#051650' }]}>
                     <Ionicons name={cfg.iconFocused} size={22} color="#fff" />
-                  </LinearGradient>
+                  </View>
                 ) : (
-                  <View style={[styles.centerPill, { backgroundColor: 'rgba(255,255,255,0.08)' }]}>
+                  <View style={[styles.centerPill, { backgroundColor: 'rgba(5,22,80,0.08)' }]}>
                     <Ionicons name={cfg.icon} size={22} color={iconColor} />
                   </View>
                 )
@@ -131,6 +124,13 @@ const styles = StyleSheet.create({
     height: 58,
     borderRadius: 30,
     overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.6)',
+    shadowColor: '#051650',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 8,
   },
   topBorder: {
     position: 'absolute',
@@ -138,7 +138,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 1,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: 'rgba(255,255,255,0.6)',
   },
   row: {
     flex: 1,

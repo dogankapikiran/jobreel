@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Interaction, UserProfile } from '@/types';
 import { safeJSONStorage } from './safeStorage';
 
@@ -32,6 +33,7 @@ interface UserState {
   setPreferences: (partial: Partial<UserProfile['preferences']>) => void;
   addInteraction: (interaction: Interaction) => void;
   completeOnboarding: () => void;
+  reset: () => Promise<void>;
 }
 
 export const useUserStore = create<UserState>()(
@@ -58,6 +60,11 @@ export const useUserStore = create<UserState>()(
         })),
 
       completeOnboarding: () => set({ hasCompletedOnboarding: true }),
+
+      reset: async () => {
+        await AsyncStorage.removeItem('jobreel-user').catch(() => {});
+        set({ profile: DEFAULT_PROFILE, interactions: [], hasCompletedOnboarding: false });
+      },
     }),
     {
       name: 'jobreel-user',

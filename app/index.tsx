@@ -3,10 +3,9 @@ import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/store/authStore';
 import { useUserStore } from '@/store/userStore';
-import { COLORS } from '@/constants/theme';
 
 export default function Index() {
-  const { session, isLoading } = useAuthStore();
+  const { session, isLoading, isRecoveryMode } = useAuthStore();
   const hasCompletedOnboarding = useUserStore((s) => s.hasCompletedOnboarding);
   const [userHydrated, setUserHydrated] = useState(
     () => useUserStore.persist.hasHydrated()
@@ -14,14 +13,12 @@ export default function Index() {
   const router = useRouter();
 
   useEffect(() => {
-    const unsub = useUserStore.persist.onFinishHydration(() => setUserHydrated(true));
-    // Safety net: if hydration hangs (e.g. corrupted storage), unblock after 5s
-    const timeout = setTimeout(() => setUserHydrated(true), 5000);
-    return () => { unsub(); clearTimeout(timeout); };
+    if (userHydrated) return;
+    return useUserStore.persist.onFinishHydration(() => setUserHydrated(true));
   }, []);
 
   useEffect(() => {
-    if (isLoading || !userHydrated) return;
+    if (isLoading || !userHydrated || isRecoveryMode) return;
 
     if (!session) {
       router.replace('/auth');
@@ -30,7 +27,7 @@ export default function Index() {
     } else {
       router.replace('/(tabs)');
     }
-  }, [session, isLoading, hasCompletedOnboarding, userHydrated]);
+  }, [session, isLoading, hasCompletedOnboarding, userHydrated, isRecoveryMode]);
 
-  return <View style={{ flex: 1, backgroundColor: COLORS.bg }} />;
+  return <View style={{ flex: 1, backgroundColor: '#eef1f8' }} />;
 }
