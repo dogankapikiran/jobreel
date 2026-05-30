@@ -1,23 +1,28 @@
-import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
+import React, { useEffect, useMemo, useRef } from 'react';
+import { Animated, Image, StyleSheet, Text, TouchableOpacity, View, useWindowDimensions } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { FONT_SIZES, GRADIENTS, RADII, SPACING } from '@/constants/theme';
+import { FONT_SIZES, RADII, SPACING, ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
-const FEATURES = [
+type Feature = { icon: string; ionIcon?: undefined; title: string; desc: string }
+             | { icon?: undefined; ionIcon: keyof typeof Ionicons.glyphMap; iconColor: string; title: string; desc: string };
+
+const FEATURES: Feature[] = [
   { icon: '⚡', title: 'Hızlı Keşfet', desc: 'Yukarı kaydır, ilanlar akar.' },
   { icon: '🎯', title: 'Sana Özel', desc: 'Algoritma seni tanır, doğru ilanları getirir.' },
-  { icon: '🔖', title: 'Kaydet & Başvur', desc: 'Beğendiklerini kaydet, tek dokunuşla başvur.' },
+  { ionIcon: 'bookmark', iconColor: '#f59e0b', title: 'Kaydet & Başvur', desc: 'Beğendiklerini kaydet, tek dokunuşla başvur.' },
 ];
 
 export default function WelcomeScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
-  const logoIconSize = Math.min(Math.round(width * 0.2), 100);
+  const logoIconSize = Math.min(Math.round(width * 0.22), 108);
   const logoFontSize = Math.min(Math.round(width * 0.096), 44);
-  const logoIconFontSize = Math.round(logoIconSize * 0.5);
 
   const logoAnim = useRef(new Animated.Value(0)).current;
   const featAnim = useRef(new Animated.Value(0)).current;
@@ -31,7 +36,7 @@ export default function WelcomeScreen() {
     ]).start();
   }, []);
 
-  const makeStyle = (anim: Animated.Value) => ({
+  const makeAnim = (anim: Animated.Value) => ({
     opacity: anim,
     transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [24, 0] }) }],
   });
@@ -39,25 +44,25 @@ export default function WelcomeScreen() {
   return (
     <View style={[styles.screen, { paddingTop: insets.top, paddingBottom: insets.bottom + SPACING.lg }]}>
       {/* Logo */}
-      <Animated.View style={[styles.logoSection, makeStyle(logoAnim)]}>
-        <LinearGradient
-          colors={GRADIENTS[0]}
+      <Animated.View style={[styles.logoSection, makeAnim(logoAnim)]}>
+        <Image
+          source={require('../../assets/icon.png')}
           style={[styles.logoIcon, { width: logoIconSize, height: logoIconSize }]}
-        >
-          <Text style={[styles.logoIconText, { fontSize: logoIconFontSize }]}>J</Text>
-        </LinearGradient>
-        <Text style={[styles.logoText, { fontSize: logoFontSize }]}>
-          JobReel
-        </Text>
-        <Text style={styles.tagline}>İş bulmak artık Reels kadar kolay.</Text>
+          resizeMode="cover"
+        />
+        <Text style={[styles.logoText, { fontSize: logoFontSize }]}>JobReel</Text>
+        <Text style={styles.tagline}>İş bulmak artık Reels kaydırmak kadar kolay.</Text>
       </Animated.View>
 
       {/* Feature list */}
-      <Animated.View style={[styles.features, makeStyle(featAnim)]}>
+      <Animated.View style={[styles.features, makeAnim(featAnim)]}>
         {FEATURES.map((f) => (
-          <View key={f.icon} style={styles.featureCard}>
+          <View key={f.title} style={styles.featureCard}>
             <View style={styles.featureIcon}>
-              <Text style={styles.featureEmoji}>{f.icon}</Text>
+              {f.ionIcon
+                ? <Ionicons name={f.ionIcon} size={22} color={f.iconColor} />
+                : <Text style={styles.featureEmoji}>{f.icon}</Text>
+              }
             </View>
             <View style={styles.featureText}>
               <Text style={styles.featureTitle}>{f.title}</Text>
@@ -68,7 +73,7 @@ export default function WelcomeScreen() {
       </Animated.View>
 
       {/* CTA */}
-      <Animated.View style={[styles.cta, makeStyle(ctaAnim)]}>
+      <Animated.View style={[styles.cta, makeAnim(ctaAnim)]}>
         <TouchableOpacity
           onPress={() => router.push('/onboarding/preferences')}
           activeOpacity={0.85}
@@ -76,113 +81,106 @@ export default function WelcomeScreen() {
         >
           <Text style={styles.primaryBtnText}>Başla →</Text>
         </TouchableOpacity>
-        <Text style={styles.disclaimer}>Kayıt gerekmez. Tamamen ücretsiz.</Text>
       </Animated.View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: '#eef1f8',
-    justifyContent: 'space-between',
-    padding: SPACING.xl,
-  },
-  logoSection: {
-    alignItems: 'center',
-    paddingTop: SPACING.xxl,
-    gap: SPACING.md,
-  },
-  logoIcon: {
-    borderRadius: RADII.xl,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoIconText: {
-    color: '#ffffff',
-    fontWeight: '800',
-  },
-  logoText: {
-    color: '#051650',
-    fontWeight: '800',
-    letterSpacing: -1,
-  },
-
-  tagline: {
-    color: '#8a94a6',
-    fontSize: FONT_SIZES.md,
-    textAlign: 'center',
-  },
-  features: {
-    gap: SPACING.sm + 2,
-  },
-  featureCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#dde1ea',
-    borderRadius: RADII.lg,
-    padding: SPACING.md,
-    shadowColor: '#051650',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 1,
-  },
-  featureIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: RADII.md,
-    backgroundColor: 'rgba(5,22,80,0.06)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
-  featureEmoji: {
-    fontSize: 22,
-  },
-  featureText: {
-    flex: 1,
-  },
-  featureTitle: {
-    color: '#051650',
-    fontSize: FONT_SIZES.md,
-    fontWeight: '700',
-    marginBottom: 2,
-  },
-  featureDesc: {
-    color: '#8a94a6',
-    fontSize: FONT_SIZES.sm,
-    lineHeight: 18,
-  },
-  cta: {
-    gap: SPACING.md,
-    alignItems: 'center',
-  },
-  primaryBtn: {
-    width: '100%',
-    height: 56,
-    backgroundColor: '#051650',
-    borderRadius: RADII.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#051650',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.28,
-    shadowRadius: 14,
-    elevation: 4,
-  },
-  primaryBtnText: {
-    color: '#ffffff',
-    fontSize: FONT_SIZES.lg,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  disclaimer: {
-    color: '#8a94a6',
-    fontSize: FONT_SIZES.xs,
-  },
-});
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: c.bg,
+      justifyContent: 'space-between',
+      padding: SPACING.xl,
+    },
+    logoSection: {
+      alignItems: 'center',
+      paddingTop: SPACING.xxl,
+      gap: SPACING.md,
+    },
+    logoIcon: {
+      borderRadius: RADII.xl,
+      overflow: 'hidden',
+    },
+    logoText: {
+      color: c.text,
+      fontWeight: '800',
+      letterSpacing: -1,
+    },
+    tagline: {
+      color: c.textMuted,
+      fontSize: FONT_SIZES.md,
+      textAlign: 'center',
+    },
+    features: {
+      gap: SPACING.sm + 2,
+    },
+    featureCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.md,
+      backgroundColor: c.bgDeep,
+      borderWidth: 1,
+      borderColor: c.cardBorder,
+      borderRadius: RADII.lg,
+      padding: SPACING.md,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: c.isDark ? 0.2 : 0.05,
+      shadowRadius: 6,
+      elevation: c.isDark ? 0 : 1,
+    },
+    featureIcon: {
+      width: 48,
+      height: 48,
+      borderRadius: RADII.md,
+      backgroundColor: c.isDark ? 'rgba(226,232,245,0.07)' : 'rgba(5,22,80,0.06)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      flexShrink: 0,
+    },
+    featureEmoji: {
+      fontSize: 22,
+    },
+    featureText: {
+      flex: 1,
+    },
+    featureTitle: {
+      color: c.text,
+      fontSize: FONT_SIZES.md,
+      fontWeight: '700',
+      marginBottom: 2,
+    },
+    featureDesc: {
+      color: c.textMuted,
+      fontSize: FONT_SIZES.sm,
+      lineHeight: 18,
+    },
+    cta: {
+      gap: SPACING.md,
+      alignItems: 'center',
+    },
+    primaryBtn: {
+      width: '100%',
+      height: 56,
+      backgroundColor: c.isDark ? c.bgDeep : c.accent,
+      borderWidth: c.isDark ? 1 : 0,
+      borderColor: c.cardBorder,
+      borderRadius: RADII.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: '#051650',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: c.isDark ? 0 : 0.28,
+      shadowRadius: 14,
+      elevation: c.isDark ? 0 : 4,
+    },
+    primaryBtnText: {
+      color: '#ffffff',
+      fontSize: FONT_SIZES.lg,
+      fontWeight: '800',
+      letterSpacing: 0.3,
+    },
+  });
+}

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -16,7 +16,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { api, JobAlert } from '@/services/api';
-import { BOTTOM_NAV_HEIGHT, FONT_SIZES, RADII, SPACING } from '@/constants/theme';
+import { registerForPushNotifications } from '@/services/notifications';
+import { BOTTOM_NAV_HEIGHT, FONT_SIZES, RADII, SPACING, ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 const WT_OPTIONS = [
   { value: 'any',    label: 'Farketmez' },
@@ -64,6 +66,8 @@ const DEFAULT_FORM = {
 
 export default function AlertsScreen() {
   const insets = useSafeAreaInsets();
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [alerts, setAlerts] = useState<JobAlert[]>([]);
   const [loading, setLoading] = useState(true);
@@ -116,6 +120,7 @@ export default function AlertsScreen() {
       });
       setAlerts((prev) => [created, ...prev]);
       setShowModal(false);
+      registerForPushNotifications();
     } catch {
       Alert.alert('Hata', 'Alarm oluşturulamadı. Lütfen tekrar dene.');
     } finally {
@@ -171,7 +176,7 @@ export default function AlertsScreen() {
 
           {loading ? (
             <View style={styles.center}>
-              <ActivityIndicator color="#051650" />
+              <ActivityIndicator color={colors.text} />
             </View>
           ) : alerts.length === 0 ? (
             <TouchableOpacity onPress={openModal} style={styles.emptyCard} activeOpacity={0.75}>
@@ -195,9 +200,15 @@ export default function AlertsScreen() {
                   <Switch
                     value={alert.enabled}
                     onValueChange={(v) => handleToggle(alert.id, v)}
-                    trackColor={{ false: '#dde1ea', true: 'rgba(5,22,80,0.4)' }}
-                    thumbColor={alert.enabled ? '#051650' : '#aab0bd'}
-                    ios_backgroundColor="#dde1ea"
+                    trackColor={{
+                      false: colors.cardBorder,
+                      true: colors.isDark ? 'rgba(226,232,245,0.25)' : 'rgba(5,22,80,0.4)',
+                    }}
+                    thumbColor={alert.enabled
+                      ? (colors.isDark ? colors.text : colors.accent)
+                      : colors.textMuted
+                    }
+                    ios_backgroundColor={colors.cardBorder}
                   />
                   <TouchableOpacity
                     onPress={() => handleDelete(alert.id)}
@@ -244,7 +255,7 @@ export default function AlertsScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="örn. React Native, Product Manager"
-                placeholderTextColor="rgba(5,22,80,0.35)"
+                placeholderTextColor={colors.textDim}
                 value={form.keyword}
                 onChangeText={(v) => setForm((p) => ({ ...p, keyword: v }))}
                 returnKeyType="next"
@@ -256,7 +267,7 @@ export default function AlertsScreen() {
               <TextInput
                 style={styles.input}
                 placeholder="İstanbul, Turkey"
-                placeholderTextColor="rgba(5,22,80,0.35)"
+                placeholderTextColor={colors.textDim}
                 value={form.location}
                 onChangeText={(v) => setForm((p) => ({ ...p, location: v }))}
                 returnKeyType="done"
@@ -324,242 +335,250 @@ export default function AlertsScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#eef1f8' },
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    screen: { flex: 1, backgroundColor: c.bg },
 
-  // Header
-  header: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    backgroundColor: '#eef1f8',
-    borderBottomWidth: 1,
-    borderBottomColor: '#dde1ea',
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: SPACING.sm,
-  },
-  title: {
-    color: '#051650',
-    fontSize: FONT_SIZES.xl,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
-  subtitle: {
-    color: '#8a94a6',
-    fontSize: FONT_SIZES.xs,
-    marginTop: 2,
-  },
-  addBtn: {
-    backgroundColor: '#051650',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs + 2,
-    borderRadius: RADII.full,
-    shadowColor: '#051650',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.22,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  addBtnText: {
-    color: '#fff',
-    fontSize: FONT_SIZES.xs,
-    fontWeight: '700',
-  },
+    // Header
+    header: {
+      paddingHorizontal: SPACING.lg,
+      paddingVertical: SPACING.md,
+      backgroundColor: c.bg,
+      borderBottomWidth: 1,
+      borderBottomColor: c.cardBorder,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: SPACING.sm,
+    },
+    title: {
+      color: c.text,
+      fontSize: FONT_SIZES.xl,
+      fontWeight: '800',
+      letterSpacing: -0.5,
+    },
+    subtitle: {
+      color: c.textMuted,
+      fontSize: FONT_SIZES.xs,
+      marginTop: 2,
+    },
+    addBtn: {
+      backgroundColor: c.isDark ? c.bgDeep : c.accent,
+      borderWidth: c.isDark ? 1 : 0,
+      borderColor: c.cardBorder,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.xs + 2,
+      borderRadius: RADII.full,
+      shadowColor: '#051650',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: c.isDark ? 0 : 0.22,
+      shadowRadius: 8,
+      elevation: c.isDark ? 0 : 3,
+    },
+    addBtnText: {
+      color: '#fff',
+      fontSize: FONT_SIZES.xs,
+      fontWeight: '700',
+    },
 
-  // Content
-  content: { padding: SPACING.lg, gap: SPACING.lg },
-  section: { gap: SPACING.sm },
-  sectionTitle: {
-    color: '#8a94a6',
-    fontSize: FONT_SIZES.xs,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
+    // Content
+    content: { padding: SPACING.lg, gap: SPACING.lg },
+    section: { gap: SPACING.sm },
+    sectionTitle: {
+      color: c.textMuted,
+      fontSize: FONT_SIZES.xs,
+      fontWeight: '600',
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+    },
 
-  // Alert cards
-  alertCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#dde1ea',
-    borderRadius: RADII.lg,
-    padding: SPACING.md,
-    gap: SPACING.md,
-    shadowColor: '#051650',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  alertLeft: { flex: 1 },
-  alertLabel: {
-    color: '#051650',
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '600',
-  },
-  alertSub: {
-    color: '#8a94a6',
-    fontSize: FONT_SIZES.xs,
-    marginTop: 2,
-  },
-  alertActions: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
-  deleteBtn: { padding: 4 },
-  deleteText: { color: '#aab0bd', fontSize: 14 },
+    // Alert cards
+    alertCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: c.bgDeep,
+      borderWidth: 1,
+      borderColor: c.cardBorder,
+      borderRadius: RADII.lg,
+      padding: SPACING.md,
+      gap: SPACING.md,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: c.isDark ? 0.2 : 0.06,
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    alertLeft: { flex: 1 },
+    alertLabel: {
+      color: c.text,
+      fontSize: FONT_SIZES.sm,
+      fontWeight: '600',
+    },
+    alertSub: {
+      color: c.textMuted,
+      fontSize: FONT_SIZES.xs,
+      marginTop: 2,
+    },
+    alertActions: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
+    deleteBtn: { padding: 4 },
+    deleteText: { color: c.textMuted, fontSize: 14 },
 
-  // Loading / empty
-  center: { alignItems: 'center', paddingVertical: SPACING.xl },
-  emptyCard: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#dde1ea',
-    borderRadius: RADII.lg,
-    padding: SPACING.xl,
-    alignItems: 'center',
-    gap: SPACING.sm,
-    shadowColor: '#051650',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  emptyIcon: { fontSize: 32 },
-  emptyText: { color: '#051650', fontSize: FONT_SIZES.md, fontWeight: '600' },
-  emptySubText: {
-    color: '#8a94a6',
-    fontSize: FONT_SIZES.xs,
-    textAlign: 'center',
-    maxWidth: 240,
-  },
-  emptyAddBtn: {
-    marginTop: SPACING.sm,
-    backgroundColor: '#051650',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADII.full,
-    shadowColor: '#051650',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.22,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  emptyAddBtnText: { color: '#fff', fontSize: FONT_SIZES.sm, fontWeight: '700' },
+    // Loading / empty
+    center: { alignItems: 'center', paddingVertical: SPACING.xl },
+    emptyCard: {
+      backgroundColor: c.bgDeep,
+      borderWidth: 1,
+      borderColor: c.cardBorder,
+      borderRadius: RADII.lg,
+      padding: SPACING.xl,
+      alignItems: 'center',
+      gap: SPACING.sm,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: c.isDark ? 0.2 : 0.06,
+      shadowRadius: 8,
+      elevation: 2,
+    },
+    emptyIcon: { fontSize: 32 },
+    emptyText: { color: c.text, fontSize: FONT_SIZES.md, fontWeight: '600' },
+    emptySubText: {
+      color: c.textMuted,
+      fontSize: FONT_SIZES.xs,
+      textAlign: 'center',
+      maxWidth: 240,
+    },
+    emptyAddBtn: {
+      marginTop: SPACING.sm,
+      backgroundColor: c.isDark ? c.bgDeep : c.accent,
+      borderWidth: c.isDark ? 1 : 0,
+      borderColor: c.cardBorder,
+      paddingHorizontal: SPACING.lg,
+      paddingVertical: SPACING.sm,
+      borderRadius: RADII.full,
+      shadowColor: '#051650',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: c.isDark ? 0 : 0.22,
+      shadowRadius: 8,
+      elevation: c.isDark ? 0 : 3,
+    },
+    emptyAddBtnText: { color: '#fff', fontSize: FONT_SIZES.sm, fontWeight: '700' },
 
-  // Modal
-  modalOverlay: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(5,22,80,0.35)',
-  },
-  modalWrapper: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-  },
-  modalSheet: {
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: 28,
-    borderTopRightRadius: 28,
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.sm,
-    maxHeight: '85%',
-    borderTopWidth: 1,
-    borderColor: '#dde1ea',
-    shadowColor: '#051650',
-    shadowOffset: { width: 0, height: -6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 20,
-    elevation: 10,
-  },
-  handle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#dde1ea',
-    alignSelf: 'center',
-    marginBottom: SPACING.md,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: SPACING.lg,
-  },
-  modalTitle: {
-    color: '#051650',
-    fontSize: FONT_SIZES.lg,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
-  modalClose: {
-    color: '#8a94a6',
-    fontSize: 17,
-    fontWeight: '600',
-  },
-  fieldLabel: {
-    color: '#8a94a6',
-    fontSize: FONT_SIZES.xs,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginBottom: SPACING.xs,
-  },
-  input: {
-    backgroundColor: '#f4f6fb',
-    borderWidth: 1,
-    borderColor: '#dde1ea',
-    borderRadius: RADII.md,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm + 2,
-    color: '#051650',
-    fontSize: FONT_SIZES.sm,
-  },
-  chipRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.xs,
-  },
-  chip: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.xs + 2,
-    borderRadius: RADII.full,
-    borderWidth: 1,
-    borderColor: '#dde1ea',
-    backgroundColor: '#ffffff',
-  },
-  chipActive: {
-    backgroundColor: '#051650',
-    borderColor: '#051650',
-  },
-  chipText: {
-    color: '#8a94a6',
-    fontSize: FONT_SIZES.xs,
-    fontWeight: '600',
-  },
-  chipTextActive: {
-    color: '#ffffff',
-  },
-  submitBtn: {
-    marginTop: SPACING.xl,
-    marginBottom: SPACING.sm,
-    backgroundColor: '#051650',
-    borderRadius: RADII.lg,
-    paddingVertical: SPACING.md,
-    alignItems: 'center',
-    shadowColor: '#051650',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.28,
-    shadowRadius: 14,
-    elevation: 4,
-  },
-  submitText: {
-    color: '#fff',
-    fontSize: FONT_SIZES.md,
-    fontWeight: '800',
-    letterSpacing: -0.3,
-  },
-});
+    // Modal
+    modalOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: c.isDark ? 'rgba(0,5,20,0.65)' : 'rgba(5,22,80,0.35)',
+    },
+    modalWrapper: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+    },
+    modalSheet: {
+      backgroundColor: c.cardBg,
+      borderTopLeftRadius: 28,
+      borderTopRightRadius: 28,
+      paddingHorizontal: SPACING.lg,
+      paddingTop: SPACING.sm,
+      maxHeight: '85%',
+      borderTopWidth: 1,
+      borderColor: c.cardBorder,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: -6 },
+      shadowOpacity: c.isDark ? 0.4 : 0.08,
+      shadowRadius: 20,
+      elevation: 10,
+    },
+    handle: {
+      width: 36,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: c.cardBorder,
+      alignSelf: 'center',
+      marginBottom: SPACING.md,
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: SPACING.lg,
+    },
+    modalTitle: {
+      color: c.text,
+      fontSize: FONT_SIZES.lg,
+      fontWeight: '800',
+      letterSpacing: -0.5,
+    },
+    modalClose: {
+      color: c.textMuted,
+      fontSize: 17,
+      fontWeight: '600',
+    },
+    fieldLabel: {
+      color: c.textMuted,
+      fontSize: FONT_SIZES.xs,
+      fontWeight: '600',
+      textTransform: 'uppercase',
+      letterSpacing: 0.8,
+      marginBottom: SPACING.xs,
+    },
+    input: {
+      backgroundColor: c.bgDeep,
+      borderWidth: 1,
+      borderColor: c.cardBorder,
+      borderRadius: RADII.md,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.sm + 2,
+      color: c.text,
+      fontSize: FONT_SIZES.sm,
+    },
+    chipRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: SPACING.xs,
+    },
+    chip: {
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.xs + 2,
+      borderRadius: RADII.full,
+      borderWidth: 1,
+      borderColor: c.cardBorder,
+      backgroundColor: c.bgDeep,
+    },
+    chipActive: {
+      backgroundColor: c.isDark ? c.bgDeep : c.accent,
+      borderColor: c.isDark ? 'rgba(255,255,255,0.25)' : c.accent,
+    },
+    chipText: {
+      color: c.textMuted,
+      fontSize: FONT_SIZES.xs,
+      fontWeight: '600',
+    },
+    chipTextActive: {
+      color: '#ffffff',
+    },
+    submitBtn: {
+      marginTop: SPACING.xl,
+      marginBottom: SPACING.sm,
+      backgroundColor: c.isDark ? c.bgDeep : c.accent,
+      borderWidth: c.isDark ? 1 : 0,
+      borderColor: c.cardBorder,
+      borderRadius: RADII.lg,
+      paddingVertical: SPACING.md,
+      alignItems: 'center',
+      shadowColor: '#051650',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: c.isDark ? 0 : 0.28,
+      shadowRadius: 14,
+      elevation: c.isDark ? 0 : 4,
+    },
+    submitText: {
+      color: '#fff',
+      fontSize: FONT_SIZES.md,
+      fontWeight: '800',
+      letterSpacing: -0.3,
+    },
+  });
+}

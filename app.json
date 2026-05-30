@@ -5,12 +5,13 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "automatic",
     "scheme": "jobreel",
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.jobreel.app",
-      "buildNumber": "1",
+      "buildNumber": "18",
+      "minimumOsVersion": "15.1",
       "entitlements": {
         "aps-environment": "production"
       },
@@ -30,10 +31,7 @@
         "backgroundColor": "#0d0d14"
       },
       "package": "com.jobreel.app",
-      "permissions": [
-        "android.permission.RECORD_AUDIO",
-        "android.permission.RECORD_AUDIO"
-      ]
+      "permissions": []
     },
     "web": {
       "bundler": "metro",
@@ -41,6 +39,7 @@
     },
     "plugins": [
       "expo-router",
+      "expo-apple-authentication",
       [
         "expo-splash-screen",
         {
@@ -53,7 +52,8 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Profil fotoğrafı seçmek için galeri erişimine izin verin."
+          "photosPermission": "Profil fotoğrafı seçmek için galeri erişimine izin verin.",
+          "cameraPermission": false
         }
       ],
       "expo-document-picker",
@@ -64,7 +64,8 @@
           "icon": "./assets/notification-icon.png",
           "color": "#6C63FF",
           "sounds": [],
-          "iosDisplayInForeground": true
+          "iosDisplayInForeground": true,
+          "notificationPermissionDescription": "İş alarmları ve yeni ilan bildirimleri almak için izin verin."
         }
       ]
     ],

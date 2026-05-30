@@ -26,29 +26,29 @@ export interface ThemeColors {
 }
 
 export const DARK_COLORS: ThemeColors = {
-  bg: '#0d0d14',
-  bgDeep: '#0a0a0f',
-  accent: '#7c6dfa',
-  accentLight: '#a89cfc',
+  bg: '#060a14',
+  bgDeep: '#1a2540',
+  accent: '#051650',
+  accentLight: '#0d2060',
   success: '#2ecc71',
   successLight: '#5ddb8f',
-  warning: '#ffc107',
-  danger: '#ff4444',
+  warning: '#f59e0b',
+  danger: '#ef4444',
 
   white: '#ffffff',
   black: '#000000',
-  text: 'rgba(255,255,255,0.9)',
-  textMuted: 'rgba(255,255,255,0.5)',
-  textDim: 'rgba(255,255,255,0.35)',
+  text: '#e2e8f5',
+  textMuted: '#c8d8f0',
+  textDim: '#4a6080',
 
-  cardBorder: 'rgba(255,255,255,0.07)',
-  cardBg: 'rgba(255,255,255,0.05)',
+  cardBorder: 'rgba(255,255,255,0.08)',
+  cardBg: '#111d35',
 
-  navBg: 'rgba(10,10,18,0.97)',
-  navBorder: 'rgba(255,255,255,0.06)',
+  navBg: 'rgba(13,21,38,0.85)',
+  navBorder: 'rgba(255,255,255,0.10)',
 
   headerBtnBg: 'rgba(255,255,255,0.08)',
-  headerBtnBorder: 'rgba(255,255,255,0.1)',
+  headerBtnBorder: 'rgba(255,255,255,0.10)',
   isDark: true,
 };
 

@@ -53,8 +53,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   signUp: async (email, password) => {
     set({ error: null });
-    const { error } = await supabase.auth.signUp({ email, password });
-    if (error) { set({ error: error.message }); return false; }
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if (error) {
+      const msg = error.message.toLowerCase();
+      if (msg.includes('already registered') || msg.includes('user already exists')) {
+        set({ error: 'already_registered' });
+      } else {
+        set({ error: error.message });
+      }
+      return false;
+    }
+    // Email confirmation ON: Supabase returns empty identities for existing users
+    if (data.user?.identities?.length === 0) {
+      set({ error: 'already_registered' });
+      return false;
+    }
     return true;
   },
 

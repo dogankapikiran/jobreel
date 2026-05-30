@@ -3,7 +3,7 @@ import { Stack, router } from 'expo-router';
 import { useFonts } from 'expo-font';
 import * as Linking from 'expo-linking';
 import { supabase } from '@/services/supabase';
-import { registerForPushNotifications } from '@/services/notifications';
+
 import { checkClosedJobs } from '@/services/jobStatusChecker';
 import {
   Syne_400Regular,
@@ -18,12 +18,11 @@ import {
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { StyleSheet } from 'react-native';
 import { useAuthStore } from '@/store/authStore';
 import { useCompanyStore } from '@/store/companyStore';
 import { useUserStore } from '@/store/userStore';
 import { api } from '@/services/api';
-import { ThemeProvider } from '@/contexts/ThemeContext';
+import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { initAnalytics, identify } from '@/services/analytics';
 
 SplashScreen.preventAutoHideAsync();
@@ -59,6 +58,7 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
+    const SUPABASE_HOST = process.env.EXPO_PUBLIC_SUPABASE_URL?.replace('https://', '');
     const processUrl = async (url: string) => {
       const fragment = url.split('#')[1] ?? '';
       const params = new URLSearchParams(fragment);
@@ -66,6 +66,13 @@ export default function RootLayout() {
       const access_token = params.get('access_token');
       const refresh_token = params.get('refresh_token');
       if (!access_token || !refresh_token) return;
+      // Verify the token was issued by our Supabase project before trusting it
+      try {
+        const payload = JSON.parse(atob(access_token.split('.')[1]));
+        if (!SUPABASE_HOST || payload.iss !== `https://${SUPABASE_HOST}/auth/v1`) return;
+      } catch {
+        return;
+      }
       setRecoveryMode(true);
       await supabase.auth.setSession({ access_token, refresh_token });
       router.replace('/reset-password');
@@ -78,8 +85,7 @@ export default function RootLayout() {
   useEffect(() => {
     if (session) {
       identify(session.user.id);
-      registerForPushNotifications();
-      api.getFollowedCompanies().then(setFollowing).catch(() => {});
+api.getFollowedCompanies().then(setFollowing).catch(() => {});
       checkClosedJobs().catch(() => {});
     }
   }, [!!session]);
@@ -92,24 +98,28 @@ export default function RootLayout() {
 
   return (
     <ThemeProvider>
-    <GestureHandlerRootView style={styles.root}>
-      <StatusBar style="dark" />
+      <AppShell />
+    </ThemeProvider>
+  );
+}
+
+function AppShell() {
+  const { bg, isDark } = useTheme();
+  return (
+    <GestureHandlerRootView style={{ flex: 1, backgroundColor: bg }}>
+      <StatusBar style={isDark ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="auth" options={{ animation: 'fade' }} />
         <Stack.Screen name="(tabs)" />
         <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
         <Stack.Screen name="job/[id]" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
-        <Stack.Screen name="linkedin-connect" options={{ animation: 'slide_from_bottom', presentation: 'transparentModal' }} />
-        <Stack.Screen name="alerts" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
+<Stack.Screen name="alerts" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
         <Stack.Screen name="settings" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
         <Stack.Screen name="privacy" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="terms" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="reset-password" options={{ animation: 'fade', headerShown: false }} />
       </Stack>
     </GestureHandlerRootView>
-    </ThemeProvider>
   );
 }
-
-const styles = StyleSheet.create({ root: { flex: 1, backgroundColor: '#eef1f8' } });

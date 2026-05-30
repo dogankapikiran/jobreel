@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -12,8 +12,10 @@ import {
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUserStore } from '@/store/userStore';
+import { useAuthStore } from '@/store/authStore';
 import { api } from '@/services/api';
-import { FONT_SIZES, RADII, SPACING } from '@/constants/theme';
+import { FONT_SIZES, RADII, SPACING, ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 const SUGGESTED_SKILLS = [
   'JavaScript', 'TypeScript', 'React', 'React Native', 'Node.js',
@@ -24,7 +26,10 @@ const SUGGESTED_SKILLS = [
 
 export default function CvScreen() {
   const insets = useSafeAreaInsets();
-  const { profile, setProfile, setPreferences, completeOnboarding } = useUserStore();
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { profile, setProfile, setPreferences, completeOnboarding, markOnboardingComplete } = useUserStore();
+  const session = useAuthStore((s) => s.session);
 
   const [name, setName] = useState(profile.name);
   const [title, setTitle] = useState(profile.title);
@@ -50,6 +55,7 @@ export default function CvScreen() {
     setProfile({ name, title, summary, skills });
     setPreferences({ skills });
     completeOnboarding();
+    if (session?.user.id) markOnboardingComplete(session.user.id);
     api.updateProfile({
       display_name: name,
       title,
@@ -61,7 +67,7 @@ export default function CvScreen() {
         skills,
       },
     }).catch(() => {});
-    router.replace('/(tabs)');
+    router.replace('/');
   }
 
   return (
@@ -78,7 +84,7 @@ export default function CvScreen() {
           <View style={styles.progress}>
             <View style={[styles.progressBar, { width: '100%' }]} />
           </View>
-          <Text style={styles.step}>2/2</Text>
+          <Text style={styles.step}>3/3</Text>
         </View>
 
         <ScrollView
@@ -96,19 +102,19 @@ export default function CvScreen() {
               value={name}
               onChangeText={setName}
               placeholder="Adın Soyadın"
-              placeholderTextColor="rgba(5,22,80,0.35)"
+              placeholderTextColor={colors.textDim}
               autoCapitalize="words"
             />
           </View>
 
           <View style={styles.section}>
-            <Text style={styles.label}>Mevcut / Hedef Ünvan</Text>
+            <Text style={styles.label}>Title</Text>
             <TextInput
               style={styles.input}
               value={title}
               onChangeText={setTitle}
               placeholder="Örn: Senior Frontend Developer"
-              placeholderTextColor="rgba(5,22,80,0.35)"
+              placeholderTextColor={colors.textDim}
             />
           </View>
 
@@ -119,7 +125,7 @@ export default function CvScreen() {
               value={summary}
               onChangeText={setSummary}
               placeholder="Birkaç cümleyle kendini anlat..."
-              placeholderTextColor="rgba(5,22,80,0.35)"
+              placeholderTextColor={colors.textDim}
               multiline
               numberOfLines={3}
               textAlignVertical="top"
@@ -134,7 +140,7 @@ export default function CvScreen() {
                 value={customSkill}
                 onChangeText={setCustomSkill}
                 placeholder="Yetenek ekle..."
-                placeholderTextColor="rgba(5,22,80,0.35)"
+                placeholderTextColor={colors.textDim}
                 onSubmitEditing={addCustomSkill}
                 returnKeyType="done"
               />
@@ -179,7 +185,7 @@ export default function CvScreen() {
             <Text style={styles.ctaText}>İlan Akışına Geç →</Text>
           </TouchableOpacity>
           <TouchableOpacity onPress={handleFinish} activeOpacity={0.7}>
-            <Text style={styles.skipText}>Şimdilik atla</Text>
+            <Text style={styles.skipText}>Haydi Başla!</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -187,153 +193,159 @@ export default function CvScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  wrapper: { flex: 1 },
-  screen: {
-    flex: 1,
-    backgroundColor: '#eef1f8',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-  },
-  backBtn: {
-    width: 36,
-    height: 36,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  backIcon: {
-    color: '#051650',
-    fontSize: 22,
-  },
-  progress: {
-    flex: 1,
-    height: 3,
-    backgroundColor: '#dde1ea',
-    borderRadius: 2,
-    overflow: 'hidden',
-  },
-  progressBar: {
-    height: '100%',
-    borderRadius: 2,
-    backgroundColor: '#051650',
-  },
-  step: {
-    color: '#8a94a6',
-    fontSize: FONT_SIZES.xs,
-    fontWeight: '600',
-    width: 28,
-    textAlign: 'right',
-  },
-  content: {
-    padding: SPACING.lg,
-    paddingBottom: SPACING.xl,
-    gap: SPACING.xl,
-  },
-  title: {
-    color: '#051650',
-    fontSize: FONT_SIZES.title,
-    fontWeight: '800',
-    letterSpacing: -0.8,
-  },
-  subtitle: {
-    color: '#8a94a6',
-    fontSize: FONT_SIZES.md,
-    marginTop: -SPACING.md,
-  },
-  section: { gap: SPACING.sm },
-  label: {
-    color: '#8a94a6',
-    fontSize: FONT_SIZES.xs,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  input: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#dde1ea',
-    borderRadius: RADII.md,
-    padding: SPACING.md,
-    color: '#051650',
-    fontSize: FONT_SIZES.md,
-  },
-  textArea: {
-    minHeight: 80,
-    paddingTop: SPACING.md,
-  },
-  skillInputRow: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-  },
-  skillInput: { flex: 1 },
-  addBtn: {
-    width: 52,
-    backgroundColor: '#051650',
-    borderRadius: RADII.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addBtnText: {
-    color: '#ffffff',
-    fontSize: 24,
-    fontWeight: '300',
-  },
-  chips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.sm,
-  },
-  chip: {
-    paddingHorizontal: SPACING.sm + 4,
-    paddingVertical: SPACING.xs + 4,
-    borderRadius: RADII.full,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#dde1ea',
-  },
-  chipActive: {
-    backgroundColor: '#051650',
-    borderColor: '#051650',
-  },
-  chipText: {
-    color: '#8a94a6',
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '500',
-  },
-  chipTextActive: {
-    color: '#ffffff',
-  },
-  footer: {
-    padding: SPACING.lg,
-    paddingTop: SPACING.sm,
-    gap: SPACING.sm,
-    alignItems: 'center',
-  },
-  ctaBtn: {
-    width: '100%',
-    height: 56,
-    backgroundColor: '#051650',
-    borderRadius: RADII.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#051650',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.28,
-    shadowRadius: 14,
-    elevation: 4,
-  },
-  ctaText: {
-    color: '#ffffff',
-    fontSize: FONT_SIZES.lg,
-    fontWeight: '800',
-  },
-  skipText: {
-    color: '#8a94a6',
-    fontSize: FONT_SIZES.sm,
-  },
-});
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    wrapper: { flex: 1 },
+    screen: {
+      flex: 1,
+      backgroundColor: c.bg,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.md,
+      paddingHorizontal: SPACING.lg,
+      paddingVertical: SPACING.md,
+    },
+    backBtn: {
+      width: 36,
+      height: 36,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    backIcon: {
+      color: c.text,
+      fontSize: 22,
+    },
+    progress: {
+      flex: 1,
+      height: 3,
+      backgroundColor: c.cardBorder,
+      borderRadius: 2,
+      overflow: 'hidden',
+    },
+    progressBar: {
+      height: '100%',
+      borderRadius: 2,
+      backgroundColor: c.isDark ? c.textMuted : c.accent,
+    },
+    step: {
+      color: c.textMuted,
+      fontSize: FONT_SIZES.xs,
+      fontWeight: '600',
+      width: 28,
+      textAlign: 'right',
+    },
+    content: {
+      padding: SPACING.lg,
+      paddingBottom: SPACING.xl,
+      gap: SPACING.xl,
+    },
+    title: {
+      color: c.text,
+      fontSize: FONT_SIZES.title,
+      fontWeight: '800',
+      letterSpacing: -0.8,
+    },
+    subtitle: {
+      color: c.textMuted,
+      fontSize: FONT_SIZES.md,
+      marginTop: -SPACING.md,
+    },
+    section: { gap: SPACING.sm },
+    label: {
+      color: c.textMuted,
+      fontSize: FONT_SIZES.xs,
+      fontWeight: '700',
+      textTransform: 'uppercase',
+      letterSpacing: 1,
+    },
+    input: {
+      backgroundColor: c.bgDeep,
+      borderWidth: 1,
+      borderColor: c.cardBorder,
+      borderRadius: RADII.md,
+      padding: SPACING.md,
+      color: c.text,
+      fontSize: FONT_SIZES.md,
+    },
+    textArea: {
+      minHeight: 80,
+      paddingTop: SPACING.md,
+    },
+    skillInputRow: {
+      flexDirection: 'row',
+      gap: SPACING.sm,
+    },
+    skillInput: { flex: 1 },
+    addBtn: {
+      width: 52,
+      backgroundColor: c.isDark ? c.bgDeep : c.accent,
+      borderWidth: c.isDark ? 1 : 0,
+      borderColor: c.cardBorder,
+      borderRadius: RADII.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    addBtnText: {
+      color: '#ffffff',
+      fontSize: 24,
+      fontWeight: '300',
+    },
+    chips: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: SPACING.sm,
+    },
+    chip: {
+      paddingHorizontal: SPACING.sm + 4,
+      paddingVertical: SPACING.xs + 4,
+      borderRadius: RADII.full,
+      backgroundColor: c.bgDeep,
+      borderWidth: 1,
+      borderColor: c.cardBorder,
+    },
+    chipActive: {
+      backgroundColor: c.isDark ? c.bgDeep : c.accent,
+      borderColor: c.isDark ? 'rgba(255,255,255,0.25)' : c.accent,
+    },
+    chipText: {
+      color: c.textMuted,
+      fontSize: FONT_SIZES.sm,
+      fontWeight: '500',
+    },
+    chipTextActive: {
+      color: '#ffffff',
+    },
+    footer: {
+      padding: SPACING.lg,
+      paddingTop: SPACING.sm,
+      gap: SPACING.sm,
+      alignItems: 'center',
+    },
+    ctaBtn: {
+      width: '100%',
+      height: 56,
+      backgroundColor: c.isDark ? c.bgDeep : c.accent,
+      borderWidth: c.isDark ? 1 : 0,
+      borderColor: c.cardBorder,
+      borderRadius: RADII.full,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: '#051650',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: c.isDark ? 0 : 0.28,
+      shadowRadius: 14,
+      elevation: c.isDark ? 0 : 4,
+    },
+    ctaText: {
+      color: '#ffffff',
+      fontSize: FONT_SIZES.lg,
+      fontWeight: '800',
+    },
+    skipText: {
+      color: c.textMuted,
+      fontSize: FONT_SIZES.sm,
+    },
+  });
+}

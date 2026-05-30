@@ -15,9 +15,10 @@ import { useRouter } from 'expo-router';
 import { Job } from '@/types';
 import { useFeedStore } from '@/store/feedStore';
 import { timeAgo } from '@/services/api';
-import { BOTTOM_NAV_HEIGHT, FONT_SIZES, RADII, SPACING } from '@/constants/theme';
+import { BOTTOM_NAV_HEIGHT, FONT_SIZES, RADII, SPACING, ThemeColors } from '@/constants/theme';
 import { brandColors } from '@/services/logoService';
 import CompanyLogo from '@/components/CompanyLogo';
+import { useTheme } from '@/contexts/ThemeContext';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -59,7 +60,9 @@ const FILTERS: FilterKey[] = ['Tümü', 'Kapananlar'];
 // ─── ApplicationCard ──────────────────────────────────────────────────────────
 
 function ApplicationCard({ job }: { job: Job }) {
-  const { gradient, accent } = brandColors(job.company);
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
+  const { accent } = brandColors(job.company);
   const isClosed = job.isClosed === true;
 
   return (
@@ -76,7 +79,7 @@ function ApplicationCard({ job }: { job: Job }) {
       />
 
       <View style={styles.cardRow}>
-        <CompanyLogo company={job.company} gradient={gradient} size={44} borderRadius={12} />
+        <CompanyLogo company={job.company} size={44} borderRadius={12} />
 
         <View style={styles.cardBody}>
           <Text style={styles.cardTitle} numberOfLines={1}>{job.title}</Text>
@@ -111,6 +114,8 @@ function ApplicationCard({ job }: { job: Job }) {
 // ─── DateGroupHeader ──────────────────────────────────────────────────────────
 
 function DateGroupHeader({ title }: { title: string }) {
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
   return (
     <View style={styles.groupHeader}>
       <Text style={styles.groupLabel}>{title.toUpperCase()}</Text>
@@ -125,6 +130,8 @@ export default function ApplicationsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { appliedJobs, appliedTimestamps } = useFeedStore();
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [activeFilter, setActiveFilter] = useState<FilterKey>('Tümü');
 
@@ -239,258 +246,264 @@ export default function ApplicationsScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: '#eef1f8',
-  },
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: c.bg,
+    },
 
-  // Header
-  header: {
-    paddingHorizontal: 18,
-    paddingTop: 6,
-    paddingBottom: 0,
-    backgroundColor: '#eef1f8',
-  },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  heading: {
-    color: '#051650',
-    fontSize: 30,
-    fontWeight: '700',
-    letterSpacing: -0.8,
-  },
-  headingCount: {
-    color: '#8a94a6',
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '600',
-    letterSpacing: 0.2,
-  },
-  filterRow: {
-    marginTop: 14,
-    marginBottom: 2,
-  },
-  filterContent: {
-    gap: SPACING.xs + 2,
-    paddingBottom: 10,
-  },
-  filterChip: {
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderRadius: RADII.full,
-    borderWidth: 1,
-    borderColor: '#dde1ea',
-    backgroundColor: '#ffffff',
-    shadowColor: '#051650',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  filterChipActive: {
-    backgroundColor: '#051650',
-    borderColor: '#051650',
-    shadowOpacity: 0.18,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  filterText: {
-    fontSize: FONT_SIZES.xs + 1,
-    fontWeight: '600',
-    color: '#8a94a6',
-    letterSpacing: -0.1,
-  },
-  filterTextActive: {
-    color: '#ffffff',
-  },
+    // Header
+    header: {
+      paddingHorizontal: 18,
+      paddingTop: 6,
+      paddingBottom: 0,
+      backgroundColor: c.bg,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      justifyContent: 'space-between',
+      gap: 12,
+    },
+    heading: {
+      color: c.text,
+      fontSize: 30,
+      fontWeight: '700',
+      letterSpacing: -0.8,
+    },
+    headingCount: {
+      color: c.textMuted,
+      fontSize: FONT_SIZES.sm,
+      fontWeight: '600',
+      letterSpacing: 0.2,
+    },
+    filterRow: {
+      marginTop: 14,
+      marginBottom: 2,
+    },
+    filterContent: {
+      gap: SPACING.xs + 2,
+      paddingBottom: 10,
+    },
+    filterChip: {
+      paddingVertical: 6,
+      paddingHorizontal: 14,
+      borderRadius: RADII.full,
+      borderWidth: 1,
+      borderColor: c.cardBorder,
+      backgroundColor: c.bgDeep,
+      shadowColor: '#051650',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: c.isDark ? 0 : 0.06,
+      shadowRadius: 4,
+      elevation: c.isDark ? 0 : 1,
+    },
+    filterChipActive: {
+      backgroundColor: c.isDark ? c.bgDeep : c.accent,
+      borderColor: c.isDark ? 'rgba(255,255,255,0.25)' : c.accent,
+      shadowOpacity: c.isDark ? 0 : 0.18,
+      shadowRadius: 8,
+      elevation: c.isDark ? 0 : 3,
+    },
+    filterText: {
+      fontSize: FONT_SIZES.xs + 1,
+      fontWeight: '600',
+      color: c.textMuted,
+      letterSpacing: -0.1,
+    },
+    filterTextActive: {
+      color: '#ffffff',
+    },
 
-  // List
-  listContent: {
-    paddingHorizontal: 14,
-    paddingTop: 4,
-  },
+    // List
+    listContent: {
+      paddingHorizontal: 14,
+      paddingTop: 4,
+    },
 
-  // Group header
-  groupHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    paddingTop: 12,
-    paddingBottom: 2,
-    paddingHorizontal: 4,
-  },
-  groupLabel: {
-    fontSize: 10.5,
-    fontWeight: '600',
-    letterSpacing: 1.2,
-    color: '#8a94a6',
-  },
-  groupLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#dde1ea',
-  },
+    // Group header
+    groupHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      paddingTop: 12,
+      paddingBottom: 2,
+      paddingHorizontal: 4,
+    },
+    groupLabel: {
+      fontSize: 10.5,
+      fontWeight: '600',
+      letterSpacing: 1.2,
+      color: c.textMuted,
+    },
+    groupLine: {
+      flex: 1,
+      height: 1,
+      backgroundColor: c.cardBorder,
+    },
 
-  // Card
-  card: {
-    borderRadius: 18,
-    borderWidth: 1,
-    borderColor: '#dde1ea',
-    backgroundColor: '#ffffff',
-    overflow: 'hidden',
-    marginTop: 10,
-    shadowColor: '#051650',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.07,
-    shadowRadius: 10,
-    elevation: 2,
-  },
-  cardRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
-    padding: 14,
-  },
-  cardBody: {
-    flex: 1,
-    minWidth: 0,
-  },
-  cardTitle: {
-    color: '#051650',
-    fontSize: 14,
-    fontWeight: '600',
-    lineHeight: 18,
-    letterSpacing: -0.2,
-  },
-  cardSub: {
-    color: '#8a94a6',
-    fontSize: 11.5,
-    marginTop: 4,
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginTop: 9,
-    flexWrap: 'wrap',
-  },
-  pillApplied: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingTop: 3,
-    paddingBottom: 3,
-    paddingLeft: 6,
-    paddingRight: 7,
-    borderRadius: RADII.full,
-    borderWidth: 1,
-    backgroundColor: 'rgba(22,163,74,0.10)',
-    borderColor: 'rgba(22,163,74,0.25)',
-  },
-  pillClosed: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingTop: 3,
-    paddingBottom: 3,
-    paddingLeft: 6,
-    paddingRight: 7,
-    borderRadius: RADII.full,
-    borderWidth: 1,
-    backgroundColor: 'rgba(100,116,139,0.10)',
-    borderColor: 'rgba(100,116,139,0.25)',
-  },
-  pillDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-  },
-  pillText: {
-    fontSize: 10.5,
-    fontWeight: '700',
-    letterSpacing: 0.1,
-  },
-  metaTag: {
-    fontSize: 10.5,
-    fontWeight: '500',
-    color: '#8a94a6',
-  },
-  metaSep: {
-    width: 2,
-    height: 2,
-    borderRadius: 1,
-    backgroundColor: 'rgba(5,22,80,0.18)',
-  },
+    // Card
+    card: {
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: c.cardBorder,
+      backgroundColor: c.bgDeep,
+      overflow: 'hidden',
+      marginTop: 10,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: c.isDark ? 0.25 : 0.07,
+      shadowRadius: 10,
+      elevation: 2,
+    },
+    cardRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 12,
+      padding: 14,
+    },
+    cardBody: {
+      flex: 1,
+      minWidth: 0,
+    },
+    cardTitle: {
+      color: c.text,
+      fontSize: 14,
+      fontWeight: '600',
+      lineHeight: 18,
+      letterSpacing: -0.2,
+    },
+    cardSub: {
+      color: c.textMuted,
+      fontSize: 11.5,
+      marginTop: 4,
+    },
+    metaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      marginTop: 9,
+      flexWrap: 'wrap',
+    },
+    pillApplied: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingTop: 3,
+      paddingBottom: 3,
+      paddingLeft: 6,
+      paddingRight: 7,
+      borderRadius: RADII.full,
+      borderWidth: 1,
+      backgroundColor: 'rgba(22,163,74,0.10)',
+      borderColor: 'rgba(22,163,74,0.25)',
+    },
+    pillClosed: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingTop: 3,
+      paddingBottom: 3,
+      paddingLeft: 6,
+      paddingRight: 7,
+      borderRadius: RADII.full,
+      borderWidth: 1,
+      backgroundColor: 'rgba(100,116,139,0.10)',
+      borderColor: 'rgba(100,116,139,0.25)',
+    },
+    pillDot: {
+      width: 5,
+      height: 5,
+      borderRadius: 3,
+    },
+    pillText: {
+      fontSize: 10.5,
+      fontWeight: '700',
+      letterSpacing: 0.1,
+    },
+    metaTag: {
+      fontSize: 10.5,
+      fontWeight: '500',
+      color: c.textMuted,
+    },
+    metaSep: {
+      width: 2,
+      height: 2,
+      borderRadius: 1,
+      backgroundColor: c.cardBorder,
+    },
 
-  // Detail button
-  detailBtn: {
-    flexShrink: 0,
-    marginTop: 18,
-    paddingVertical: 8,
-    paddingHorizontal: 13,
-    borderRadius: 11,
-    backgroundColor: '#051650',
-    shadowColor: '#051650',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.22,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  detailText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: '#ffffff',
-  },
+    // Detail button
+    detailBtn: {
+      flexShrink: 0,
+      marginTop: 18,
+      paddingVertical: 8,
+      paddingHorizontal: 13,
+      borderRadius: 11,
+      backgroundColor: c.isDark ? c.bgDeep : c.accent,
+      borderWidth: c.isDark ? 1 : 0,
+      borderColor: c.cardBorder,
+      shadowColor: '#051650',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: c.isDark ? 0 : 0.22,
+      shadowRadius: 8,
+      elevation: c.isDark ? 0 : 3,
+    },
+    detailText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: '#ffffff',
+    },
 
-  // Empty state
-  empty: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: SPACING.xl,
-    gap: SPACING.sm + 4,
-  },
-  emptyIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: RADII.xl - 4,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.sm,
-  },
-  emptyTitle: {
-    color: '#051650',
-    fontSize: FONT_SIZES.lg,
-    fontWeight: '700',
-    textAlign: 'center',
-    letterSpacing: -0.3,
-  },
-  emptyDesc: {
-    color: '#8a94a6',
-    fontSize: FONT_SIZES.sm,
-    textAlign: 'center',
-    lineHeight: 20,
-    maxWidth: 260,
-  },
-  emptyCta: {
-    marginTop: SPACING.xs,
-    backgroundColor: '#051650',
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.sm + 4,
-    borderRadius: RADII.full,
-    shadowColor: '#051650',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.28,
-    shadowRadius: 14,
-    elevation: 4,
-  },
-  emptyCtaText: {
-    color: '#ffffff',
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '700',
-  },
-});
+    // Empty state
+    empty: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: SPACING.xl,
+      gap: SPACING.sm + 4,
+    },
+    emptyIcon: {
+      width: 72,
+      height: 72,
+      borderRadius: RADII.xl - 4,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: SPACING.sm,
+    },
+    emptyTitle: {
+      color: c.text,
+      fontSize: FONT_SIZES.lg,
+      fontWeight: '700',
+      textAlign: 'center',
+      letterSpacing: -0.3,
+    },
+    emptyDesc: {
+      color: c.textMuted,
+      fontSize: FONT_SIZES.sm,
+      textAlign: 'center',
+      lineHeight: 20,
+      maxWidth: 260,
+    },
+    emptyCta: {
+      marginTop: SPACING.xs,
+      backgroundColor: c.isDark ? c.bgDeep : c.accent,
+      borderWidth: c.isDark ? 1 : 0,
+      borderColor: c.cardBorder,
+      paddingHorizontal: SPACING.xl,
+      paddingVertical: SPACING.sm + 4,
+      borderRadius: RADII.full,
+      shadowColor: '#051650',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: c.isDark ? 0 : 0.28,
+      shadowRadius: 14,
+      elevation: c.isDark ? 0 : 4,
+    },
+    emptyCtaText: {
+      color: '#ffffff',
+      fontSize: FONT_SIZES.sm,
+      fontWeight: '700',
+    },
+  });
+}

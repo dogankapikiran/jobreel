@@ -27,7 +27,7 @@ export default function PrivacyScreen() {
         contentContainerStyle={[s.content, { paddingBottom: insets.bottom + SPACING.xl }]}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={s.lastUpdated}>Son güncelleme: 1 Mayıs 2025</Text>
+        <Text style={s.lastUpdated}>Son güncelleme: 30 Mayıs 2026</Text>
 
         <Text style={s.intro}>
           JobReel olarak kişisel verilerinizin korunmasına büyük önem veriyoruz. Bu politika, uygulamamızı
@@ -39,11 +39,11 @@ export default function PrivacyScreen() {
         <Section title="1. Topladığımız Veriler" s={s}>
           <Paragraph s={s}>
             <Bold s={s}>Kimlik ve İletişim Bilgileri:</Bold> Adınız, e-posta adresiniz ve (varsa) profil
-            fotoğrafınız. Apple veya LinkedIn ile giriş yapmanız durumunda ilgili platformların sağladığı
+            fotoğrafınız. Apple veya Google ile giriş yapmanız durumunda ilgili platformların sağladığı
             temel profil bilgileri aktarılır.
           </Paragraph>
           <Paragraph s={s}>
-            <Bold s={s}>Özgeçmiş (CV):</Bold> Yüklediğiniz PDF veya LinkedIn'den çekilen iş deneyimi,
+            <Bold s={s}>Özgeçmiş (CV):</Bold> Yüklediğiniz PDF dosyasından çıkarılan iş deneyimi,
             eğitim ve beceri bilgileri.
           </Paragraph>
           <Paragraph s={s}>
@@ -76,6 +76,17 @@ export default function PrivacyScreen() {
             <Bold s={s}>Altyapı Sağlayıcılar:</Bold> Supabase (veritabanı ve kimlik doğrulama),
             Expo (push bildirim altyapısı). Bu sağlayıcılar yalnızca hizmeti sunmak amacıyla
             veri işler.
+          </Paragraph>
+          <Paragraph s={s}>
+            <Bold s={s}>Yapay Zeka (CV Analizi):</Bold> Yüklediğiniz CV'nin metni, beceri ve deneyim
+            bilgilerini otomatik olarak çıkarmak amacıyla Groq, Inc. tarafından işlenmektedir.
+            CV metniniz yalnızca bu analiz için Groq API'sine iletilir; Groq'un gizlilik politikası
+            (groq.com/privacy) geçerlidir. CV yüklemek isteğe bağlıdır.
+          </Paragraph>
+          <Paragraph s={s}>
+            <Bold s={s}>Analitik:</Bold> Mixpanel (kullanım analizi ve olay takibi). Uygulama
+            davranışını iyileştirmek amacıyla anonim kullanım istatistikleri toplanır; bu veriler
+            üçüncü taraflarla paylaşılmaz veya reklam amacıyla kullanılmaz.
           </Paragraph>
           <Paragraph s={s}>
             <Bold s={s}>Yasal Zorunluluk:</Bold> Mahkeme kararı veya yasal düzenleme gerektirdiğinde

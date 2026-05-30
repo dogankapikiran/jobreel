@@ -20,7 +20,6 @@ import { useUserStore } from '@/store/userStore';
 import { api, timeAgo } from '@/services/api';
 import { FONT_SIZES, RADII, SPACING, ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useBrandColor } from '@/hooks/useBrandColor';
 import CompanyLogo from '@/components/CompanyLogo';
 import TagBadge from '@/components/TagBadge';
 
@@ -104,8 +103,6 @@ export default function JobDetailScreen() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const job = jobs.find((j) => j.id === id) ?? savedJobs.find((j) => j.id === id);
-
-  const { gradient, accent } = useBrandColor(job?.company ?? '');
 
   const [description, setDescription] = useState(job?.description ?? '');
   const [descLoading, setDescLoading] = useState(false);
@@ -199,13 +196,13 @@ export default function JobDetailScreen() {
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>{job.title}</Text>
         <TouchableOpacity onPress={handleShare} style={styles.saveBtn}>
-          <Text style={styles.saveIcon}>⬆</Text>
+          <Ionicons name="share-outline" size={18} color={colors.textMuted} />
         </TouchableOpacity>
         <TouchableOpacity onPress={handleSave} style={[styles.saveBtn, saved && styles.saveBtnSaved]}>
           <Ionicons
             name={saved ? 'bookmark' : 'bookmark-outline'}
             size={18}
-            color={saved ? '#f59e0b' : '#8a94a6'}
+            color={saved ? '#f59e0b' : colors.textMuted}
           />
         </TouchableOpacity>
       </View>
@@ -215,7 +212,6 @@ export default function JobDetailScreen() {
         <View style={styles.companyRow}>
           <CompanyLogo
             company={job.company}
-            gradient={gradient}
             size={52}
             borderRadius={RADII.md}
           />
@@ -251,7 +247,7 @@ export default function JobDetailScreen() {
             <View style={styles.divider} />
             <View style={styles.salaryBlock}>
               <Text style={styles.salaryLabel}>Maaş Aralığı</Text>
-              <Text style={[styles.salaryAmount, { color: accent }]}>
+              <Text style={[styles.salaryAmount, { color: colors.isDark ? colors.textMuted : colors.accent }]}>
                 {job.salaryMin && job.salaryMax
                   ? `${job.salaryCurrency}${job.salaryMin.toLocaleString('tr-TR')} – ${job.salaryCurrency}${job.salaryMax.toLocaleString('tr-TR')}`
                   : job.salaryMin
@@ -321,7 +317,7 @@ export default function JobDetailScreen() {
           <Text style={styles.sectionTitle}>İş Tanımı</Text>
           {descLoading ? (
             <View style={styles.descLoadingRow}>
-              <ActivityIndicator size="small" color={accent} />
+              <ActivityIndicator size="small" color={colors.isDark ? colors.textMuted : colors.accent} />
               <Text style={styles.descLoading}>Açıklama yükleniyor...</Text>
             </View>
           ) : descItems.length > 0 ? (
@@ -334,7 +330,7 @@ export default function JobDetailScreen() {
               if (item.kind === 'bullet') {
                 return (
                   <View key={i} style={styles.bulletRow}>
-                    <Text style={[styles.bulletDot, { color: accent }]}>•</Text>
+                    <Text style={[styles.bulletDot, { color: colors.isDark ? colors.textMuted : colors.accent }]}>•</Text>
                     <Text style={styles.bulletText}>{item.text}</Text>
                   </View>
                 );
@@ -351,11 +347,15 @@ export default function JobDetailScreen() {
 
       {/* Footer */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + SPACING.md }]}>
-        <LinearGradient colors={gradient} style={styles.applyGradient}>
-          <TouchableOpacity style={styles.applyInner} onPress={handleApply} activeOpacity={0.85}>
-            <Text style={styles.applyText}>{applied ? 'Başvuruldu ✓' : 'Hemen Başvur'}</Text>
-          </TouchableOpacity>
-        </LinearGradient>
+        <TouchableOpacity
+          style={[styles.applyBtn, applied && styles.applyBtnApplied]}
+          onPress={handleApply}
+          activeOpacity={0.85}
+        >
+          <Text style={[styles.applyText, applied && styles.applyTextApplied]}>
+            {applied ? 'Başvuruldu ✓' : 'Hemen Başvur'}
+          </Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
@@ -418,9 +418,9 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: RADII.full,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.bgDeep,
     borderWidth: 1,
-    borderColor: '#dde1ea',
+    borderColor: colors.cardBorder,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
@@ -431,7 +431,7 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   saveIcon: {
     fontSize: 18,
-    color: '#8a94a6',
+    color: colors.textMuted,
   },
   content: {
     padding: SPACING.lg,
@@ -514,15 +514,15 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     gap: SPACING.sm,
   },
   skillChip: {
-    backgroundColor: `${colors.accent}18`,
+    backgroundColor: colors.isDark ? 'rgba(226,232,245,0.07)' : `${colors.accent}18`,
     borderWidth: 1,
-    borderColor: `${colors.accent}44`,
+    borderColor: colors.isDark ? 'rgba(226,232,245,0.2)' : `${colors.accent}44`,
     borderRadius: RADII.full,
     paddingHorizontal: SPACING.sm + 4,
     paddingVertical: SPACING.xs + 2,
   },
   skillText: {
-    color: colors.accentLight,
+    color: colors.isDark ? colors.textMuted : colors.accentLight,
     fontSize: FONT_SIZES.xs,
     fontWeight: '500',
   },
@@ -607,18 +607,26 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     borderTopColor: colors.cardBorder,
     backgroundColor: colors.bg,
   },
-  applyGradient: {
-    borderRadius: RADII.full,
-    height: 56,
-  },
-  applyInner: {
-    flex: 1,
+  applyBtn: {
+    borderRadius: RADII.md,
+    backgroundColor: colors.isDark ? colors.bgDeep : colors.accent,
+    borderWidth: colors.isDark ? 1 : 0,
+    borderColor: colors.cardBorder,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingVertical: 15,
+  },
+  applyBtnApplied: {
+    backgroundColor: 'rgba(46,204,113,0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(46,204,113,0.4)',
   },
   applyText: {
-    color: colors.white,
-    fontSize: FONT_SIZES.lg,
-    fontWeight: '800',
+    color: '#ffffff',
+    fontSize: FONT_SIZES.md,
+    fontWeight: '700',
+  },
+  applyTextApplied: {
+    color: '#2ecc71',
   },
 });

@@ -7,6 +7,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/authStore';
 import { useEffect } from 'react';
 import { track } from '@/services/analytics';
+import { useTheme } from '@/contexts/ThemeContext';
 
 const SCREEN_NAMES: Record<string, string> = {
   saved: 'Kaydettiklerim',
@@ -19,25 +20,30 @@ const SCREEN_NAMES: Record<string, string> = {
 const TAB_CONFIG: Record<string, {
   icon: keyof typeof Ionicons.glyphMap;
   iconFocused: keyof typeof Ionicons.glyphMap;
-  color?: string;
   center?: boolean;
 }> = {
-  saved:        { icon: 'bookmark-outline',      iconFocused: 'bookmark',      color: '#f59e0b' },
-  applications: { icon: 'briefcase-outline',     iconFocused: 'briefcase',     color: '#4facfe' },
-  index:        { icon: 'home-outline',           iconFocused: 'home',          center: true },
-  alerts:       { icon: 'notifications-outline', iconFocused: 'notifications', color: '#fb923c' },
-  profile:      { icon: 'person-outline',        iconFocused: 'person',        color: '#a78bfa' },
+  saved:        { icon: 'bookmark-outline',      iconFocused: 'bookmark' },
+  applications: { icon: 'briefcase-outline',     iconFocused: 'briefcase' },
+  index:        { icon: 'home-outline',           iconFocused: 'home', center: true },
+  alerts:       { icon: 'notifications-outline', iconFocused: 'notifications' },
+  profile:      { icon: 'person-outline',        iconFocused: 'person' },
 };
 
 function CustomTabBar({ state, navigation }: BottomTabBarProps) {
+  const { isDark, navBg, navBorder } = useTheme();
+
+  const iconFocused  = isDark ? 'rgba(255,255,255,0.85)' : '#051650';
+  const iconDefault  = isDark ? 'rgba(255,255,255,0.25)' : 'rgba(5,22,80,0.30)';
+  const centerActive = isDark ? '#1a2540' : '#051650';
+  const centerIdle   = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(5,22,80,0.08)';
+
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { borderColor: navBorder, shadowColor: isDark ? '#000000' : '#051650' }]}>
       <BlurView
         intensity={55}
-        tint="light"
-        style={StyleSheet.absoluteFillObject}
+        tint={isDark ? 'dark' : 'light'}
+        style={[StyleSheet.absoluteFillObject, { backgroundColor: navBg }]}
       />
-      <View style={styles.topBorder} />
 
       <View style={styles.row}>
         {state.routes.map((route, index) => {
@@ -57,9 +63,7 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
             }
           };
 
-          const iconColor = focused
-            ? (cfg.center ? '#ffffff' : '#051650')
-            : 'rgba(5,22,80,0.30)';
+          const color = focused ? (cfg.center ? '#ffffff' : iconFocused) : iconDefault;
 
           return (
             <TouchableOpacity
@@ -69,20 +73,14 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
               style={styles.tabItem}
             >
               {cfg.center ? (
-                focused ? (
-                  <View style={[styles.centerPill, { backgroundColor: '#051650' }]}>
-                    <Ionicons name={cfg.iconFocused} size={22} color="#fff" />
-                  </View>
-                ) : (
-                  <View style={[styles.centerPill, { backgroundColor: 'rgba(5,22,80,0.08)' }]}>
-                    <Ionicons name={cfg.icon} size={22} color={iconColor} />
-                  </View>
-                )
+                <View style={[styles.centerPill, { backgroundColor: focused ? centerActive : centerIdle }]}>
+                  <Ionicons name={focused ? cfg.iconFocused : cfg.icon} size={22} color={focused ? '#fff' : color} />
+                </View>
               ) : (
                 <Ionicons
                   name={focused ? cfg.iconFocused : cfg.icon}
                   size={22}
-                  color={iconColor}
+                  color={color}
                 />
               )}
             </TouchableOpacity>
@@ -125,20 +123,10 @@ const styles = StyleSheet.create({
     borderRadius: 30,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.6)',
-    shadowColor: '#051650',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.18,
     shadowRadius: 24,
     elevation: 8,
-  },
-  topBorder: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.6)',
   },
   row: {
     flex: 1,

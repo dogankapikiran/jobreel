@@ -1,11 +1,11 @@
 import asyncio
 import io
 import json
+import logging
 import os
 import random
 import re
-import traceback
-from collections import Counter
+from collections import Counter, OrderedDict
 from contextlib import asynccontextmanager
 from typing import Optional
 from urllib.parse import urlparse
@@ -31,12 +31,31 @@ limiter = Limiter(key_func=get_remote_address)
 
 ALLOWED_OAUTH_ERRORS = {"access_denied", "invalid_request", "unauthorized_client", "invalid_scope"}
 
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s %(message)s")
+
+_ALLOWED_JOB_DOMAINS = {
+    "linkedin.com", "www.linkedin.com",
+    "indeed.com", "tr.indeed.com", "www.indeed.com",
+    "glassdoor.com", "www.glassdoor.com",
+    "kariyer.net", "www.kariyer.net",
+    "secretcv.com", "www.secretcv.com",
+    "yenibiris.com", "www.yenibiris.com",
+    "jobs.lever.co", "boards.greenhouse.io",
+    "workday.com",
+}
+
 def _is_safe_url(url: str | None) -> bool:
     if not url:
         return False
     try:
         parsed = urlparse(url)
-        return parsed.scheme in ("http", "https") and bool(parsed.netloc)
+        if parsed.scheme not in ("http", "https") or not parsed.netloc:
+            return False
+        hostname = parsed.hostname or ""
+        return hostname in _ALLOWED_JOB_DOMAINS or any(
+            hostname.endswith("." + d) for d in _ALLOWED_JOB_DOMAINS
+        )
     except Exception:
         return False
 
@@ -44,9 +63,6 @@ load_dotenv()
 
 SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_SERVICE_ROLE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
-LINKEDIN_CLIENT_ID = os.getenv("LINKEDIN_CLIENT_ID", "")
-LINKEDIN_CLIENT_SECRET = os.getenv("LINKEDIN_CLIENT_SECRET", "")
-LINKEDIN_REDIRECT_URI = os.getenv("LINKEDIN_REDIRECT_URI", "")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 
 
@@ -273,7 +289,7 @@ async def _get_user_context(user_id: str, db: Client) -> tuple[list[tuple[str, f
 
     try:
         prof = db.table("profiles") \
-            .select("title, linkedin_headline, preferences, cv_parsed") \
+            .select("title, preferences, cv_parsed") \
             .eq("user_id", user_id) \
             .maybe_single() \
             .execute()
@@ -282,11 +298,9 @@ async def _get_user_context(user_id: str, db: Client) -> tuple[list[tuple[str, f
         prof = None
 
     if prof and prof.data:
-        for field in ("title", "linkedin_headline"):
-            val = (prof.data.get(field) or "").strip()
-            if val:
-                cv_title = val.lower()
-                break
+        val = (prof.data.get("title") or "").strip()
+        if val:
+            cv_title = val.lower()
         prefs = prof.data.get("preferences") or {}
         cv_parsed = prof.data.get("cv_parsed") or None
 
@@ -360,9 +374,16 @@ async def _generate_groq_batch(
     if not GROQ_API_KEY or not jobs:
         return {}
 
-    cv_title = cv_parsed.get("title") or ""
-    cv_skills = (cv_parsed.get("skills") or [])[:10]
-    cv_roles = [e.get("role", "") for e in (cv_parsed.get("experience") or [])[:3]]
+    cv_title = str(cv_parsed.get("title") or "")[:120]
+    cv_skills = [
+        str(s)[:60] for s in (cv_parsed.get("skills") or [])
+        if isinstance(s, (str, int, float)) and str(s).strip()
+    ][:10]
+    cv_roles = [
+        str(e.get("role", ""))[:80]
+        for e in (cv_parsed.get("experience") or [])
+        if isinstance(e, dict)
+    ][:3]
 
     job_lines = []
     for i, job in enumerate(jobs):
@@ -412,14 +433,27 @@ async def _generate_groq_batch(
                 raw,
             ):
                 data[m.group(1)] = {"score": int(m.group(2)), "reason": m.group(3)}
+        def _to_str_list(val: object) -> list[str]:
+            if isinstance(val, list):
+                return [str(s) for s in val if s and isinstance(s, (str, int, float))]
+            if isinstance(val, str) and val.strip():
+                import ast
+                try:
+                    parsed = ast.literal_eval(val.strip())
+                    if isinstance(parsed, list):
+                        return [str(s) for s in parsed if s]
+                except (ValueError, SyntaxError):
+                    pass
+            return []
+
         result: dict[int, dict] = {}
         for k, v in data.items():
             if str(k).isdigit() and isinstance(v, dict):
                 result[int(k)] = {
                     "score": max(0, min(50, int(v.get("score", 25)))),
                     "reason": str(v.get("reason", "")),
-                    "matched_skills": v.get("matched_skills") or [],
-                    "missing_skills": v.get("missing_skills") or [],
+                    "matched_skills": _to_str_list(v.get("matched_skills")),
+                    "missing_skills": _to_str_list(v.get("missing_skills")),
                 }
         return result
     except Exception as e:
@@ -429,20 +463,65 @@ async def _generate_groq_batch(
 
 # ── Groq Score Cache ─────────────────────────────────────────────────────────
 
-groq_score_cache: dict[str, dict] = {}      # job_id → {"score": int, "reason": str}
-groq_scoring_in_progress: set[str] = set()  # job_ids currently being scored by Groq
+_SCORE_CACHE_MAX = 10_000
+groq_score_cache: OrderedDict[tuple, dict] = OrderedDict()
+groq_scoring_in_progress: set[tuple] = set()
 
 
-async def _score_jobs_background(jobs: list[dict], cv_parsed: dict) -> None:
-    """Background: Groq CV match scoring — results stored in groq_score_cache."""
-    ids = {j["id"] for j in jobs}
+def _cache_put(key: tuple, value: dict) -> None:
+    groq_score_cache[key] = value
+    if len(groq_score_cache) > _SCORE_CACHE_MAX:
+        groq_score_cache.popitem(last=False)
+
+
+async def _load_scores_from_db(user_id: str, job_ids: list[str], db) -> None:
+    """Load persisted scores from Supabase into in-memory cache."""
+    try:
+        rows = db.table("job_cv_scores") \
+            .select("job_id,score,reason,matched_skills,missing_skills") \
+            .eq("user_id", user_id) \
+            .in_("job_id", job_ids) \
+            .execute()
+        for row in (rows.data or []):
+            jid = row["job_id"]
+            if (user_id, jid) not in groq_score_cache:
+                _cache_put((user_id, jid), {
+                    "score": row["score"],
+                    "reason": row["reason"] or "",
+                    "matched_skills": row["matched_skills"] or [],
+                    "missing_skills": row["missing_skills"] or [],
+                })
+    except Exception as e:
+        print(f"[Score Load] DB error: {e}")
+
+
+async def _score_jobs_background(jobs: list[dict], cv_parsed: dict, user_id: str | None = None) -> None:
+    """Background: Groq CV match scoring — results stored in groq_score_cache and Supabase."""
+    ids = {(user_id, j["id"]) for j in jobs}
     groq_scoring_in_progress.update(ids)
     try:
         results = await _generate_groq_batch(jobs, cv_parsed)
+        rows_to_upsert = []
         for i, job in enumerate(jobs):
             entry = results.get(i)
             if entry:
-                groq_score_cache[job["id"]] = entry
+                _cache_put((user_id, job["id"]), entry)
+                if user_id:
+                    rows_to_upsert.append({
+                        "job_id": job["id"],
+                        "user_id": user_id,
+                        "score": entry["score"],
+                        "reason": entry["reason"],
+                        "matched_skills": entry["matched_skills"],
+                        "missing_skills": entry["missing_skills"],
+                    })
+        if rows_to_upsert:
+            try:
+                get_supabase().table("job_cv_scores") \
+                    .upsert(rows_to_upsert, on_conflict="job_id,user_id") \
+                    .execute()
+            except Exception as e:
+                print(f"[Score Save] DB error: {e}")
     finally:
         groq_scoring_in_progress.difference_update(ids)
 
@@ -464,8 +543,7 @@ async def feed(
     try:
         return await _feed_impl(request, location, keyword, sectors, work_type, seniority, page, user)
     except Exception as e:
-        print(f"[Feed] UNHANDLED ERROR for user={user and user.get('sub','?')[:8]}: {e}")
-        traceback.print_exc()
+        logger.exception("[Feed] UNHANDLED ERROR for user=%s", user and user.get("sub", "?")[:8])
         raise HTTPException(status_code=500, detail="Internal Server Error")
 
 
@@ -558,10 +636,24 @@ async def _feed_impl(
                 job, user_prefs, work_type, seniority_list, sectors_list
             )
 
-        if cv_parsed:
+        # Merge cv_parsed skills + manually selected preferences.skills (deduplicated)
+        pref_skills = list(user_prefs.get("skills") or [])
+        effective_cv: dict | None = None
+        if cv_parsed or pref_skills:
+            effective_cv = dict(cv_parsed or {})
+            merged_skills = list(dict.fromkeys(
+                (effective_cv.get("skills") or []) + pref_skills
+            ))
+            effective_cv["skills"] = merged_skills
+
+        if effective_cv and effective_cv.get("skills"):
+            # Load persisted scores from DB for jobs not in memory cache
+            uncached_ids = [j["id"] for j in jobs if (user["sub"], j["id"]) not in groq_score_cache]
+            if uncached_ids:
+                await _load_scores_from_db(user["sub"], uncached_ids, get_supabase())
             # Apply cached Groq scores (default 25 if not yet computed)
             for job in jobs:
-                cached = groq_score_cache.get(job["id"], {})
+                cached = groq_score_cache.get((user["sub"], job["id"]), {})
                 job["score"] = job["_pref_score"] + cached.get("score", 25)
                 if cached.get("reason"):
                     job["ai_reason"] = cached["reason"]
@@ -572,12 +664,13 @@ async def _feed_impl(
             # Kick off background scoring for jobs not cached and not already in progress
             to_score = [
                 j for j in jobs
-                if j["id"] not in groq_score_cache and j["id"] not in groq_scoring_in_progress
+                if (user["sub"], j["id"]) not in groq_score_cache
+                and (user["sub"], j["id"]) not in groq_scoring_in_progress
             ]
             if to_score:
-                asyncio.create_task(_score_jobs_background(to_score, cv_parsed))
+                asyncio.create_task(_score_jobs_background(to_score, effective_cv, user["sub"]))
             # Tell frontend to come back once Groq scores are ready
-            if any(j["id"] not in groq_score_cache for j in jobs):
+            if any((user["sub"], j["id"]) not in groq_score_cache for j in jobs):
                 partial = True
         else:
             for job in jobs:
@@ -591,7 +684,7 @@ async def _feed_impl(
 
 
 @app.get("/api/job/{job_id}/description")
-async def job_description(job_id: str):
+async def job_description(job_id: str, user: dict = Depends(get_current_user)):
     desc = await get_job_description(job_id)
     return {"description": desc}
 
@@ -601,7 +694,9 @@ async def job_description(job_id: str):
 @app.get("/api/profile")
 async def get_profile(user: dict = Depends(get_current_user)):
     db = get_supabase()
-    res = db.table("profiles").select("*").eq("user_id", user["sub"]).maybe_single().execute()
+    res = db.table("profiles").select(
+        "user_id, display_name, title, avatar_url, preferences, skills, cv_url, cv_parsed"
+    ).eq("user_id", user["sub"]).maybe_single().execute()
     return res.data or {}
 
 
@@ -612,7 +707,6 @@ class ProfileUpdate(BaseModel):
     skills: list[str] | None = None
     avatar_url: str | None = None
     cv_url: str | None = None
-    cv_parsed: dict | None = None
 
 @app.put("/api/profile")
 @limiter.limit("30/minute")
@@ -628,6 +722,8 @@ async def save_push_token(body: dict, user: dict = Depends(get_current_user)):
     token = body.get("token", "").strip()
     if not token:
         raise HTTPException(status_code=400, detail="Missing token")
+    if not re.match(r'^ExponentPushToken\[[\w-]+\]$', token):
+        raise HTTPException(status_code=400, detail="Invalid token format")
     db = get_supabase()
     try:
         # Önce UPDATE dene (profil varsa), sonra INSERT
@@ -644,6 +740,7 @@ async def save_push_token(body: dict, user: dict = Depends(get_current_user)):
 async def avatar_url(body: dict, user: dict = Depends(get_current_user)):
     db = get_supabase()
     ext = body.get("ext", "jpg")
+    ext = ext if ext in ("jpg", "jpeg", "png", "webp") else "jpg"
     path = f"avatars/{user['sub']}.{ext}"
     res = db.storage.from_("avatars").create_signed_upload_url(path)
     signed_url = res.get("signedURL", "")
@@ -695,6 +792,11 @@ async def parse_cv(request: Request, user: dict = Depends(get_current_user)):
     except Exception:
         raise HTTPException(status_code=404, detail="CV bulunamadı — önce yükleyin")
 
+    if len(file_bytes) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=413, detail="CV dosyası 10 MB sınırını aşıyor")
+    if not file_bytes.startswith(b"%PDF"):
+        raise HTTPException(status_code=422, detail="Geçersiz dosya formatı — yalnızca PDF kabul edilir")
+
     text = _extract_cv_text(file_bytes)
     if not text.strip():
         raise HTTPException(status_code=422, detail="PDF'den metin çıkarılamadı")
@@ -705,10 +807,9 @@ async def parse_cv(request: Request, user: dict = Depends(get_current_user)):
         print(f"[CV Parse] error for {user['sub'][:8]}: {e}")
         raise HTTPException(status_code=500, detail="CV parse işlemi başarısız oldu")
 
-    public_url = f"{SUPABASE_URL}/storage/v1/object/public/cvs/{path}"
     db.table("profiles").upsert({
         "user_id": user["sub"],
-        "cv_url": public_url,
+        "cv_url": path,
         "cv_parsed": parsed,
     }, on_conflict="user_id").execute()
 
@@ -719,6 +820,12 @@ async def parse_cv(request: Request, user: dict = Depends(get_current_user)):
 
 ALLOWED_ACTIONS = {"view", "save", "apply", "skip", "unsave"}
 
+def _str_field(val: object, max_len: int) -> str | None:
+    if val is None:
+        return None
+    return str(val)[:max_len]
+
+
 @app.post("/api/interactions")
 @limiter.limit("60/minute")
 async def post_interaction(request: Request, body: dict, user: dict = Depends(get_current_user)):
@@ -727,18 +834,20 @@ async def post_interaction(request: Request, body: dict, user: dict = Depends(ge
         raise HTTPException(status_code=400, detail="Geçersiz aksiyon")
     raw_url = body.get("job_url")
     safe_url = raw_url[:2048] if raw_url and _is_safe_url(raw_url) else None
+    raw_duration = body.get("duration_seconds")
+    duration = int(raw_duration) if isinstance(raw_duration, (int, float)) else None
     db = get_supabase()
     db.table("interactions").insert({
         "user_id": user["sub"],
-        "job_id": body.get("job_id"),
+        "job_id": _str_field(body.get("job_id"), 128),
         "action": action,
-        "duration_seconds": body.get("duration_seconds"),
-        "job_title": body.get("job_title"),
-        "job_company": body.get("job_company"),
-        "job_location": body.get("job_location"),
-        "job_sector": body.get("job_sector"),
-        "job_work_type": body.get("job_work_type"),
-        "job_seniority": body.get("job_seniority"),
+        "duration_seconds": duration,
+        "job_title": _str_field(body.get("job_title"), 200),
+        "job_company": _str_field(body.get("job_company"), 200),
+        "job_location": _str_field(body.get("job_location"), 200),
+        "job_sector": _str_field(body.get("job_sector"), 100),
+        "job_work_type": _str_field(body.get("job_work_type"), 50),
+        "job_seniority": _str_field(body.get("job_seniority"), 50),
         "job_url": safe_url,
     }).execute()
     return {"success": True}
@@ -793,9 +902,16 @@ async def get_alerts(user: dict = Depends(get_current_user)):
     return res.data or []
 
 
+MAX_ALERTS_PER_USER = 20
+
+
 @app.post("/api/alerts")
-async def create_alert(body: dict, user: dict = Depends(get_current_user)):
+@limiter.limit("30/minute")
+async def create_alert(request: Request, body: dict, user: dict = Depends(get_current_user)):
     db = get_supabase()
+    existing = db.table("job_alerts").select("id").eq("user_id", user["sub"]).execute()
+    if len(existing.data or []) >= MAX_ALERTS_PER_USER:
+        raise HTTPException(status_code=429, detail=f"Maksimum {MAX_ALERTS_PER_USER} alarm oluşturabilirsiniz")
     seniority = body.get("seniority") or []
     if isinstance(seniority, str):
         seniority = [s.strip() for s in seniority.split(",") if s.strip()]
@@ -873,88 +989,6 @@ async def unfollow_company(company_name: str, user: dict = Depends(get_current_u
         .eq("company_name", company_name) \
         .execute()
     return {"success": True}
-
-
-# ── LinkedIn Connect ──────────────────────────────────────────────────────────
-
-@app.post("/api/linkedin/connect")
-async def connect_linkedin(body: dict, user: dict = Depends(get_current_user)):
-    code: Optional[str] = body.get("code")
-    if not code:
-        raise HTTPException(status_code=400, detail="Missing authorization code")
-    if not LINKEDIN_CLIENT_SECRET:
-        raise HTTPException(status_code=500, detail="LinkedIn not configured")
-
-    async with httpx.AsyncClient() as client:
-        token_res = await client.post(
-            "https://www.linkedin.com/oauth/v2/accessToken",
-            data={
-                "grant_type": "authorization_code",
-                "code": code,
-                "redirect_uri": LINKEDIN_REDIRECT_URI,
-                "client_id": LINKEDIN_CLIENT_ID,
-                "client_secret": LINKEDIN_CLIENT_SECRET,
-            },
-            headers={"Content-Type": "application/x-www-form-urlencoded"},
-        )
-        if token_res.status_code != 200:
-            raise HTTPException(status_code=400, detail="LinkedIn token exchange failed")
-
-        access_token = token_res.json().get("access_token")
-
-        profile_res = await client.get(
-            "https://api.linkedin.com/v2/userinfo",
-            headers={"Authorization": f"Bearer {access_token}"},
-        )
-        if profile_res.status_code != 200:
-            raise HTTPException(status_code=400, detail="LinkedIn profile fetch failed")
-
-        li = profile_res.json()
-
-    db = get_supabase()
-    db.table("profiles").upsert({
-        "user_id": user["sub"],
-        "linkedin_connected": True,
-        "linkedin_sub": li.get("sub"),
-        "linkedin_name": li.get("name"),
-        "linkedin_headline": li.get("headline"),
-        "linkedin_photo_url": li.get("picture"),
-    }, on_conflict="user_id").execute()
-
-    return {
-        "success": True,
-        "name": li.get("name"),
-        "headline": li.get("headline"),
-        "photo_url": li.get("picture"),
-    }
-
-
-@app.delete("/api/linkedin/connect")
-async def disconnect_linkedin(user: dict = Depends(get_current_user)):
-    db = get_supabase()
-    db.table("profiles").update({
-        "linkedin_connected": False,
-        "linkedin_sub": None,
-        "linkedin_name": None,
-        "linkedin_headline": None,
-        "linkedin_photo_url": None,
-    }).eq("user_id", user["sub"]).execute()
-    return {"success": True}
-
-
-# ── LinkedIn Callback ─────────────────────────────────────────────────────────
-
-@app.get("/linkedin/callback")
-async def linkedin_callback(
-    code: str = Query(default=""),
-    error: str = Query(default=""),
-    state: str = Query(default=""),
-):
-    safe_state = re.sub(r"[^a-zA-Z0-9_-]", "", state)[:64]
-    if error:
-        safe_error = error if error in ALLOWED_OAUTH_ERRORS else "unknown_error"
-        return RedirectResponse(url=f"jobreel://linkedin-callback?error={safe_error}&state={safe_state}")
-    return RedirectResponse(url=f"jobreel://linkedin-callback?code={code}&state={safe_state}")
 
 
 # ── Health ────────────────────────────────────────────────────────────────────

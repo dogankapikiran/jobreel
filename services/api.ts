@@ -43,8 +43,8 @@ function mapJob(r: Record<string, unknown>, i: number): Job {
     skills: (r.tags as string[]) || [],
     score: typeof r.score === 'number' ? r.score : undefined,
     aiReason: (r.ai_reason as string) || undefined,
-    matchedSkills: (r.matched_skills as string[]) || undefined,
-    missingSkills: (r.missing_skills as string[]) || undefined,
+    matchedSkills: Array.isArray(r.matched_skills) ? (r.matched_skills as string[]) : undefined,
+    missingSkills: Array.isArray(r.missing_skills) ? (r.missing_skills as string[]) : undefined,
     potentialScore: typeof r.potential_score === 'number' ? r.potential_score : undefined,
     accentIndex: i % 6,
   };
@@ -133,16 +133,7 @@ export const api = {
   getJobDescription: (jobId: string) =>
     request<{ description: string }>(`/job/${jobId}/description`),
 
-  connectLinkedIn: (code: string) =>
-    request<{ success: boolean; name: string; headline: string; photo_url: string }>(
-      '/linkedin/connect',
-      { method: 'POST', body: JSON.stringify({ code }) }
-    ),
-
-  disconnectLinkedIn: () =>
-    request<{ success: boolean }>('/linkedin/connect', { method: 'DELETE' }),
-
-  savePushToken: (token: string) =>
+savePushToken: (token: string) =>
     request<{ success: boolean }>('/profile/push-token', {
       method: 'PUT',
       body: JSON.stringify({ token }),

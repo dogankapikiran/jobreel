@@ -1,18 +1,21 @@
 import React, { useEffect, useRef } from 'react';
 import { Animated, StyleSheet, View } from 'react-native';
-import { COLORS, RADII, SPACING } from '@/constants/theme';
+import { RADII, SPACING } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 interface SkeletonBoxProps {
   width: number | string;
   height: number;
   style?: object;
-  shimmer: Animated.Value;
+  shimmerLight: string;
+  shimmerDark: string;
+  anim: Animated.Value;
 }
 
-function SkeletonBox({ width, height, style, shimmer }: SkeletonBoxProps) {
-  const bg = shimmer.interpolate({
+function SkeletonBox({ width, height, style, shimmerLight, shimmerDark, anim }: SkeletonBoxProps) {
+  const bg = anim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['rgba(255,255,255,0.05)', 'rgba(255,255,255,0.11)'],
+    outputRange: [shimmerLight, shimmerDark],
   });
   return (
     <Animated.View
@@ -26,48 +29,55 @@ interface Props {
 }
 
 export default function SkeletonCard({ cardHeight }: Props) {
-  const shimmer = useRef(new Animated.Value(0)).current;
+  const { bg, isDark } = useTheme();
+  const anim = useRef(new Animated.Value(0)).current;
+
+  const shimmerLight = isDark ? '#111d35' : '#e8ecf4';
+  const shimmerDark  = isDark ? '#1a2540' : '#d0d5e4';
 
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
-        Animated.timing(shimmer, { toValue: 1, duration: 900, useNativeDriver: false }),
-        Animated.timing(shimmer, { toValue: 0, duration: 900, useNativeDriver: false }),
+        Animated.timing(anim, { toValue: 1, duration: 900, useNativeDriver: false }),
+        Animated.timing(anim, { toValue: 0, duration: 900, useNativeDriver: false }),
       ])
     ).start();
   }, []);
 
+  const box = (width: number | string, height: number, style?: object) => (
+    <SkeletonBox
+      width={width}
+      height={height}
+      style={style}
+      shimmerLight={shimmerLight}
+      shimmerDark={shimmerDark}
+      anim={anim}
+    />
+  );
+
   return (
-    <View style={[styles.card, { height: cardHeight }]}>
-      {/* Şirket satırı */}
+    <View style={[styles.card, { height: cardHeight, backgroundColor: bg }]}>
       <View style={styles.companyRow}>
-        <SkeletonBox width={46} height={46} style={{ borderRadius: RADII.md }} shimmer={shimmer} />
+        {box(46, 46, { borderRadius: RADII.md })}
         <View style={styles.companyMeta}>
-          <SkeletonBox width={120} height={14} shimmer={shimmer} />
-          <SkeletonBox width={80} height={11} style={{ marginTop: 6 }} shimmer={shimmer} />
+          {box(120, 14)}
+          {box(80, 11, { marginTop: 6 })}
         </View>
-        <SkeletonBox width={48} height={24} style={{ borderRadius: RADII.full }} shimmer={shimmer} />
+        {box(48, 24, { borderRadius: RADII.full })}
       </View>
 
-      {/* Başlık */}
-      <SkeletonBox width="90%" height={28} style={{ marginBottom: 8 }} shimmer={shimmer} />
-      <SkeletonBox width="60%" height={28} style={{ marginBottom: SPACING.md }} shimmer={shimmer} />
+      {box('90%', 28, { marginBottom: 8 })}
+      {box('60%', 28, { marginBottom: SPACING.md })}
+      {box(200, 28, { borderRadius: RADII.full, marginBottom: SPACING.sm })}
 
-      {/* AI reason pill */}
-      <SkeletonBox width={200} height={28} style={{ borderRadius: RADII.full, marginBottom: SPACING.sm }} shimmer={shimmer} />
-
-      {/* Etiketler */}
       <View style={styles.tags}>
-        <SkeletonBox width={80} height={28} style={{ borderRadius: RADII.full }} shimmer={shimmer} />
-        <SkeletonBox width={90} height={28} style={{ borderRadius: RADII.full }} shimmer={shimmer} />
-        <SkeletonBox width={70} height={28} style={{ borderRadius: RADII.full }} shimmer={shimmer} />
+        {box(80, 28, { borderRadius: RADII.full })}
+        {box(90, 28, { borderRadius: RADII.full })}
+        {box(70, 28, { borderRadius: RADII.full })}
       </View>
 
-      {/* Maaş bloğu */}
-      <SkeletonBox width="100%" height={60} style={{ borderRadius: RADII.md, marginBottom: SPACING.md }} shimmer={shimmer} />
-
-      {/* Explore butonu */}
-      <SkeletonBox width="100%" height={48} style={{ borderRadius: RADII.full, marginTop: 'auto' as any }} shimmer={shimmer} />
+      {box('100%', 60, { borderRadius: RADII.md, marginBottom: SPACING.md })}
+      {box('100%', 48, { borderRadius: RADII.full, marginTop: 'auto' as any })}
     </View>
   );
 }
@@ -76,7 +86,6 @@ const styles = StyleSheet.create({
   card: {
     padding: SPACING.lg,
     paddingBottom: SPACING.md,
-    backgroundColor: COLORS.bg,
   },
   companyRow: {
     flexDirection: 'row',
@@ -86,7 +95,6 @@ const styles = StyleSheet.create({
   },
   companyMeta: {
     flex: 1,
-    gap: 0,
   },
   tags: {
     flexDirection: 'row',

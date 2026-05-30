@@ -2,15 +2,24 @@ import React, { useEffect, useState } from 'react';
 import { Image, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { clearbitLogoUrl, faviconFallbackUrl } from '@/services/logoService';
+import { GRADIENTS } from '@/constants/theme';
 
 interface Props {
   company: string | undefined | null;
-  gradient: readonly [string, string];
   size: number;
   borderRadius: number;
 }
 
-export default function CompanyLogo({ company, gradient, size, borderRadius }: Props) {
+function companyGradient(company: string | undefined | null): readonly [string, string] {
+  if (!company) return GRADIENTS[0];
+  let hash = 0;
+  for (let i = 0; i < company.length; i++) {
+    hash = (hash * 31 + company.charCodeAt(i)) | 0;
+  }
+  return GRADIENTS[Math.abs(hash) % GRADIENTS.length];
+}
+
+export default function CompanyLogo({ company, size, borderRadius }: Props) {
   const [logoUri, setLogoUri] = useState<string | null>(() => clearbitLogoUrl(company));
   const [logoLoaded, setLogoLoaded] = useState(false);
 
@@ -19,12 +28,12 @@ export default function CompanyLogo({ company, gradient, size, borderRadius }: P
     setLogoLoaded(false);
   }, [company]);
 
+  const gradient = companyGradient(company);
   const containerStyle = { width: size, height: size, borderRadius, overflow: 'hidden' as const };
   const imgSize = size * 0.72;
 
   return (
     <View style={containerStyle}>
-      {/* Letter avatar — always visible immediately */}
       <LinearGradient
         colors={gradient as [string, string]}
         style={[StyleSheet.absoluteFillObject, styles.center]}
@@ -34,7 +43,6 @@ export default function CompanyLogo({ company, gradient, size, borderRadius }: P
         </Text>
       </LinearGradient>
 
-      {/* Logo overlay — white bg only shown after successful load */}
       {logoUri !== null && (
         <View style={[StyleSheet.absoluteFillObject, logoLoaded ? styles.whiteBg : null, styles.center]}>
           <Image

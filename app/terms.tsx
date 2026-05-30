@@ -27,7 +27,7 @@ export default function TermsScreen() {
         contentContainerStyle={[s.content, { paddingBottom: insets.bottom + SPACING.xl }]}
         showsVerticalScrollIndicator={false}
       >
-        <Text style={s.lastUpdated}>Son güncelleme: 1 Mayıs 2025</Text>
+        <Text style={s.lastUpdated}>Son güncelleme: 30 Mayıs 2026</Text>
 
         <Text style={s.intro}>
           JobReel uygulamasını ("Uygulama") kullanmadan önce lütfen bu Kullanım Koşullarını dikkatlice

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,14 +13,16 @@ import {
 import { useRouter } from 'expo-router';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
+import * as AppleAuthentication from 'expo-apple-authentication';
 
 WebBrowser.maybeCompleteAuthSession();
 
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuthStore } from '@/store/authStore';
 import { useUserStore } from '@/store/userStore';
 import { supabase } from '@/services/supabase';
-import { LinearGradient } from 'expo-linear-gradient';
-import { FONT_SIZES, GRADIENTS, RADII, SPACING } from '@/constants/theme';
+import { FONT_SIZES, GRADIENTS, RADII, SPACING, ThemeColors } from '@/constants/theme';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function AuthScreen() {
   const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>('signin');
@@ -36,10 +38,13 @@ export default function AuthScreen() {
 
   const { signIn, signUp, error, clearError, session } = useAuthStore();
   const hasCompletedOnboarding = useUserStore((s) => s.hasCompletedOnboarding);
+  const completedOnboardingUserIds = useUserStore((s) => s.completedOnboardingUserIds);
   const [userHydrated, setUserHydrated] = useState(
     () => useUserStore.persist.hasHydrated()
   );
   const router = useRouter();
+  const colors = useTheme();
+  const styles = useMemo(() => makeStyles(colors), [colors]);
 
   useEffect(() => {
     const unsub = useUserStore.persist.onFinishHydration(() => setUserHydrated(true));
@@ -48,8 +53,10 @@ export default function AuthScreen() {
 
   useEffect(() => {
     if (!session || !userHydrated) return;
-    router.replace(hasCompletedOnboarding ? '/(tabs)' : '/onboarding/welcome');
-  }, [session, hasCompletedOnboarding, userHydrated]);
+    const hasOnboarded =
+      completedOnboardingUserIds.includes(session.user.id) || hasCompletedOnboarding;
+    router.replace(hasOnboarded ? '/' : '/onboarding/welcome');
+  }, [session, hasCompletedOnboarding, completedOnboardingUserIds, userHydrated]);
 
   function switchMode(m: 'signin' | 'signup' | 'forgot') {
     setMode(m);
@@ -90,6 +97,39 @@ export default function AuthScreen() {
     setBusy(false);
   }
 
+  async function handleAppleSignIn() {
+    try {
+      setBusy(true);
+      const credential = await AppleAuthentication.signInAsync({
+        requestedScopes: [
+          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+          AppleAuthentication.AppleAuthenticationScope.EMAIL,
+        ],
+      });
+      if (!credential.identityToken) throw new Error('Apple kimlik token alınamadı');
+      const { data, error } = await supabase.auth.signInWithIdToken({
+        provider: 'apple',
+        token: credential.identityToken,
+      });
+      if (error) throw error;
+      const user = data.session?.user;
+      if (user && credential.fullName) {
+        const name = [credential.fullName.givenName, credential.fullName.familyName]
+          .filter(Boolean).join(' ');
+        if (name) {
+          useUserStore.getState().setProfile({ name });
+          supabase.from('profiles').update({ display_name: name }).eq('user_id', user.id).then(() => {});
+        }
+      }
+    } catch (e: unknown) {
+      if ((e as any).code === 'ERR_REQUEST_CANCELED') return;
+      const msg = e instanceof Error ? e.message : 'Apple ile giriş başarısız oldu.';
+      Alert.alert('Hata', msg);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleGoogleSignIn() {
     try {
       setBusy(true);
@@ -121,7 +161,7 @@ export default function AuthScreen() {
             });
           }
           if (avatarUrl) {
-            supabase.from('profiles').update({ avatar_url: avatarUrl }).eq('id', user.id).then(() => {});
+            supabase.from('profiles').update({ avatar_url: avatarUrl }).eq('user_id', user.id).then(() => {});
           }
         }
       }
@@ -155,9 +195,7 @@ export default function AuthScreen() {
             <LinearGradient colors={GRADIENTS[0]} style={styles.logoIcon}>
               <Text style={styles.logoIconText}>J</Text>
             </LinearGradient>
-            <Text style={styles.logo}>
-              JobReel
-            </Text>
+            <Text style={styles.logo}>JobReel</Text>
             <Text style={styles.sub}>Şifre Sıfırlama</Text>
           </View>
 
@@ -175,7 +213,7 @@ export default function AuthScreen() {
               <TextInput
                 style={[styles.input, focusedField === 'email' && styles.inputFocused]}
                 placeholder="E-posta"
-                placeholderTextColor="rgba(5,22,80,0.35)"
+                placeholderTextColor={colors.textDim}
                 value={email}
                 onChangeText={setEmail}
                 onFocus={() => setFocusedField('email')}
@@ -209,11 +247,23 @@ export default function AuthScreen() {
           <LinearGradient colors={GRADIENTS[0]} style={styles.logoIcon}>
             <Text style={styles.logoIconText}>J</Text>
           </LinearGradient>
-          <Text style={styles.logo}>
-            JobReel
-          </Text>
+          <Text style={styles.logo}>JobReel</Text>
           <Text style={styles.sub}>Kariyerini keşfet</Text>
         </View>
+
+        {Platform.OS === 'ios' && (
+          <AppleAuthentication.AppleAuthenticationButton
+            buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
+            buttonStyle={
+              colors.isDark
+                ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+            }
+            cornerRadius={RADII.full}
+            style={styles.appleBtn}
+            onPress={handleAppleSignIn}
+          />
+        )}
 
         <TouchableOpacity
           style={styles.googleBtn}
@@ -249,7 +299,7 @@ export default function AuthScreen() {
         <TextInput
           style={[styles.input, focusedField === 'email' && styles.inputFocused]}
           placeholder="✉  E-posta"
-          placeholderTextColor="rgba(5,22,80,0.35)"
+          placeholderTextColor={colors.textDim}
           value={email}
           onChangeText={setEmail}
           onFocus={() => setFocusedField('email')}
@@ -261,7 +311,7 @@ export default function AuthScreen() {
         <TextInput
           style={[styles.input, focusedField === 'password' && styles.inputFocused]}
           placeholder="🔒  Şifre"
-          placeholderTextColor="rgba(5,22,80,0.35)"
+          placeholderTextColor={colors.textDim}
           value={password}
           onChangeText={setPassword}
           onFocus={() => setFocusedField('password')}
@@ -273,7 +323,7 @@ export default function AuthScreen() {
           <TextInput
             style={[styles.input, focusedField === 'confirmPassword' && styles.inputFocused]}
             placeholder="🔒  Şifre Tekrar"
-            placeholderTextColor="rgba(5,22,80,0.35)"
+            placeholderTextColor={colors.textDim}
             value={confirmPassword}
             onChangeText={setConfirmPassword}
             onFocus={() => setFocusedField('confirmPassword')}
@@ -288,9 +338,20 @@ export default function AuthScreen() {
           </TouchableOpacity>
         )}
 
-        {(validationError || error) && (
-          <Text style={styles.error}>{validationError || error}</Text>
-        )}
+        {validationError ? (
+          <Text style={styles.error}>{validationError}</Text>
+        ) : error === 'already_registered' ? (
+          <View style={styles.alreadyRegisteredBox}>
+            <Text style={styles.alreadyRegisteredText}>
+              Bu e-posta adresi zaten kayıtlı.
+            </Text>
+            <TouchableOpacity onPress={() => switchMode('signin')}>
+              <Text style={styles.alreadyRegisteredLink}>Giriş yapmak için tıklayın →</Text>
+            </TouchableOpacity>
+          </View>
+        ) : error ? (
+          <Text style={styles.error}>{error}</Text>
+        ) : null}
 
         {signupSent ? (
           <View style={styles.successBox}>
@@ -320,172 +381,207 @@ export default function AuthScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: '#eef1f8',
-  },
-  inner: {
-    flex: 1,
-    justifyContent: 'center',
-    paddingHorizontal: SPACING.lg + 8,
-    gap: SPACING.md,
-  },
-  heroSection: {
-    alignItems: 'center',
-    marginBottom: SPACING.sm,
-    gap: SPACING.sm,
-  },
-  logoIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.xs,
-  },
-  logoIconText: {
-    color: '#ffffff',
-    fontSize: 34,
-    fontWeight: '800',
-  },
-  logo: {
-    color: '#051650',
-    fontSize: 40,
-    fontWeight: '800',
-    textAlign: 'center',
-    letterSpacing: -1,
-    marginBottom: SPACING.xs,
-  },
-
-  sub: {
-    color: '#8a94a6',
-    fontSize: FONT_SIZES.md,
-    textAlign: 'center',
-  },
-  tabs: {
-    flexDirection: 'row',
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#dde1ea',
-    borderRadius: RADII.md,
-    padding: 4,
-    shadowColor: '#051650',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 1,
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADII.sm,
-    alignItems: 'center',
-  },
-  tabActive: {
-    backgroundColor: '#051650',
-    shadowColor: '#051650',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  tabText: { color: '#8a94a6', fontWeight: '600', fontSize: FONT_SIZES.sm },
-  tabTextActive: { color: '#ffffff' },
-  input: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#dde1ea',
-    borderRadius: RADII.md,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm + 4,
-    color: '#051650',
-    fontSize: FONT_SIZES.md,
-    shadowColor: '#051650',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  inputFocused: {
-    borderColor: '#051650',
-    borderWidth: 1.5,
-  },
-  forgotLink: {
-    alignSelf: 'flex-end',
-    marginTop: -SPACING.xs,
-  },
-  forgotLinkText: {
-    color: '#051650',
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '600',
-  },
-  forgotDesc: {
-    color: '#8a94a6',
-    fontSize: FONT_SIZES.sm,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  error: {
-    color: '#ef4444',
-    fontSize: FONT_SIZES.sm,
-    textAlign: 'center',
-  },
-  primaryBtn: {
-    backgroundColor: '#051650',
-    borderRadius: RADII.full,
-    paddingVertical: SPACING.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: SPACING.xs,
-    shadowColor: '#051650',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.28,
-    shadowRadius: 14,
-    elevation: 4,
-  },
-  primaryBtnText: { color: '#ffffff', fontWeight: '700', fontSize: FONT_SIZES.md },
-  backLink: {
-    alignItems: 'center',
-    marginTop: SPACING.sm,
-  },
-  backLinkText: {
-    color: '#8a94a6',
-    fontSize: FONT_SIZES.sm,
-  },
-  successBox: {
-    backgroundColor: 'rgba(22,163,74,0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(22,163,74,0.22)',
-    borderRadius: RADII.md,
-    padding: SPACING.md,
-  },
-  successText: {
-    color: '#16a34a',
-    fontSize: FONT_SIZES.sm,
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  dividerLine: { flex: 1, height: 1, backgroundColor: '#dde1ea' },
-  dividerText: { color: '#8a94a6', fontSize: FONT_SIZES.xs },
-  googleBtn: {
-    backgroundColor: '#ffffff',
-    borderRadius: RADII.full,
-    height: 50,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#dde1ea',
-    shadowColor: '#051650',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  googleBtnText: { color: '#051650', fontWeight: '700', fontSize: FONT_SIZES.md },
-});
+function makeStyles(c: ThemeColors) {
+  return StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: c.bg,
+    },
+    inner: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingHorizontal: SPACING.lg + 8,
+      gap: SPACING.md,
+    },
+    heroSection: {
+      alignItems: 'center',
+      marginBottom: SPACING.sm,
+      gap: SPACING.sm,
+    },
+    logoIcon: {
+      width: 72,
+      height: 72,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: SPACING.xs,
+      shadowColor: '#7c6dfa',
+      shadowOffset: { width: 0, height: c.isDark ? 0 : 6 },
+      shadowOpacity: c.isDark ? 0.55 : 0.22,
+      shadowRadius: c.isDark ? 22 : 12,
+      elevation: c.isDark ? 0 : 4,
+    },
+    logoIconText: {
+      color: '#ffffff',
+      fontSize: 34,
+      fontWeight: '800',
+    },
+    logo: {
+      color: c.isDark ? '#ffffff' : c.text,
+      fontSize: 40,
+      fontWeight: '800',
+      textAlign: 'center',
+      letterSpacing: -1,
+      marginBottom: SPACING.xs,
+    },
+    sub: {
+      color: c.isDark ? 'rgba(255,255,255,0.55)' : c.textMuted,
+      fontSize: FONT_SIZES.md,
+      textAlign: 'center',
+    },
+    tabs: {
+      flexDirection: 'row',
+      backgroundColor: c.bgDeep,
+      borderWidth: 1,
+      borderColor: c.cardBorder,
+      borderRadius: RADII.md,
+      padding: 4,
+      shadowColor: '#051650',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: c.isDark ? 0 : 0.06,
+      shadowRadius: 6,
+      elevation: c.isDark ? 0 : 1,
+    },
+    tab: {
+      flex: 1,
+      paddingVertical: SPACING.sm,
+      borderRadius: RADII.sm,
+      alignItems: 'center',
+    },
+    tabActive: {
+      backgroundColor: c.isDark ? c.cardBg : c.accent,
+      borderWidth: c.isDark ? 1 : 0,
+      borderColor: c.cardBorder,
+      shadowColor: '#051650',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: c.isDark ? 0 : 0.2,
+      shadowRadius: 6,
+      elevation: c.isDark ? 0 : 2,
+    },
+    tabText: { color: c.textMuted, fontWeight: '600', fontSize: FONT_SIZES.sm },
+    tabTextActive: { color: '#ffffff' },
+    input: {
+      backgroundColor: c.bgDeep,
+      borderWidth: 1,
+      borderColor: c.cardBorder,
+      borderRadius: RADII.md,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.sm + 4,
+      color: c.text,
+      fontSize: FONT_SIZES.md,
+      shadowColor: '#051650',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: c.isDark ? 0 : 0.05,
+      shadowRadius: 4,
+      elevation: c.isDark ? 0 : 1,
+    },
+    inputFocused: {
+      borderColor: c.isDark ? 'rgba(255,255,255,0.30)' : c.accent,
+      borderWidth: 1.5,
+    },
+    forgotLink: {
+      alignSelf: 'flex-end',
+      marginTop: -SPACING.xs,
+    },
+    forgotLinkText: {
+      color: c.text,
+      fontSize: FONT_SIZES.sm,
+      fontWeight: '600',
+    },
+    forgotDesc: {
+      color: c.textMuted,
+      fontSize: FONT_SIZES.sm,
+      textAlign: 'center',
+      lineHeight: 20,
+    },
+    error: {
+      color: '#ef4444',
+      fontSize: FONT_SIZES.sm,
+      textAlign: 'center',
+    },
+    primaryBtn: {
+      backgroundColor: c.isDark ? c.bgDeep : c.accent,
+      borderWidth: c.isDark ? 1 : 0,
+      borderColor: c.cardBorder,
+      borderRadius: RADII.full,
+      paddingVertical: SPACING.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: SPACING.xs,
+      shadowColor: '#051650',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: c.isDark ? 0 : 0.28,
+      shadowRadius: 14,
+      elevation: c.isDark ? 0 : 4,
+    },
+    primaryBtnText: { color: '#ffffff', fontWeight: '700', fontSize: FONT_SIZES.md },
+    backLink: {
+      alignItems: 'center',
+      marginTop: SPACING.sm,
+    },
+    backLinkText: {
+      color: c.textMuted,
+      fontSize: FONT_SIZES.sm,
+    },
+    successBox: {
+      backgroundColor: 'rgba(22,163,74,0.08)',
+      borderWidth: 1,
+      borderColor: 'rgba(22,163,74,0.22)',
+      borderRadius: RADII.md,
+      padding: SPACING.md,
+    },
+    successText: {
+      color: '#16a34a',
+      fontSize: FONT_SIZES.sm,
+      textAlign: 'center',
+      lineHeight: 22,
+    },
+    dividerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+    },
+    dividerLine: { flex: 1, height: 1, backgroundColor: c.cardBorder },
+    dividerText: { color: c.textMuted, fontSize: FONT_SIZES.xs },
+    appleBtn: {
+      height: 50,
+      width: '100%',
+    },
+    googleBtn: {
+      backgroundColor: c.bgDeep,
+      borderRadius: RADII.full,
+      height: 50,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: c.cardBorder,
+      shadowColor: '#051650',
+      shadowOffset: { width: 0, height: 3 },
+      shadowOpacity: c.isDark ? 0 : 0.08,
+      shadowRadius: 8,
+      elevation: c.isDark ? 0 : 2,
+    },
+    googleBtnText: { color: c.text, fontWeight: '700', fontSize: FONT_SIZES.md },
+    alreadyRegisteredBox: {
+      backgroundColor: 'rgba(239,68,68,0.07)',
+      borderWidth: 1,
+      borderColor: 'rgba(239,68,68,0.2)',
+      borderRadius: RADII.md,
+      padding: SPACING.md,
+      alignItems: 'center',
+      gap: SPACING.xs,
+    },
+    alreadyRegisteredText: {
+      color: '#ef4444',
+      fontSize: FONT_SIZES.sm,
+      textAlign: 'center',
+      fontWeight: '600',
+    },
+    alreadyRegisteredLink: {
+      color: c.text,
+      fontSize: FONT_SIZES.sm,
+      fontWeight: '700',
+      textDecorationLine: 'underline',
+    },
+  });
+}

@@ -1,15 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Linking,
-  Modal,
   Platform,
   ScrollView,
   StyleSheet,
   Switch,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -27,6 +24,12 @@ import type { ThemeColors } from '@/constants/theme';
 import { supabase } from '@/services/supabase';
 
 const NOTIF_KEY = 'notification_settings';
+
+const THEME_OPTIONS = [
+  { value: 'light',  label: 'Açık',     icon: 'sunny-outline' },
+  { value: 'system', label: 'Otomatik', icon: 'phone-portrait-outline' },
+  { value: 'dark',   label: 'Koyu',     icon: 'moon-outline' },
+] as const;
 
 interface NotifSettings {
   pushEnabled: boolean;
@@ -67,10 +70,6 @@ export default function SettingsScreen() {
   const [notif, setNotif] = useState<NotifSettings>(DEFAULT_SETTINGS);
   const [showDndStart, setShowDndStart] = useState(false);
   const [showDndEnd, setShowDndEnd] = useState(false);
-  const [emailModalVisible, setEmailModalVisible] = useState(false);
-  const [newEmail, setNewEmail] = useState('');
-  const [emailLoading, setEmailLoading] = useState(false);
-  const [emailError, setEmailError] = useState('');
 
   useEffect(() => {
     AsyncStorage.getItem(NOTIF_KEY).then((raw) => {
@@ -129,7 +128,25 @@ export default function SettingsScreen() {
               {
                 text: 'Hesabı Sil', style: 'destructive',
                 onPress: async () => {
-                  try { await supabase.rpc('delete_user'); } catch {}
+                  const { error: rpcError } = await supabase.rpc('delete_user');
+                  if (rpcError) {
+                    Alert.alert(
+                      'Hata',
+                      'Hesap silinemedi. Destek ekibimize yazarak hesabınızın silinmesini talep edebilir veya oturumu kapatabilirsiniz.',
+                      [
+                        {
+                          text: 'Destek Yaz',
+                          onPress: () => Linking.openURL('mailto:support@jobreel.app?subject=Hesap%20Silme%20Talebi'),
+                        },
+                        {
+                          text: 'Oturumu Kapat',
+                          onPress: async () => { await signOut(); router.replace('/auth'); },
+                        },
+                        { text: 'İptal', style: 'cancel' },
+                      ],
+                    );
+                    return;
+                  }
                   await signOut();
                   router.replace('/auth');
                 },
@@ -140,26 +157,6 @@ export default function SettingsScreen() {
       ],
     );
   }
-
-  async function handleEmailChange() {
-    if (!newEmail.trim() || !newEmail.includes('@')) {
-      setEmailError('Geçerli bir e-posta adresi girin.');
-      return;
-    }
-    setEmailLoading(true);
-    setEmailError('');
-    const { error } = await supabase.auth.updateUser({ email: newEmail.trim() });
-    setEmailLoading(false);
-    if (error) {
-      setEmailError(error.message);
-    } else {
-      setEmailModalVisible(false);
-      setNewEmail('');
-      Alert.alert('Başarılı', 'Yeni e-posta adresinize bir onay maili gönderildi.');
-    }
-  }
-
-  const userEmail = session?.user?.email ?? '';
 
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
@@ -177,6 +174,33 @@ export default function SettingsScreen() {
         contentContainerStyle={[s.scrollContent, { paddingBottom: insets.bottom + SPACING.xl }]}
         showsVerticalScrollIndicator={false}
       >
+        {/* ── GÖRÜNÜM ── */}
+        <Text style={s.sectionLabel}>GÖRÜNÜM</Text>
+        <View style={s.card}>
+          <View style={s.themeSegment}>
+            {THEME_OPTIONS.map((opt) => {
+              const active = colors.colorScheme === opt.value;
+              return (
+                <TouchableOpacity
+                  key={opt.value}
+                  style={[s.themeOption, active && s.themeOptionActive]}
+                  onPress={() => colors.setColorScheme(opt.value)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons
+                    name={opt.icon as any}
+                    size={18}
+                    color={active ? (colors.isDark ? colors.text : '#ffffff') : colors.textMuted}
+                  />
+                  <Text style={[s.themeOptionLabel, active && s.themeOptionLabelActive]}>
+                    {opt.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </View>
+
         {/* ── BİLDİRİMLER ── */}
         <Text style={s.sectionLabel}>BİLDİRİMLER</Text>
         <View style={s.card}>
@@ -232,22 +256,6 @@ export default function SettingsScreen() {
         {/* ── HESAP & GÜVENLİK ── */}
         <Text style={s.sectionLabel}>HESAP & GÜVENLİK</Text>
         <View style={s.card}>
-          <ArrowRow
-            icon="link-outline"
-            label="Bağlı Hesaplar"
-            sublabel="Apple, LinkedIn"
-            onPress={() => router.push('/linkedin-connect')}
-            colors={colors}
-          />
-          <Divider colors={colors} />
-          <ArrowRow
-            icon="mail-outline"
-            label="E-posta Değiştir"
-            sublabel={userEmail}
-            onPress={() => { setNewEmail(''); setEmailError(''); setEmailModalVisible(true); }}
-            colors={colors}
-          />
-          <Divider colors={colors} />
           <TouchableOpacity style={s.row} onPress={handleSignOut} activeOpacity={0.7}>
             <Ionicons name="log-out-outline" size={20} color={colors.danger} style={s.rowIcon} />
             <Text style={[s.rowLabel, { color: colors.danger }]}>Çıkış Yap</Text>
@@ -315,36 +323,6 @@ export default function SettingsScreen() {
         />
       )}
 
-      {/* E-posta Değiştir Modal */}
-      <Modal
-        visible={emailModalVisible}
-        transparent
-        animationType="slide"
-        onRequestClose={() => setEmailModalVisible(false)}
-      >
-        <TouchableOpacity style={s.backdrop} activeOpacity={1} onPress={() => setEmailModalVisible(false)} />
-        <View style={[s.sheet, { paddingBottom: insets.bottom + SPACING.md }]}>
-          <View style={s.sheetHandle} />
-          <Text style={s.sheetTitle}>E-posta Değiştir</Text>
-          {userEmail ? <Text style={s.sheetSub}>Mevcut: {userEmail}</Text> : null}
-          <TextInput
-            style={[s.emailInput, emailError ? s.emailInputError : null]}
-            placeholder="Yeni e-posta adresi"
-            placeholderTextColor={colors.textMuted}
-            value={newEmail}
-            onChangeText={setNewEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-          {emailError ? <Text style={s.errorText}>{emailError}</Text> : null}
-          <TouchableOpacity style={[s.sheetBtn, s.sheetBtnSolid]} onPress={handleEmailChange} activeOpacity={0.8} disabled={emailLoading}>
-            {emailLoading
-              ? <ActivityIndicator color="#fff" size="small" />
-              : <Text style={s.sheetBtnText}>Güncelle</Text>}
-          </TouchableOpacity>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -366,9 +344,12 @@ function ToggleRow({
         value={value}
         onValueChange={onValueChange}
         disabled={disabled}
-        trackColor={{ false: colors.cardBorder, true: colors.accent }}
+        trackColor={{
+          false: colors.isDark ? 'rgba(255,255,255,0.18)' : colors.cardBorder,
+          true:  colors.isDark ? 'rgba(200,216,240,0.55)' : colors.accent,
+        }}
         thumbColor="#ffffff"
-        ios_backgroundColor={colors.cardBorder}
+        ios_backgroundColor={colors.isDark ? 'rgba(255,255,255,0.14)' : colors.cardBorder}
       />
     </View>
   );
@@ -464,59 +445,34 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   timeBtn: { flex: 1, paddingVertical: SPACING.sm, alignItems: 'center' },
   timeSep: { width: 1, backgroundColor: colors.cardBorder },
   timeBtnLabel: { color: colors.textMuted, fontSize: FONT_SIZES.xs, marginBottom: 2 },
-  timeBtnValue: { color: colors.accent, fontSize: FONT_SIZES.md, fontWeight: '600' },
+  timeBtnValue: { color: colors.isDark ? colors.textMuted : colors.accent, fontSize: FONT_SIZES.md, fontWeight: '600' },
   versionText: { color: colors.textMuted, fontSize: FONT_SIZES.sm },
-  // Modal/Sheet
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(5,22,80,0.35)' },
-  sheet: {
-    position: 'absolute',
-    bottom: 0, left: 0, right: 0,
-    backgroundColor: '#ffffff',
-    borderTopLeftRadius: RADII.xl,
-    borderTopRightRadius: RADII.xl,
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    borderColor: '#dde1ea',
-    padding: SPACING.lg,
-    paddingTop: SPACING.md,
-    shadowColor: '#051650',
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
+  themeSegment: {
+    flexDirection: 'row',
+    padding: SPACING.sm,
+    gap: SPACING.xs,
   },
-  sheetHandle: {
-    width: 40, height: 4,
-    backgroundColor: '#dde1ea',
-    borderRadius: RADII.full,
-    alignSelf: 'center',
-    marginBottom: SPACING.lg,
-  },
-  sheetTitle: { color: colors.text, fontSize: FONT_SIZES.xl, fontWeight: '700', marginBottom: SPACING.xs },
-  sheetSub: { color: colors.textMuted, fontSize: FONT_SIZES.sm, marginBottom: SPACING.md },
-  emailInput: {
-    backgroundColor: colors.cardBg,
-    borderWidth: 1,
-    borderColor: colors.cardBorder,
-    borderRadius: RADII.md,
-    padding: SPACING.md,
-    color: colors.text,
-    fontSize: FONT_SIZES.md,
-    marginBottom: SPACING.sm,
-  },
-  emailInputError: { borderColor: colors.danger },
-  errorText: { color: colors.danger, fontSize: FONT_SIZES.xs, marginBottom: SPACING.sm },
-  sheetBtn: { borderRadius: RADII.md, overflow: 'hidden', marginTop: SPACING.sm },
-  sheetBtnSolid: {
-    height: 52,
-    backgroundColor: '#051650',
+  themeOption: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#051650',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 3,
+    gap: 5,
+    paddingVertical: SPACING.sm + 4,
+    borderRadius: RADII.sm,
+    backgroundColor: colors.bg,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
   },
-  sheetBtnText: { color: '#fff', fontSize: FONT_SIZES.md, fontWeight: '700' },
+  themeOptionActive: {
+    backgroundColor: colors.isDark ? '#1a2540' : colors.accent,
+    borderColor: colors.isDark ? 'rgba(255,255,255,0.15)' : colors.accent,
+  },
+  themeOptionLabel: {
+    color: colors.textMuted,
+    fontSize: FONT_SIZES.xs,
+    fontWeight: '600',
+  },
+  themeOptionLabelActive: {
+    color: colors.isDark ? colors.text : '#ffffff',
+  },
 });

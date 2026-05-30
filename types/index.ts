@@ -35,7 +35,9 @@ export interface UserPreferences {
   sectors: string[];
   seniority: Seniority[];
   workType: WorkType | 'any';
+  workTypes?: WorkType[];
   location: string;
+  cities?: string[];
   salaryMin: number;
   skills: string[];
 }

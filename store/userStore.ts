@@ -28,11 +28,13 @@ interface UserState {
   profile: UserProfile;
   interactions: Interaction[];
   hasCompletedOnboarding: boolean;
+  completedOnboardingUserIds: string[];
 
   setProfile: (partial: Partial<UserProfile>) => void;
   setPreferences: (partial: Partial<UserProfile['preferences']>) => void;
   addInteraction: (interaction: Interaction) => void;
   completeOnboarding: () => void;
+  markOnboardingComplete: (userId: string) => void;
   reset: () => Promise<void>;
 }
 
@@ -42,6 +44,7 @@ export const useUserStore = create<UserState>()(
       profile: DEFAULT_PROFILE,
       interactions: [],
       hasCompletedOnboarding: false,
+      completedOnboardingUserIds: [],
 
       setProfile: (partial) =>
         set((state) => ({ profile: { ...state.profile, ...partial } })),
@@ -61,8 +64,15 @@ export const useUserStore = create<UserState>()(
 
       completeOnboarding: () => set({ hasCompletedOnboarding: true }),
 
+      markOnboardingComplete: (userId) =>
+        set((state) => ({
+          completedOnboardingUserIds: state.completedOnboardingUserIds.includes(userId)
+            ? state.completedOnboardingUserIds
+            : [...state.completedOnboardingUserIds, userId],
+        })),
+
       reset: async () => {
-        await AsyncStorage.removeItem('jobreel-user').catch(() => {});
+        // completedOnboardingUserIds intentionally preserved so returning users skip onboarding
         set({ profile: DEFAULT_PROFILE, interactions: [], hasCompletedOnboarding: false });
       },
     }),
@@ -74,6 +84,7 @@ export const useUserStore = create<UserState>()(
         return {
           ...current,
           ...p,
+          completedOnboardingUserIds: p?.completedOnboardingUserIds ?? [],
           profile: {
             ...current.profile,
             ...(p?.profile ?? {}),

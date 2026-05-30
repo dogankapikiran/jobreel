@@ -11,7 +11,7 @@ _cache: dict = {}
 _scraping: set[str] = set()  # background scrape takibi
 CACHE_TTL = 3600
 RESULTS_PER_TERM = 50
-RESULTS_PER_TERM_BG = 150
+RESULTS_PER_TERM_BG = 250
 PAGE_SIZE = 20
 
 # Türkçe iş unvanı → LinkedIn/Indeed'in İngilizce indexed karşılıkları
@@ -208,7 +208,7 @@ def _map_row(row: pd.Series, index: int) -> dict:
         "seniority":       _seniority(row),
         "sector":          str(row.get("company_industry", "") or ""),
         "company_size":    _company_size(row),
-        "description":     str(row.get("description", "") or "")[:4000],
+        "description":     str(row.get("description", "") or "")[:10000],
         "apply_url":       str(row.get("job_url", "")),
         "fetched_at":      posted_at,
         "tags":            skills,
@@ -474,7 +474,7 @@ def _fetch_linkedin_description(linkedin_id: str) -> str:
         content = re.sub(r'<p[^>]*>', '\n', content, flags=re.IGNORECASE)
         content = re.sub(r'<[^>]+>', '', content)
         content = re.sub(r'\n{3,}', '\n\n', content)
-        return content.strip()[:4000]
+        return content.strip()[:10000]
     except Exception as e:
         print(f"[LinkedIn] Fetch error for {linkedin_id}: {e}")
         return ""

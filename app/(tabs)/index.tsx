@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -25,7 +25,6 @@ import SkeletonCard from '@/components/SkeletonCard';
 import FilterSheet, { FilterState } from '@/components/FilterSheet';
 import {
   BOTTOM_NAV_HEIGHT,
-  COLORS,
   FONT_SIZES,
   HEADER_HEIGHT,
   RADII,
@@ -35,7 +34,8 @@ import {
 export default function FeedScreen() {
   const insets = useSafeAreaInsets();
   const { height } = useWindowDimensions();
-  const { bg } = useTheme();
+  const colors = useTheme();
+  const { bg, text, textDim, textMuted, accent, headerBtnBg, cardBorder, bgDeep, isDark } = colors;
 
   const { jobs, setJobs, appendJobs, updateJobs, isLoading, setLoading, setCurrentIndex } =
     useFeedStore();
@@ -62,18 +62,24 @@ export default function FeedScreen() {
   const bgRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bgRefreshRetries = useRef(0);
   const BG_MAX_RETRIES = 10;
+  // Refs for stale-closure-safe access inside onViewableItemsChanged
+  const pageRef = useRef(1);
+  const filtersRef = useRef(filters);
+  const hasMoreRef = useRef(true);
 
   const SEARCH_BAR_HEIGHT = showSearchBars ? 100 : 0;
   const cardHeight = height - insets.top - HEADER_HEIGHT - SEARCH_BAR_HEIGHT - BOTTOM_NAV_HEIGHT - insets.bottom;
 
+  const styles = useMemo(() => makeStyles({ bg, text, textDim, textMuted, accent, headerBtnBg, cardBorder, bgDeep, isDark }), [bg, text, textDim, textMuted, accent, headerBtnBg, cardBorder, bgDeep, isDark]);
+
   useEffect(() => {
+    if (jobs.length > 0) return;
     loadInitialFeed(filters, 1);
   }, []);
 
   function normalizeLocation(loc: string): string {
     const trimmed = (loc || '').trim();
     if (!trimmed) return 'Istanbul, Turkey';
-    // Map common Turkish city names to English equivalents JobSpy understands
     const map: Record<string, string> = {
       'İstanbul': 'Istanbul, Turkey',
       'istanbul': 'Istanbul, Turkey',
@@ -94,7 +100,6 @@ export default function FeedScreen() {
       work_type: f.workType,
       seniority: f.seniority.join(','),
     };
-    // Kullanıcı manuel keyword girmişse gönder; yoksa backend profil+geçmişten kişiselleştirir
     if (f.keyword) params.keyword = f.keyword;
     return params;
   }
@@ -114,9 +119,12 @@ export default function FeedScreen() {
   async function loadInitialFeed(f: FilterState, pageNum = 1) {
     if (bgRefreshTimer.current) clearTimeout(bgRefreshTimer.current);
     bgRefreshRetries.current = 0;
+    pageRef.current = 1;
+    filtersRef.current = f;
+    hasMoreRef.current = true;
     setLoading(true);
     setLoadError(false);
-    setPage(pageNum);
+    setPage(1);
     try {
       const { jobs: feed, partial } = await api.feed(buildParams(f, pageNum));
       setJobs(feed);
@@ -140,19 +148,27 @@ export default function FeedScreen() {
   }
 
   async function loadMoreJobs() {
-    if (loadingMoreRef.current) return;
+    if (loadingMoreRef.current || !hasMoreRef.current) return;
     loadingMoreRef.current = true;
     try {
-      const nextPage = page + 1;
-      setPage(nextPage);
-      const { jobs: more } = await api.feed(buildParams(filters, nextPage));
-      appendJobs(more);
+      const nextPage = pageRef.current + 1;
+      const { jobs: more } = await api.feed(buildParams(filtersRef.current, nextPage));
+      if (more.length > 0) {
+        pageRef.current = nextPage;
+        setPage(nextPage);
+        appendJobs(more);
+      } else {
+        hasMoreRef.current = false;
+      }
+    } catch {
+      // ağ hatası — hasMore'u sıfırlama, sonra tekrar denenebilir
     } finally {
       loadingMoreRef.current = false;
     }
   }
 
   function handleApplyFilter(newFilters: FilterState) {
+    filtersRef.current = newFilters;
     setFilters(newFilters);
     setSearchText(newFilters.keyword);
     setLocationText(newFilters.location);
@@ -164,6 +180,7 @@ export default function FeedScreen() {
     setShowRecent(false);
     if (kw.trim()) addRecentSearch(kw.trim());
     const newFilters = { ...filters, keyword: kw, location: loc };
+    filtersRef.current = newFilters;
     setFilters(newFilters);
     loadInitialFeed(newFilters, 1);
   }
@@ -214,16 +231,18 @@ export default function FeedScreen() {
     ? jobs.filter((j) => (j.score ?? 0) >= filters.minScore)
     : jobs;
 
+  const isFilterActive = filters.workType !== 'any' || filters.seniority.length > 0 || !!filters.keyword || filters.minScore > 0;
+
   if (isLoading && jobs.length === 0) {
     return (
-      <View style={[styles.screen, { paddingTop: insets.top, backgroundColor: bg }]}>
+      <View style={[styles.screen, { paddingTop: insets.top }]}>
         <SkeletonCard cardHeight={cardHeight} />
       </View>
     );
   }
 
   return (
-    <View style={[styles.screen, { paddingTop: insets.top, backgroundColor: bg }]}>
+    <View style={[styles.screen, { paddingTop: insets.top }]}>
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -238,27 +257,23 @@ export default function FeedScreen() {
             activeOpacity={0.7}
             onPress={() => setShowSearchBars((v) => !v)}
           >
-            <Ionicons name="search-outline" size={18} color={showSearchBars ? '#ffffff' : '#051650'} />
+            <Ionicons name="search-outline" size={18} color={showSearchBars ? '#ffffff' : text} />
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.headerIconBtn, (filters.workType !== 'any' || filters.seniority.length > 0 || filters.keyword || filters.minScore > 0) && styles.headerIconBtnActive]}
+            style={[styles.headerIconBtn, isFilterActive && styles.headerIconBtnActive]}
             activeOpacity={0.7}
             onPress={() => setShowFilter(true)}
           >
-            <Ionicons
-              name="options-outline"
-              size={18}
-              color={(filters.workType !== 'any' || filters.seniority.length > 0 || filters.keyword || filters.minScore > 0) ? '#ffffff' : '#051650'}
-            />
+            <Ionicons name="options-outline" size={18} color={isFilterActive ? '#ffffff' : text} />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Arama çubukları — sadece toggle açıkken göster */}
+      {/* Arama çubukları */}
       {showSearchBars && (
         <View>
           <View style={styles.searchRow}>
-            <Ionicons name="search-outline" size={15} color={COLORS.textDim} />
+            <Ionicons name="search-outline" size={15} color={textDim} />
             <TextInput
               style={styles.searchInput}
               value={searchText}
@@ -267,7 +282,7 @@ export default function FeedScreen() {
               onBlur={() => setTimeout(() => setShowRecent(false), 150)}
               onSubmitEditing={() => applySearchAndLocation(searchText, locationText)}
               placeholder="Pozisyon veya şirket ara..."
-              placeholderTextColor={COLORS.textDim}
+              placeholderTextColor={textDim}
               returnKeyType="search"
               autoCorrect={false}
               autoCapitalize="none"
@@ -275,7 +290,7 @@ export default function FeedScreen() {
             />
             {searchText.length > 0 && (
               <TouchableOpacity onPress={handleSearchClear} style={styles.searchClearBtn} activeOpacity={0.7}>
-                <Ionicons name="close-outline" size={16} color={COLORS.textDim} />
+                <Ionicons name="close-outline" size={16} color={textDim} />
               </TouchableOpacity>
             )}
           </View>
@@ -290,7 +305,7 @@ export default function FeedScreen() {
               </View>
               {recentSearches.map((kw) => (
                 <TouchableOpacity key={kw} style={styles.recentItem} onPress={() => handleRecentSelect(kw)} activeOpacity={0.7}>
-                  <Ionicons name="time-outline" size={14} color={COLORS.textDim} />
+                  <Ionicons name="time-outline" size={14} color={textDim} />
                   <Text style={styles.recentItemText}>{kw}</Text>
                 </TouchableOpacity>
               ))}
@@ -298,21 +313,21 @@ export default function FeedScreen() {
           )}
 
           <View style={styles.searchRow}>
-            <Ionicons name="location-outline" size={15} color={COLORS.textDim} />
+            <Ionicons name="location-outline" size={15} color={textDim} />
             <TextInput
               style={styles.searchInput}
               value={locationText}
               onChangeText={setLocationText}
               onSubmitEditing={() => applySearchAndLocation(searchText, locationText)}
               placeholder="İstanbul, Ankara, Remote..."
-              placeholderTextColor={COLORS.textDim}
+              placeholderTextColor={textDim}
               returnKeyType="search"
               autoCorrect={false}
               autoCapitalize="words"
             />
             {locationText !== 'Istanbul, Turkey' && (
               <TouchableOpacity onPress={handleLocationClear} style={styles.searchClearBtn} activeOpacity={0.7}>
-                <Ionicons name="close-outline" size={16} color={COLORS.textDim} />
+                <Ionicons name="close-outline" size={16} color={textDim} />
               </TouchableOpacity>
             )}
           </View>
@@ -328,12 +343,11 @@ export default function FeedScreen() {
 
       {isLoading && jobs.length > 0 && (
         <View style={styles.filteringBanner}>
-          <ActivityIndicator size="small" color={COLORS.accent} />
+          <ActivityIndicator size="small" color={accent} />
           <Text style={styles.filteringText}>Yükleniyor...</Text>
         </View>
       )}
 
-      {/* Feed */}
       <FlatList
         key={cardHeight}
         ref={listRef}
@@ -348,8 +362,8 @@ export default function FeedScreen() {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={handleRefresh}
-            tintColor={COLORS.accent}
-            colors={[COLORS.accent]}
+            tintColor={accent}
+            colors={[accent]}
           />
         }
         pagingEnabled
@@ -380,193 +394,176 @@ export default function FeedScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    backgroundColor: '#eef1f8',
-  },
-  center: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.md,
-  },
-  header: {
-    height: HEADER_HEIGHT,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    backgroundColor: '#eef1f8',
-  },
-  logo: {
-    color: '#051650',
-    fontSize: FONT_SIZES.xl,
-    fontWeight: '800',
-    letterSpacing: -0.5,
-  },
+interface StyleProps {
+  bg: string;
+  text: string;
+  textDim: string;
+  textMuted: string;
+  accent: string;
+  headerBtnBg: string;
+  cardBorder: string;
+  bgDeep: string;
+  isDark: boolean;
+}
 
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  headerIconBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    backgroundColor: '#ffffff',
-    borderWidth: 0,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#051650',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.10,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  headerIconBtnActive: {
-    backgroundColor: '#051650',
-  },
-  searchRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.sm,
-    height: 44,
-    backgroundColor: '#ffffff',
-    borderWidth: 0,
-    borderRadius: 12,
-    paddingHorizontal: SPACING.md,
-    gap: SPACING.sm,
-    shadowColor: '#051650',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  searchInput: {
-    flex: 1,
-    color: '#051650',
-    fontSize: FONT_SIZES.sm,
-    height: '100%',
-  },
-  searchClearBtn: {
-    padding: 4,
-  },
-  searchClearText: {
-    color: '#8a94a6',
-    fontSize: 12,
-  },
-  dots: {
-    position: 'absolute',
-    right: 14,
-    gap: 5,
-    zIndex: 200,
-  },
-  dot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(5,22,80,0.15)',
-  },
-  dotActive: {
-    height: 20,
-    backgroundColor: '#051650',
-    borderRadius: 2,
-  },
-  loadingText: {
-    color: '#8a94a6',
-    fontSize: FONT_SIZES.sm,
-  },
-  emptyText: {
-    color: '#051650',
-    fontSize: FONT_SIZES.md,
-  },
-  emptySubText: {
-    color: '#8a94a6',
-    fontSize: FONT_SIZES.xs,
-    textAlign: 'center',
-    maxWidth: 240,
-  },
-  loadingSubText: {
-    color: '#8a94a6',
-    fontSize: FONT_SIZES.xs,
-    marginTop: 4,
-  },
-  retryBtn: {
-    backgroundColor: '#051650',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADII.full,
-  },
-  retryText: {
-    color: '#ffffff',
-    fontWeight: '600',
-    fontSize: FONT_SIZES.sm,
-  },
-  filteringBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.sm,
-    paddingVertical: SPACING.sm,
-    backgroundColor: 'rgba(5,22,80,0.06)',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(5,22,80,0.10)',
-  },
-  filteringText: {
-    color: '#051650',
-    fontSize: FONT_SIZES.xs,
-    fontWeight: '600',
-  },
-  recentDropdown: {
-    marginHorizontal: SPACING.lg,
-    marginTop: -SPACING.xs,
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#dde1ea',
-    borderRadius: RADII.lg,
-    overflow: 'hidden',
-    zIndex: 100,
-    shadowColor: '#051650',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 3,
-  },
-  recentHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: '#dde1ea',
-  },
-  recentTitle: {
-    color: '#8a94a6',
-    fontSize: FONT_SIZES.xs,
-    fontWeight: '600',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  recentClear: {
-    color: '#051650',
-    fontSize: FONT_SIZES.xs,
-    fontWeight: '600',
-  },
-  recentItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm + 2,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f2f7',
-  },
-  recentItemText: {
-    color: '#051650',
-    fontSize: FONT_SIZES.sm,
-  },
-});
+function makeStyles({ bg, text, textDim, textMuted, accent, headerBtnBg, cardBorder, bgDeep, isDark }: StyleProps) {
+  return StyleSheet.create({
+    screen: {
+      flex: 1,
+      backgroundColor: bg,
+    },
+    center: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: SPACING.md,
+    },
+    header: {
+      height: HEADER_HEIGHT,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: SPACING.lg,
+      backgroundColor: bg,
+    },
+    logo: {
+      color: text,
+      fontSize: FONT_SIZES.xl,
+      fontWeight: '800',
+      letterSpacing: -0.5,
+    },
+    headerRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+    },
+    headerIconBtn: {
+      width: 38,
+      height: 38,
+      borderRadius: 19,
+      backgroundColor: headerBtnBg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: isDark ? '#000000' : '#051650',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: isDark ? 0.30 : 0.10,
+      shadowRadius: 6,
+      elevation: 2,
+    },
+    headerIconBtnActive: {
+      backgroundColor: accent,
+    },
+    searchRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginHorizontal: SPACING.lg,
+      marginBottom: SPACING.sm,
+      height: 44,
+      backgroundColor: bgDeep,
+      borderWidth: isDark ? 1 : 0,
+      borderColor: cardBorder,
+      borderRadius: 12,
+      paddingHorizontal: SPACING.md,
+      gap: SPACING.sm,
+      shadowColor: isDark ? '#000000' : '#051650',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: isDark ? 0.30 : 0.08,
+      shadowRadius: 6,
+      elevation: 2,
+    },
+    searchInput: {
+      flex: 1,
+      color: text,
+      fontSize: FONT_SIZES.sm,
+      height: '100%',
+    },
+    searchClearBtn: {
+      padding: 4,
+    },
+    emptyText: {
+      color: text,
+      fontSize: FONT_SIZES.md,
+    },
+    emptySubText: {
+      color: textMuted,
+      fontSize: FONT_SIZES.xs,
+      textAlign: 'center',
+      maxWidth: 240,
+    },
+    retryBtn: {
+      backgroundColor: accent,
+      paddingHorizontal: SPACING.lg,
+      paddingVertical: SPACING.sm,
+      borderRadius: RADII.full,
+    },
+    retryText: {
+      color: '#ffffff',
+      fontWeight: '600',
+      fontSize: FONT_SIZES.sm,
+    },
+    filteringBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: SPACING.sm,
+      paddingVertical: SPACING.sm,
+      backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(5,22,80,0.06)',
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(5,22,80,0.10)',
+    },
+    filteringText: {
+      color: text,
+      fontSize: FONT_SIZES.xs,
+      fontWeight: '600',
+    },
+    recentDropdown: {
+      marginHorizontal: SPACING.lg,
+      marginTop: -SPACING.xs,
+      backgroundColor: bgDeep,
+      borderWidth: 1,
+      borderColor: cardBorder,
+      borderRadius: RADII.lg,
+      overflow: 'hidden',
+      zIndex: 100,
+      shadowColor: isDark ? '#000000' : '#051650',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: isDark ? 0.40 : 0.08,
+      shadowRadius: 12,
+      elevation: 3,
+    },
+    recentHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.sm,
+      borderBottomWidth: 1,
+      borderBottomColor: cardBorder,
+    },
+    recentTitle: {
+      color: textMuted,
+      fontSize: FONT_SIZES.xs,
+      fontWeight: '600',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    recentClear: {
+      color: text,
+      fontSize: FONT_SIZES.xs,
+      fontWeight: '600',
+    },
+    recentItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.sm + 2,
+      borderBottomWidth: 1,
+      borderBottomColor: isDark ? 'rgba(255,255,255,0.04)' : '#f0f2f7',
+    },
+    recentItemText: {
+      color: text,
+      fontSize: FONT_SIZES.sm,
+    },
+  });
+}
