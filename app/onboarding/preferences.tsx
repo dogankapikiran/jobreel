@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Modal,
   ScrollView,
   StyleSheet,
@@ -98,9 +99,16 @@ export default function PreferencesScreen() {
   const isEditMode = edit === '1';
 
   const [sectors, setSectors] = useState<string[]>(prefs.sectors);
-  const [workTypes, setWorkTypes] = useState<WorkType[]>(
-    prefs.workTypes ?? ALL_WORK_TYPES
-  );
+  const [workTypes, setWorkTypes] = useState<WorkType[]>(() => {
+    if (prefs.workTypes?.length && prefs.workTypes.length < WORK_TYPES.length) {
+      return prefs.workTypes;
+    }
+    if (prefs.workType && prefs.workType !== 'any') {
+      const parts = prefs.workType.split(',').map((s) => s.trim()).filter(Boolean) as WorkType[];
+      if (parts.length > 0 && parts.length < ALL_WORK_TYPES.length) return parts;
+    }
+    return ALL_WORK_TYPES;
+  });
   const [seniority, setSeniority] = useState<Seniority[]>(
     Array.isArray(prefs.seniority) && prefs.seniority.length > 0
       ? prefs.seniority
@@ -154,10 +162,30 @@ export default function PreferencesScreen() {
     return [...matched.filter((c) => cities.includes(c)), ...matched.filter((c) => !cities.includes(c))];
   }, [citySearch, cities]);
 
+  function normalizeCityForApi(city: string): string {
+    const map: Record<string, string> = {
+      'İstanbul': 'Istanbul, Turkey', 'Ankara': 'Ankara, Turkey',
+      'İzmir': 'Izmir, Turkey', 'Bursa': 'Bursa, Turkey',
+      'Antalya': 'Antalya, Turkey', 'Adana': 'Adana, Turkey',
+      'Konya': 'Konya, Turkey', 'Gaziantep': 'Gaziantep, Turkey',
+      'Kayseri': 'Kayseri, Turkey', 'Mersin': 'Mersin, Turkey',
+      'Kocaeli': 'Kocaeli, Turkey', 'Samsun': 'Samsun, Turkey',
+      'Trabzon': 'Trabzon, Turkey', 'Eskişehir': 'Eskişehir, Turkey',
+      'Diyarbakır': 'Diyarbakır, Turkey', 'Edirne': 'Edirne, Turkey',
+      'Tekirdağ': 'Tekirdağ, Turkey', 'Sakarya': 'Sakarya, Turkey',
+      'Manisa': 'Manisa, Turkey', 'Denizli': 'Denizli, Turkey',
+    };
+    return map[city] ?? (city ? `${city}, Turkey` : 'Istanbul, Turkey');
+  }
+
   async function handleContinue() {
-    const effectiveWorkType =
-      workTypes.length === 0 || workTypes.length === 3 ? 'any' : workTypes[0];
-    const locationStr = cities.length === 0 ? '' : cities.join(', ');
+    const effectiveWorkType = (
+      workTypes.length === 0 || workTypes.length === ALL_WORK_TYPES.length
+        ? 'any'
+        : workTypes.join(',')
+    ) as WorkType | 'any';
+    // Sadece ilk şehri API'ye uygun formatta sakla — birden fazla şehir join edilince feed bozuluyor
+    const locationStr = cities.length === 0 ? '' : normalizeCityForApi(cities[0]);
 
     setPreferences({
       sectors,
@@ -173,16 +201,18 @@ export default function PreferencesScreen() {
       api.updateProfile({
         preferences: {
           sectors,
-          work_type: workTypes.length === 0 || workTypes.length === 3
-            ? 'any'
-            : workTypes.join(','),
+          work_type: effectiveWorkType,
           seniority,
           location: locationStr,
+          cities,
           salary_min: prefs.salaryMin,
           skills: prefs.skills,
         },
-      }).catch(() => {}).finally(() => setSaving(false));
-      router.back();
+      }).then(() => {
+        router.back();
+      }).catch(() => {
+        Alert.alert('Hata', 'Tercihler kaydedilemedi. Lütfen tekrar dene.');
+      }).finally(() => setSaving(false));
     } else {
       router.push('/onboarding/cv-upload');
     }
@@ -313,6 +343,9 @@ export default function PreferencesScreen() {
               );
             })}
           </View>
+          {workTypes.length === 3 && (
+            <Text style={styles.workTypeHint}>= Farketmez olarak kaydedilir</Text>
+          )}
         </View>
 
         {/* Kıdem */}
@@ -373,6 +406,9 @@ export default function PreferencesScreen() {
                 </TouchableOpacity>
               ))}
             </View>
+          )}
+          {cities.length > 1 && (
+            <Text style={styles.workTypeHint}>Feed {cities[0]} için filtrelenir (ilk şehir öncelikli)</Text>
           )}
         </View>
 
@@ -652,6 +688,11 @@ function makeStyles(c: ThemeColors) {
     optionLabelActive: {
       color: c.text,
       fontWeight: '700',
+    },
+    workTypeHint: {
+      color: c.textDim,
+      fontSize: FONT_SIZES.xs,
+      marginTop: 4,
     },
     seniorityList: {
       gap: SPACING.sm,

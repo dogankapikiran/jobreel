@@ -22,8 +22,9 @@ PDF CV'ini yükle. Becerilerini otomatik çıkar, ilanlarla ne kadar
 "React Native Developer, İstanbul, Remote" gibi özel filtrelerle
 uyarı kur. Kriterlere uyan ilan çıktığında anında bildirim al.
 
-— LinkedIn Entegrasyonu —
-LinkedIn profilini bağla, adını ve ünvanını otomatik doldur.
+— Takip Et & Bildirim Al —
+Şirketleri ve pozisyonları takip et. Yeni ilan çıktığında anında
+bildirim al, hiçbir fırsatı kaçırma.
 
 — Kaydet & Takip Et —
 Beğendiğin ilanları kaydet, başvurduklarını ayrı listede takip et.

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -12,7 +12,6 @@ import {
   View,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFeedStore } from '@/store/feedStore';
@@ -90,7 +89,7 @@ function employmentTypeLabel(et: string): string {
     case 'parttime':    return 'Part-time';
     case 'contract':    return 'Sözleşmeli';
     case 'internship':  return 'Staj';
-    default:            return 'Tam Zamanlı';
+    default:            return '';
   }
 }
 
@@ -106,6 +105,23 @@ export default function JobDetailScreen() {
 
   const [description, setDescription] = useState(job?.description ?? '');
   const [descLoading, setDescLoading] = useState(false);
+  const [descError, setDescError] = useState(false);
+  const applySubRef = useRef<ReturnType<typeof AppState.addEventListener> | null>(null);
+  const applyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      applySubRef.current?.remove();
+      applySubRef.current = null;
+      if (applyTimeoutRef.current) {
+        clearTimeout(applyTimeoutRef.current);
+        applyTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   const descItems = useMemo(() => buildDescItems(description), [description]);
 
@@ -113,15 +129,17 @@ export default function JobDetailScreen() {
     if (!job) return;
     if (description.trim().length > 30) return;
     setDescLoading(true);
+    setDescError(false);
     api.getJobDescription(job.id)
       .then(({ description: desc }) => {
+        if (!mountedRef.current) return;
         if (desc) {
           setDescription(desc);
           updateJobs([{ ...job, description: desc }]);
         }
       })
-      .catch(() => {})
-      .finally(() => setDescLoading(false));
+      .catch(() => { if (mountedRef.current) setDescError(true); })
+      .finally(() => { if (mountedRef.current) setDescLoading(false); });
   }, [job?.id]);
 
   if (!job) {
@@ -139,15 +157,18 @@ export default function JobDetailScreen() {
   const wt       = workTypeLabel(job.workType);
 
   function handleApply() {
+    if (applied) { safeOpenURL(job!.url); return; }
+    if (applySubRef.current) return;
     safeOpenURL(job!.url);
-    if (applied) return;
 
-    let confirmed = false;
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active' && !confirmed) {
-        confirmed = true;
-        sub.remove();
-        setTimeout(() => {
+    const openedAt = Date.now();
+    applySubRef.current = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        applySubRef.current?.remove();
+        applySubRef.current = null;
+        if (Date.now() - openedAt < 2000) return;
+        applyTimeoutRef.current = setTimeout(() => {
+          applyTimeoutRef.current = null;
           Alert.alert(
             'Başvuru tamamlandı mı?',
             `${job!.company} pozisyonuna başvurdunuz mu?`,
@@ -157,7 +178,7 @@ export default function JobDetailScreen() {
                 onPress: () => {
                   markApplied(job!);
                   addInteraction({ jobId: job!.id, action: 'apply', timestamp: Date.now() });
-                  api.postInteraction(job!.id, 'apply').catch(() => {});
+                  api.postInteraction(job!.id, 'apply', job!).catch(() => {});
                 },
               },
               { text: 'Hayır', style: 'cancel' },
@@ -171,9 +192,13 @@ export default function JobDetailScreen() {
   function handleSave() {
     if (saved) {
       unsaveJob(job!.id);
+      api.unsaveJob(job!.id).catch(() => { saveJob(job!); });
+      addInteraction({ jobId: job!.id, action: 'unsave', timestamp: Date.now() });
+      api.postInteraction(job!.id, 'unsave', job!).catch(() => {});
     } else {
       saveJob(job!);
       addInteraction({ jobId: job!.id, action: 'save', timestamp: Date.now() });
+      api.postInteraction(job!.id, 'save', job!).catch(() => { unsaveJob(job!.id); });
     }
   }
 
@@ -320,6 +345,8 @@ export default function JobDetailScreen() {
               <ActivityIndicator size="small" color={colors.isDark ? colors.textMuted : colors.accent} />
               <Text style={styles.descLoading}>Açıklama yükleniyor...</Text>
             </View>
+          ) : descError ? (
+            <Text style={styles.descError}>Açıklama yüklenemedi. İnternet bağlantınızı kontrol edin.</Text>
           ) : descItems.length > 0 ? (
             descItems.map((item, i) => {
               if (item.kind === 'head') {
@@ -352,9 +379,14 @@ export default function JobDetailScreen() {
           onPress={handleApply}
           activeOpacity={0.85}
         >
-          <Text style={[styles.applyText, applied && styles.applyTextApplied]}>
-            {applied ? 'Başvuruldu ✓' : 'Hemen Başvur'}
-          </Text>
+          {applied ? (
+            <Text style={[styles.applyText, styles.applyTextApplied]}>Başvuruldu ✓</Text>
+          ) : (
+            <View style={styles.applyInner}>
+              <Text style={styles.applyText}>Hemen Başvur</Text>
+              <Ionicons name="open-outline" size={18} color="#ffffff" style={styles.applyIcon} />
+            </View>
+          )}
         </TouchableOpacity>
       </View>
     </View>
@@ -584,6 +616,10 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     fontSize: FONT_SIZES.sm,
     fontStyle: 'italic',
   },
+  descError: {
+    color: '#ef4444',
+    fontSize: FONT_SIZES.sm,
+  },
   bulletRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -621,10 +657,18 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(46,204,113,0.4)',
   },
+  applyInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   applyText: {
     color: '#ffffff',
     fontSize: FONT_SIZES.md,
     fontWeight: '700',
+  },
+  applyIcon: {
+    opacity: 0.85,
   },
   applyTextApplied: {
     color: '#2ecc71',

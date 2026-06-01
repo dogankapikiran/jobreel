@@ -22,6 +22,7 @@ import { useTheme } from '@/contexts/ThemeContext';
 import { FONT_SIZES, RADII, SPACING } from '@/constants/theme';
 import type { ThemeColors } from '@/constants/theme';
 import { supabase } from '@/services/supabase';
+import { api } from '@/services/api';
 
 const NOTIF_KEY = 'notification_settings';
 
@@ -98,8 +99,23 @@ export default function SettingsScreen() {
         );
         return;
       }
+      await saveNotif({ ...notif, pushEnabled: true });
+      api.updateNotifPrefs({ notif_follow: true, notif_job_alerts: true }).catch(() => {});
+    } else {
+      await saveNotif({ ...notif, pushEnabled: false, newMatch: false, jobAlerts: false, dndEnabled: false });
+      api.updateNotifPrefs({ notif_follow: false, notif_job_alerts: false }).catch(() => {});
     }
-    await saveNotif({ ...notif, pushEnabled: val });
+  }
+
+  async function toggleSubNotif(key: 'newMatch' | 'jobAlerts' | 'dndEnabled', val: boolean) {
+    const next = { ...notif, [key]: val };
+    if (!next.newMatch && !next.jobAlerts) {
+      next.pushEnabled = false;
+      next.dndEnabled = false;
+    }
+    await saveNotif(next);
+    if (key === 'newMatch') api.updateNotifPrefs({ notif_follow: val }).catch(() => {});
+    if (key === 'jobAlerts') api.updateNotifPrefs({ notif_job_alerts: val }).catch(() => {});
   }
 
   function handleSignOut() {
@@ -211,31 +227,35 @@ export default function SettingsScreen() {
             onValueChange={togglePush}
             colors={colors}
           />
-          <Divider colors={colors} />
+          <Divider colors={colors} sub />
           <ToggleRow
-            icon="flash-outline"
-            label="Yeni Eşleşme"
+            icon="business-outline"
+            label="Takip Bildirimleri"
             value={notif.newMatch}
-            onValueChange={(v) => saveNotif({ ...notif, newMatch: v })}
+            onValueChange={(v) => toggleSubNotif('newMatch', v)}
             disabled={!notif.pushEnabled}
+            sub
             colors={colors}
           />
-          <Divider colors={colors} />
+          <Divider colors={colors} sub />
           <ToggleRow
             icon="alarm-outline"
             label="İş Uyarıları"
             value={notif.jobAlerts}
-            onValueChange={(v) => saveNotif({ ...notif, jobAlerts: v })}
+            onValueChange={(v) => toggleSubNotif('jobAlerts', v)}
             disabled={!notif.pushEnabled}
+            sub
             colors={colors}
           />
-          <Divider colors={colors} />
+          <Divider colors={colors} sub />
           <ToggleRow
             icon="moon-outline"
             label="Sessiz Saatler (DND)"
+            sublabel="Push bildirimleri bu ayardan etkilenmez"
             value={notif.dndEnabled}
-            onValueChange={(v) => saveNotif({ ...notif, dndEnabled: v })}
+            onValueChange={(v) => toggleSubNotif('dndEnabled', v)}
             disabled={!notif.pushEnabled}
+            sub
             colors={colors}
           />
           {notif.dndEnabled && notif.pushEnabled && (
@@ -273,14 +293,14 @@ export default function SettingsScreen() {
           <ArrowRow
             icon="document-text-outline"
             label="Gizlilik Politikası"
-            onPress={() => router.push('/privacy')}
+            onPress={() => Linking.openURL('https://jobreel.app/gizlilik')}
             colors={colors}
           />
           <Divider colors={colors} />
           <ArrowRow
             icon="reader-outline"
             label="Kullanım Koşulları"
-            onPress={() => router.push('/terms')}
+            onPress={() => Linking.openURL('https://jobreel.app/sartlar')}
             colors={colors}
           />
           <Divider colors={colors} />
@@ -330,23 +350,43 @@ export default function SettingsScreen() {
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 function ToggleRow({
-  icon, label, value, onValueChange, disabled, colors,
+  icon, label, sublabel, value, onValueChange, disabled, sub, colors,
 }: {
-  icon: string; label: string; value: boolean;
-  onValueChange: (v: boolean) => void; disabled?: boolean; colors: ThemeColors;
+  icon: string; label: string; sublabel?: string; value: boolean;
+  onValueChange: (v: boolean) => void; disabled?: boolean; sub?: boolean; colors: ThemeColors;
 }) {
   const s = makeStyles(colors);
   return (
-    <View style={[s.row, disabled && s.rowDisabled]}>
-      <Ionicons name={icon as any} size={20} color={disabled ? colors.textDim : colors.textMuted} style={s.rowIcon} />
-      <Text style={[s.rowLabel, disabled && { color: colors.textDim }]}>{label}</Text>
+    <View style={[s.row, sub && s.subRow, disabled && s.rowDisabled]}>
+      <Ionicons
+        name={icon as any}
+        size={18}
+        color={
+          disabled ? colors.textDim
+          : sub && !value ? (colors.isDark ? 'rgba(200,216,240,0.35)' : colors.textMuted)
+          : colors.textMuted
+        }
+        style={[s.rowIcon, sub && s.subRowIcon]}
+      />
+      <View style={{ flex: 1 }}>
+        <Text style={[
+          s.rowLabel,
+          sub && s.subRowLabel,
+          disabled
+            ? { color: colors.textDim }
+            : sub && !value
+            ? { color: colors.isDark ? 'rgba(200,216,240,0.35)' : colors.textMuted }
+            : {},
+        ]}>{label}</Text>
+        {sublabel ? <Text style={s.rowSublabel}>{sublabel}</Text> : null}
+      </View>
       <Switch
         value={value}
         onValueChange={onValueChange}
         disabled={disabled}
         trackColor={{
-          false: colors.isDark ? 'rgba(255,255,255,0.18)' : colors.cardBorder,
-          true:  colors.isDark ? 'rgba(200,216,240,0.55)' : colors.accent,
+          false: colors.isDark ? 'rgba(255,255,255,0.28)' : colors.cardBorder,
+          true:  colors.isDark ? 'rgba(130,170,240,0.85)' : colors.accent,
         }}
         thumbColor="#ffffff"
         ios_backgroundColor={colors.isDark ? 'rgba(255,255,255,0.14)' : colors.cardBorder}
@@ -373,8 +413,8 @@ function ArrowRow({
   );
 }
 
-function Divider({ colors }: { colors: ThemeColors }) {
-  return <View style={{ height: 1, backgroundColor: colors.cardBorder, marginLeft: 44 }} />;
+function Divider({ colors, sub }: { colors: ThemeColors; sub?: boolean }) {
+  return <View style={{ height: 1, backgroundColor: colors.cardBorder, marginLeft: sub ? 60 : 44 }} />;
 }
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
@@ -430,6 +470,9 @@ const makeStyles = (colors: ThemeColors) => StyleSheet.create({
   rowDisabled: { opacity: 0.4 },
   rowIcon: { marginRight: SPACING.sm + 4, width: 24, textAlign: 'center' },
   rowLabel: { flex: 1, color: colors.text, fontSize: FONT_SIZES.md, fontWeight: '500' },
+  subRow: { paddingLeft: SPACING.md + 16 },
+  subRowIcon: { width: 20 },
+  subRowLabel: { fontSize: FONT_SIZES.sm, fontWeight: '400' },
   rowSublabel: { color: colors.textMuted, fontSize: FONT_SIZES.xs, marginTop: 1 },
   dndTimes: {
     flexDirection: 'row',

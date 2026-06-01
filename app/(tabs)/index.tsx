@@ -1,9 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Animated,
+  AppState,
   FlatList,
   Keyboard,
+  LayoutAnimation,
   ListRenderItemInfo,
+  Platform,
   RefreshControl,
   StyleSheet,
   Text,
@@ -12,12 +16,14 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Job } from '@/types';
 import { useFeedStore } from '@/store/feedStore';
 import { useUserStore } from '@/store/userStore';
 import { useSearchStore } from '@/store/searchStore';
+import { useAuthStore } from '@/store/authStore';
 import { useTheme } from '@/contexts/ThemeContext';
 import { api } from '@/services/api';
 import JobCard from '@/components/JobCard';
@@ -41,13 +47,20 @@ export default function FeedScreen() {
     useFeedStore();
   const { profile } = useUserStore();
   const { recentSearches, addRecentSearch, clearRecentSearches } = useSearchStore();
+  const sessionUserId = useAuthStore((s) => s.session?.user.id);
 
   const [page, setPage] = useState(1);
   const [loadError, setLoadError] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showFilter, setShowFilter] = useState(false);
   const [showRecent, setShowRecent] = useState(false);
   const [showSearchBars, setShowSearchBars] = useState(false);
+  const [showHint, setShowHint] = useState(false);
+  const [showLocationToast, setShowLocationToast] = useState(false);
+  const hintFade = useRef(new Animated.Value(0)).current;
+  const hintBounce = useRef(new Animated.Value(0)).current;
+  const locationToastAnim = useRef(new Animated.Value(0)).current;
   const [filters, setFilters] = useState<FilterState>({
     keyword: '',
     location: profile.preferences.location || 'Istanbul, Turkey',
@@ -58,6 +71,7 @@ export default function FeedScreen() {
   const [searchText, setSearchText] = useState('');
   const [locationText, setLocationText] = useState(profile.preferences.location || 'Istanbul, Turkey');
   const listRef = useRef<FlatList<Job>>(null);
+  const locationInputRef = useRef<TextInput>(null);
   const loadingMoreRef = useRef(false);
   const bgRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bgRefreshRetries = useRef(0);
@@ -66,16 +80,82 @@ export default function FeedScreen() {
   const pageRef = useRef(1);
   const filtersRef = useRef(filters);
   const hasMoreRef = useRef(true);
+  // BUG-06: sectors için ref — buildParams stale closure'ı önler
+  const sectorsRef = useRef(profile.preferences.sectors);
+  // BUG-13: arka plan→ön plan geçişinde feed refresh
+  const lastForegroundAt = useRef<number>(Date.now());
+  // BUG-23: profile location ilk kez set edildiğinde filters'ı güncelle
+  const locationInitializedRef = useRef(!!profile.preferences.location);
+  const hintShownRef = useRef(false);
 
-  const SEARCH_BAR_HEIGHT = showSearchBars ? 100 : 0;
+  const SEARCH_BAR_HEIGHT = showSearchBars ? 148 : 0;
   const cardHeight = height - insets.top - HEADER_HEIGHT - SEARCH_BAR_HEIGHT - BOTTOM_NAV_HEIGHT - insets.bottom;
 
-  const styles = useMemo(() => makeStyles({ bg, text, textDim, textMuted, accent, headerBtnBg, cardBorder, bgDeep, isDark }), [bg, text, textDim, textMuted, accent, headerBtnBg, cardBorder, bgDeep, isDark]);
+  const styles = useMemo(() => makeStyles({ bg, text, textDim, textMuted, accent, headerBtnBg, cardBorder, bgDeep, isDark, bottomNavH: BOTTOM_NAV_HEIGHT }), [bg, text, textDim, textMuted, accent, headerBtnBg, cardBorder, bgDeep, isDark]);
 
   useEffect(() => {
     if (jobs.length > 0) return;
     loadInitialFeed(filters, 1);
   }, []);
+
+  // BUG-06: sectorsRef'i profil güncellendiğinde senkronize et
+  useEffect(() => {
+    sectorsRef.current = profile.preferences.sectors;
+  }, [profile.preferences.sectors]);
+
+  // BUG-23: Profil hydrate olduktan sonra filters.location'ı güncelle (kullanıcı manuel değiştirmediyse)
+  useEffect(() => {
+    const loc = profile.preferences.location;
+    if (loc && !locationInitializedRef.current) {
+      locationInitializedRef.current = true;
+      setFilters((f) => {
+        if (f.location === 'Istanbul, Turkey') {
+          return { ...f, location: loc };
+        }
+        return f;
+      });
+      setLocationText((t) => (t === 'Istanbul, Turkey' ? loc : t));
+    }
+  }, [profile.preferences.location]);
+
+  // BUG-13: Uygulama arka plandan öne geldiğinde 5+ dakika geçtiyse feed'i yenile
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        const elapsed = Date.now() - lastForegroundAt.current;
+        if (elapsed > 5 * 60 * 1000) {
+          loadInitialFeed(filtersRef.current, 1);
+        }
+        lastForegroundAt.current = Date.now();
+      } else if (state === 'background') {
+        lastForegroundAt.current = Date.now();
+      }
+    });
+    return () => sub.remove();
+  }, []);
+
+  useEffect(() => { hintShownRef.current = false; }, [sessionUserId]);
+
+  useEffect(() => {
+    if (hintShownRef.current || isLoading || jobs.length === 0) return;
+    hintShownRef.current = true;
+    setShowHint(true);
+    Animated.timing(hintFade, { toValue: 1, duration: 400, useNativeDriver: true }).start();
+    const bounce = Animated.loop(
+      Animated.sequence([
+        Animated.timing(hintBounce, { toValue: 10, duration: 500, useNativeDriver: true }),
+        Animated.timing(hintBounce, { toValue: 0, duration: 500, useNativeDriver: true }),
+      ]),
+      { iterations: 4 }
+    );
+    bounce.start();
+    const t = setTimeout(() => {
+      bounce.stop();
+      Animated.timing(hintFade, { toValue: 0, duration: 500, useNativeDriver: true })
+        .start(() => setShowHint(false));
+    }, 2800);
+    return () => { clearTimeout(t); bounce.stop(); };
+  }, [isLoading]);
 
   function normalizeLocation(loc: string): string {
     const trimmed = (loc || '').trim();
@@ -83,20 +163,27 @@ export default function FeedScreen() {
     const map: Record<string, string> = {
       'İstanbul': 'Istanbul, Turkey',
       'istanbul': 'Istanbul, Turkey',
+      'İstanbul, Turkey': 'Istanbul, Turkey',
       'Ankara': 'Ankara, Turkey',
       'ankara': 'Ankara, Turkey',
+      'Ankara, Turkey': 'Ankara, Turkey',
       'İzmir': 'Izmir, Turkey',
       'izmir': 'Izmir, Turkey',
+      'İzmir, Turkey': 'Izmir, Turkey',
+      'Bursa': 'Bursa, Turkey',
+      'Antalya': 'Antalya, Turkey',
+      'Remote': 'Remote',
+      'remote': 'Remote',
+      'Uzaktan': 'Remote',
     };
     return map[trimmed] ?? trimmed;
   }
 
   function buildParams(f: FilterState, pageNum: number) {
-    const { sectors } = profile.preferences;
     const params: Record<string, string | number> = {
       page: pageNum,
       location: normalizeLocation(f.location),
-      sectors: sectors.join(','),
+      sectors: sectorsRef.current.join(','),
       work_type: f.workType,
       seniority: f.seniority.join(','),
     };
@@ -120,6 +207,7 @@ export default function FeedScreen() {
     if (bgRefreshTimer.current) clearTimeout(bgRefreshTimer.current);
     bgRefreshRetries.current = 0;
     pageRef.current = 1;
+    prevIndexRef.current = 0;
     filtersRef.current = f;
     hasMoreRef.current = true;
     setLoading(true);
@@ -150,13 +238,20 @@ export default function FeedScreen() {
   async function loadMoreJobs() {
     if (loadingMoreRef.current || !hasMoreRef.current) return;
     loadingMoreRef.current = true;
+    setLoadingMore(true);
     try {
       const nextPage = pageRef.current + 1;
-      const { jobs: more } = await api.feed(buildParams(filtersRef.current, nextPage));
+      const { jobs: more, partial } = await api.feed(buildParams(filtersRef.current, nextPage));
       if (more.length > 0) {
         pageRef.current = nextPage;
         setPage(nextPage);
         appendJobs(more);
+        if (partial) {
+          bgRefreshTimer.current = setTimeout(
+            () => refreshInBackground(filtersRef.current, nextPage),
+            2000,
+          );
+        }
       } else {
         hasMoreRef.current = false;
       }
@@ -164,6 +259,7 @@ export default function FeedScreen() {
       // ağ hatası — hasMore'u sıfırlama, sonra tekrar denenebilir
     } finally {
       loadingMoreRef.current = false;
+      setLoadingMore(false);
     }
   }
 
@@ -195,34 +291,66 @@ export default function FeedScreen() {
     applySearchAndLocation('', locationText);
   }
 
+  const defaultLocation = profile.preferences.location || 'Istanbul, Turkey';
+
   function handleLocationClear() {
-    const defaultLoc = 'Istanbul, Turkey';
-    setLocationText(defaultLoc);
-    applySearchAndLocation(searchText, defaultLoc);
+    setLocationText(defaultLocation);
+    applySearchAndLocation(searchText, defaultLocation);
+    setShowLocationToast(true);
+    Animated.sequence([
+      Animated.timing(locationToastAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+      Animated.delay(1600),
+      Animated.timing(locationToastAnim, { toValue: 0, duration: 300, useNativeDriver: true }),
+    ]).start(() => setShowLocationToast(false));
+  }
+
+  function toggleSearch() {
+    if (Platform.OS === 'ios') {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    }
+    setShowSearchBars((v) => !v);
   }
 
   const renderItem = useCallback(
-    ({ item, index }: ListRenderItemInfo<Job>) => (
+    ({ item }: ListRenderItemInfo<Job>) => (
       <JobCard
         job={item}
         cardHeight={cardHeight}
-        onNext={() => listRef.current?.scrollToIndex({ index: index + 1, animated: true })}
       />
     ),
     [cardHeight]
   );
 
+  const handleFlatListLayout = useCallback(() => {
+    const idx = prevIndexRef.current;
+    if (idx > 0 && idx < displayJobsCountRef.current) {
+      requestAnimationFrame(() => {
+        listRef.current?.scrollToIndex({ index: idx, animated: false, viewPosition: 0 });
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (bgRefreshTimer.current) clearTimeout(bgRefreshTimer.current);
+    };
+  }, []);
+
   const prevIndexRef = useRef(0);
+  const jobsCountRef = useRef(jobs.length);
+  useEffect(() => { jobsCountRef.current = jobs.length; }, [jobs.length]);
+
+  const displayJobsCountRef = useRef(0);
 
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: any) => {
       if (!viewableItems[0]) return;
       const idx: number = viewableItems[0].index ?? 0;
       setCurrentIndex(idx);
-      if (jobs.length - idx <= 5) loadMoreJobs();
+      if (displayJobsCountRef.current - idx <= 5) loadMoreJobs();
       prevIndexRef.current = idx;
     },
-    [jobs.length]
+    []
   );
 
   const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 60 });
@@ -230,6 +358,7 @@ export default function FeedScreen() {
   const displayJobs = filters.minScore > 0
     ? jobs.filter((j) => (j.score ?? 0) >= filters.minScore)
     : jobs;
+  displayJobsCountRef.current = displayJobs.length;
 
   const isFilterActive = filters.workType !== 'any' || filters.seniority.length > 0 || !!filters.keyword || filters.minScore > 0;
 
@@ -255,7 +384,10 @@ export default function FeedScreen() {
           <TouchableOpacity
             style={[styles.headerIconBtn, showSearchBars && styles.headerIconBtnActive]}
             activeOpacity={0.7}
-            onPress={() => setShowSearchBars((v) => !v)}
+            onPress={toggleSearch}
+            accessibilityRole="button"
+            accessibilityLabel="Arama"
+            accessibilityState={{ selected: showSearchBars }}
           >
             <Ionicons name="search-outline" size={18} color={showSearchBars ? '#ffffff' : text} />
           </TouchableOpacity>
@@ -263,6 +395,8 @@ export default function FeedScreen() {
             style={[styles.headerIconBtn, isFilterActive && styles.headerIconBtnActive]}
             activeOpacity={0.7}
             onPress={() => setShowFilter(true)}
+            accessibilityRole="button"
+            accessibilityLabel={isFilterActive ? 'Filtrele (aktif)' : 'Filtrele'}
           >
             <Ionicons name="options-outline" size={18} color={isFilterActive ? '#ffffff' : text} />
           </TouchableOpacity>
@@ -280,13 +414,12 @@ export default function FeedScreen() {
               onChangeText={setSearchText}
               onFocus={() => setShowRecent(recentSearches.length > 0)}
               onBlur={() => setTimeout(() => setShowRecent(false), 150)}
-              onSubmitEditing={() => applySearchAndLocation(searchText, locationText)}
+              onSubmitEditing={() => locationInputRef.current?.focus()}
               placeholder="Pozisyon veya şirket ara..."
               placeholderTextColor={textDim}
-              returnKeyType="search"
+              returnKeyType="next"
               autoCorrect={false}
               autoCapitalize="none"
-              autoFocus
             />
             {searchText.length > 0 && (
               <TouchableOpacity onPress={handleSearchClear} style={styles.searchClearBtn} activeOpacity={0.7}>
@@ -315,22 +448,38 @@ export default function FeedScreen() {
           <View style={styles.searchRow}>
             <Ionicons name="location-outline" size={15} color={textDim} />
             <TextInput
+              ref={locationInputRef}
               style={styles.searchInput}
               value={locationText}
               onChangeText={setLocationText}
               onSubmitEditing={() => applySearchAndLocation(searchText, locationText)}
-              placeholder="İstanbul, Ankara, Remote..."
+              placeholder="İstanbul, Ankara, Uzaktan..."
               placeholderTextColor={textDim}
               returnKeyType="search"
               autoCorrect={false}
               autoCapitalize="words"
             />
-            {locationText !== 'Istanbul, Turkey' && (
-              <TouchableOpacity onPress={handleLocationClear} style={styles.searchClearBtn} activeOpacity={0.7}>
-                <Ionicons name="close-outline" size={16} color={textDim} />
+            {locationText !== defaultLocation && locationText.length > 0 && (
+              <TouchableOpacity
+                onPress={handleLocationClear}
+                style={styles.searchClearBtn}
+                activeOpacity={0.7}
+                accessibilityLabel="Konumu varsayılana sıfırla"
+              >
+                <Ionicons name="arrow-undo-outline" size={15} color={textDim} />
               </TouchableOpacity>
             )}
           </View>
+          <TouchableOpacity
+            style={styles.searchSubmitBtn}
+            onPress={() => applySearchAndLocation(searchText, locationText)}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Aramayı uygula"
+          >
+            <Ionicons name="search" size={14} color="#ffffff" />
+            <Text style={styles.searchSubmitText}>Ara</Text>
+          </TouchableOpacity>
         </View>
       )}
 
@@ -341,18 +490,38 @@ export default function FeedScreen() {
         onClose={() => setShowFilter(false)}
       />
 
-      {isLoading && jobs.length > 0 && (
+      {(isLoading && jobs.length > 0 || loadingMore) && (
         <View style={styles.filteringBanner}>
           <ActivityIndicator size="small" color={accent} />
-          <Text style={styles.filteringText}>Yükleniyor...</Text>
+          <Text style={styles.filteringText}>
+            {loadingMore && !isLoading ? 'Daha fazla ilan yükleniyor...' : 'Yükleniyor...'}
+          </Text>
         </View>
       )}
 
+      {showHint && (
+        <Animated.View style={[styles.swipeHintContainer, { opacity: hintFade }]} pointerEvents="none">
+          <View style={styles.swipeHint}>
+            <Ionicons name="chevron-up-outline" size={18} color="rgba(255,255,255,0.8)" />
+            <Animated.View style={{ transform: [{ translateY: hintBounce }] }}>
+              <Ionicons name="swap-vertical-outline" size={28} color="#ffffff" />
+            </Animated.View>
+            <Text style={styles.swipeHintText}>Kaydır</Text>
+            <Ionicons name="chevron-down-outline" size={18} color="rgba(255,255,255,0.8)" />
+          </View>
+        </Animated.View>
+      )}
+      {showLocationToast && (
+        <Animated.View style={[styles.toast, { opacity: locationToastAnim }]} pointerEvents="none">
+          <Text style={styles.toastText}>Konum varsayılana döndürüldü</Text>
+        </Animated.View>
+      )}
       <FlatList
-        key={cardHeight}
         ref={listRef}
         data={displayJobs}
         renderItem={renderItem}
+        extraData={cardHeight}
+        onLayout={handleFlatListLayout}
         getItemLayout={(_, index) => ({
           length: cardHeight,
           offset: cardHeight * index,
@@ -376,17 +545,30 @@ export default function FeedScreen() {
         keyExtractor={(item) => item.id}
         ListEmptyComponent={
           <View style={[styles.center, { height: cardHeight }]}>
+            <Ionicons
+              name={loadError ? 'warning-outline' : 'search-outline'}
+              size={36}
+              color={loadError ? '#ef4444' : textMuted}
+            />
             <Text style={styles.emptyText}>
-              {loadError ? '⚠️ Sunucuya ulaşılamadı' : 'İlan bulunamadı'}
+              {loadError ? 'Sunucuya ulaşılamadı' : 'İlan bulunamadı'}
             </Text>
             <Text style={styles.emptySubText}>
               {loadError
-                ? 'Backend çalışıyor mu? IP doğru mu?'
-                : 'Filtre kriterlerini genişletmeyi dene'}
+                ? 'İnternet bağlantınızı kontrol edin ve tekrar deneyin.'
+                : filters.minScore > 0
+                  ? `Eşleşme skoru filtresi (≥%${filters.minScore}) tüm ilanları gizliyor`
+                  : 'Filtre kriterlerini genişletmeyi dene'}
             </Text>
-            <TouchableOpacity style={styles.retryBtn} onPress={() => loadInitialFeed(filters)}>
-              <Text style={styles.retryText}>Tekrar Dene</Text>
-            </TouchableOpacity>
+            {!loadError && filters.minScore > 0 ? (
+              <TouchableOpacity style={styles.retryBtn} onPress={() => handleApplyFilter({ ...filters, minScore: 0 })}>
+                <Text style={styles.retryText}>Skor Filtresini Kaldır</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity style={styles.retryBtn} onPress={() => loadInitialFeed(filters)}>
+                <Text style={styles.retryText}>Tekrar Dene</Text>
+              </TouchableOpacity>
+            )}
           </View>
         }
       />
@@ -404,9 +586,10 @@ interface StyleProps {
   cardBorder: string;
   bgDeep: string;
   isDark: boolean;
+  bottomNavH: number;
 }
 
-function makeStyles({ bg, text, textDim, textMuted, accent, headerBtnBg, cardBorder, bgDeep, isDark }: StyleProps) {
+function makeStyles({ bg, text, textDim, textMuted, accent, headerBtnBg, cardBorder, bgDeep, isDark, bottomNavH }: StyleProps) {
   return StyleSheet.create({
     screen: {
       flex: 1,
@@ -564,6 +747,60 @@ function makeStyles({ bg, text, textDim, textMuted, accent, headerBtnBg, cardBor
     recentItemText: {
       color: text,
       fontSize: FONT_SIZES.sm,
+    },
+    swipeHintContainer: {
+      position: 'absolute',
+      top: 0, left: 0, right: 0, bottom: 0,
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: 50,
+    },
+    swipeHint: {
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: 'rgba(0,0,0,0.45)',
+      borderRadius: 20,
+      paddingHorizontal: 20,
+      paddingVertical: 12,
+    },
+    swipeHintText: {
+      color: '#ffffff',
+      fontSize: FONT_SIZES.xs,
+      fontWeight: '700',
+      letterSpacing: 0.5,
+    },
+    toast: {
+      position: 'absolute',
+      bottom: bottomNavH + 12,
+      left: SPACING.lg,
+      right: SPACING.lg,
+      backgroundColor: isDark ? '#1a2540' : '#051650',
+      borderRadius: RADII.full,
+      paddingVertical: SPACING.sm + 2,
+      paddingHorizontal: SPACING.lg,
+      alignItems: 'center',
+      zIndex: 200,
+    },
+    toastText: {
+      color: '#ffffff',
+      fontSize: FONT_SIZES.xs,
+      fontWeight: '600',
+    },
+    searchSubmitBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: SPACING.xs,
+      marginHorizontal: SPACING.lg,
+      marginBottom: SPACING.sm,
+      height: 38,
+      backgroundColor: accent,
+      borderRadius: RADII.full,
+    },
+    searchSubmitText: {
+      color: '#ffffff',
+      fontSize: FONT_SIZES.sm,
+      fontWeight: '700',
     },
   });
 }

@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Platform,
   StyleSheet,
   Text,
@@ -30,7 +31,9 @@ export default function CvUploadScreen() {
     try {
       const mod = require('expo-document-picker');
       getDocumentAsync = mod.getDocumentAsync ?? mod.default?.getDocumentAsync;
+      if (typeof getDocumentAsync !== 'function') throw new Error('not available');
     } catch {
+      Alert.alert('Hata', 'Doküman seçici bu cihazda desteklenmiyor. Uygulamayı yeniden yükleyin.');
       return;
     }
 
@@ -39,10 +42,14 @@ export default function CvUploadScreen() {
       copyToCacheDirectory: true,
     });
     if (result.canceled || !result.assets?.[0]) return;
+    const file = result.assets[0];
+    if (file.size && file.size > 10 * 1024 * 1024) {
+      Alert.alert('Dosya Çok Büyük', "CV dosyası en fazla 10 MB olabilir. Daha küçük bir PDF seçin.");
+      return;
+    }
 
     setUploading(true);
     try {
-      const file = result.assets[0];
       const { signedUrl } = await api.getCvUploadUrl();
 
       const fileResponse = await fetch(file.uri);
@@ -66,15 +73,22 @@ export default function CvUploadScreen() {
       const { parsed } = await api.parseCv();
 
       setProfile({
-        name: parsed.name || '',
-        title: parsed.title || '',
-        summary: parsed.summary || '',
+        ...(parsed.name ? { name: parsed.name } : {}),
+        ...(parsed.title ? { title: parsed.title } : {}),
+        ...(parsed.summary ? { summary: parsed.summary } : {}),
         skills: parsed.skills || [],
       });
 
       setParsedSkillCount(parsed.skills?.length ?? 0);
       setUploaded(true);
-    } catch {
+    } catch (e: any) {
+      if (e?.name === 'AbortError' || e?.message?.includes('abort')) {
+        Alert.alert('Zaman Aşımı', 'CV yükleme çok uzun sürdü. İnternet bağlantınızı kontrol edip tekrar deneyin.');
+      } else if (e?.message?.includes('Upload HTTP')) {
+        Alert.alert('Yükleme Hatası', 'Dosya sunucuya gönderilemedi. Dosyanın geçerli bir PDF ve 10 MB\'den küçük olduğunu kontrol edin.');
+      } else {
+        Alert.alert('Bağlantı Hatası', 'CV yüklenemedi. İnternet bağlantınızı kontrol edip tekrar deneyin.');
+      }
     } finally {
       setUploading(false);
     }
@@ -118,6 +132,7 @@ export default function CvUploadScreen() {
             <>
               <ActivityIndicator size="large" color={colors.isDark ? colors.textMuted : colors.accent} />
               <Text style={styles.uploadingText}>CV yükleniyor ve analiz ediliyor...</Text>
+              <Text style={styles.uploadingHint}>Bu işlem 30 saniyeye kadar sürebilir</Text>
             </>
           ) : uploaded ? (
             <>
@@ -150,32 +165,22 @@ export default function CvUploadScreen() {
 
         {/* Supported format note */}
         {!uploaded && !uploading && (
-          <Text style={styles.formatNote}>Desteklenen format: PDF</Text>
+          <Text style={styles.formatNote}>Desteklenen format: PDF · Maks. 10 MB</Text>
         )}
       </View>
 
-      {/* Footer */}
+      {/* Footer — yükleme başarılıysa "Devam", aksi hâlde "Atla" */}
       <View style={styles.footer}>
-        {uploaded ? (
+        {uploaded && (
           <TouchableOpacity style={styles.primaryBtn} onPress={handleContinue} activeOpacity={0.85}>
             <Text style={styles.primaryBtnText}>Devam →</Text>
           </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            style={[styles.primaryBtn, uploading && { opacity: 0.6 }]}
-            onPress={uploading ? undefined : handlePickCv}
-            activeOpacity={0.85}
-            disabled={uploading}
-          >
-            {uploading
-              ? <ActivityIndicator color="#fff" />
-              : <Text style={styles.primaryBtnText}>CV Yükle</Text>
-            }
+        )}
+        {!uploaded && (
+          <TouchableOpacity onPress={uploading ? undefined : handleContinue} activeOpacity={0.7} disabled={uploading}>
+            <Text style={[styles.skipText, uploading && { opacity: 0.4 }]}>Şimdilik atla →</Text>
           </TouchableOpacity>
         )}
-        <TouchableOpacity onPress={handleContinue} activeOpacity={0.7} disabled={uploading}>
-          <Text style={[styles.skipText, uploading && { opacity: 0.4 }]}>Şimdilik atla</Text>
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -281,6 +286,11 @@ function makeStyles(c: ThemeColors) {
       fontSize: FONT_SIZES.sm,
       textAlign: 'center',
       marginTop: SPACING.sm,
+    },
+    uploadingHint: {
+      color: c.textDim,
+      fontSize: FONT_SIZES.xs,
+      textAlign: 'center',
     },
     doneIcon: {
       marginBottom: SPACING.xs,

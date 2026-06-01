@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Alert, AppState, Linking, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { router } from 'expo-router';
@@ -22,7 +22,6 @@ import ActionButtons from './ActionButtons';
 interface Props {
   job: Job;
   cardHeight: number;
-  onNext?: () => void;
 }
 
 function safeOpenURL(url: string): void {
@@ -35,29 +34,29 @@ function safeOpenURL(url: string): void {
 
 function workTypeShort(wt: Job['workType']): string {
   switch (wt) {
-    case 'remote': return 'UZAKTAN';
-    case 'hybrid': return 'HİBRİT';
-    case 'office': return 'OFİS';
+    case 'remote': return 'Uzaktan';
+    case 'hybrid': return 'Hibrit';
+    case 'office': return 'Ofis';
     default:       return '';
   }
 }
 
 function seniorityLabel(s: Seniority): string {
   switch (s) {
-    case 'junior': return 'JUNIOR';
-    case 'mid':    return 'MİD';
-    case 'senior': return 'SENİOR';
-    case 'lead':   return 'LEAD';
+    case 'junior': return 'Junior';
+    case 'mid':    return 'Mid';
+    case 'senior': return 'Senior';
+    case 'lead':   return 'Lead';
     default:       return '';
   }
 }
 
 function employmentShort(e: EmploymentType): string {
   switch (e) {
-    case 'fulltime':   return 'TAM ZAMANLI';
-    case 'parttime':   return 'YARI ZAMANLI';
-    case 'contract':   return 'SÖZLEŞMELİ';
-    case 'internship': return 'STAJ';
+    case 'fulltime':   return 'Tam Zamanlı';
+    case 'parttime':   return 'Yarı Zamanlı';
+    case 'contract':   return 'Sözleşmeli';
+    case 'internship': return 'Staj';
     default:           return '';
   }
 }
@@ -68,6 +67,19 @@ const JobCard = React.memo(function JobCard({ job, cardHeight }: Props) {
   const { isFollowing, follow, unfollow } = useCompanyStore();
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const applySubRef = useRef<ReturnType<typeof AppState.addEventListener> | null>(null);
+  const applyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      applySubRef.current?.remove();
+      applySubRef.current = null;
+      if (applyTimeoutRef.current) {
+        clearTimeout(applyTimeoutRef.current);
+        applyTimeoutRef.current = null;
+      }
+    };
+  }, []);
 
   const followed = isFollowing(job.company);
   const saved    = isSaved(job.id);
@@ -93,11 +105,17 @@ const JobCard = React.memo(function JobCard({ job, cardHeight }: Props) {
   const handleSave = useCallback(() => {
     if (saved) {
       unsaveJob(job.id);
-      api.unsaveJob(job.id).catch(() => {});
+      addInteraction({ jobId: job.id, action: 'unsave', timestamp: Date.now() });
+      api.unsaveJob(job.id).catch(() => {
+        saveJob(job);
+      });
+      api.postInteraction(job.id, 'unsave', job).catch(() => {});
     } else {
       saveJob(job);
       addInteraction({ jobId: job.id, action: 'save', timestamp: Date.now() });
-      api.postInteraction(job.id, 'save', job).catch(() => {});
+      api.postInteraction(job.id, 'save', job).catch(() => {
+        unsaveJob(job.id);
+      });
       track('Job Saved', { job_id: job.id, company: job.company, title: job.title, score: job.score });
     }
   }, [saved, job, saveJob, unsaveJob, addInteraction]);
@@ -107,15 +125,18 @@ const JobCard = React.memo(function JobCard({ job, cardHeight }: Props) {
   }, [job]);
 
   const handleApply = useCallback(() => {
+    if (applied) { safeOpenURL(job.url); return; }
+    if (applySubRef.current) return;
     safeOpenURL(job.url);
-    if (applied) return;
 
-    let confirmed = false;
-    const sub = AppState.addEventListener('change', (state) => {
-      if (state === 'active' && !confirmed) {
-        confirmed = true;
-        sub.remove();
-        setTimeout(() => {
+    const openedAt = Date.now();
+    applySubRef.current = AppState.addEventListener('change', (state) => {
+      if (state === 'active') {
+        applySubRef.current?.remove();
+        applySubRef.current = null;
+        if (Date.now() - openedAt < 2500) return;
+        applyTimeoutRef.current = setTimeout(() => {
+          applyTimeoutRef.current = null;
           Alert.alert(
             'Başvuru tamamlandı mı?',
             `${job.company} pozisyonuna başvurdunuz mu?`,
@@ -159,12 +180,23 @@ const JobCard = React.memo(function JobCard({ job, cardHeight }: Props) {
               borderRadius={RADII.md}
             />
             <View style={styles.companyMeta}>
-              <TouchableOpacity onPress={handleToggleFollow} activeOpacity={0.7} style={styles.companyNameRow}>
+              <View style={styles.companyNameRow}>
                 <Text style={styles.companyName} numberOfLines={1}>{job.company}</Text>
-                <Text style={[styles.followBadge, followed && styles.followBadgeActive]}>
-                  {followed ? '★' : '☆'}
-                </Text>
-              </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={handleToggleFollow}
+                  activeOpacity={0.7}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  style={[styles.followBtn, followed && styles.followBtnActive]}
+                  accessibilityRole="button"
+                  accessibilityLabel={followed ? `${job.company} takipten çık` : `${job.company} takip et`}
+                >
+                  <Ionicons
+                    name={followed ? 'notifications' : 'notifications-outline'}
+                    size={18}
+                    color={followed ? '#f59e0b' : colors.textDim}
+                  />
+                </TouchableOpacity>
+              </View>
               <Text style={styles.postedAt}>{timeAgo(job.postedAt)}</Text>
             </View>
           </View>
@@ -210,8 +242,9 @@ const JobCard = React.memo(function JobCard({ job, cardHeight }: Props) {
         )}
 
         {/* Başlık */}
-        <TouchableOpacity onPress={handleExplore} activeOpacity={0.8}>
+        <TouchableOpacity onPress={handleExplore} activeOpacity={0.8} style={styles.titleRow}>
           <Text style={styles.title} numberOfLines={2}>{job.title}</Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.textDim} style={styles.titleChevron} />
         </TouchableOpacity>
 
         {/* Konum pill */}
@@ -229,14 +262,19 @@ const JobCard = React.memo(function JobCard({ job, cardHeight }: Props) {
           let matched: string[] = [];
           let missing: string[] = [];
 
-          if (job.skills && job.skills.length > 0) {
-            job.skills.slice(0, 5).forEach((s) => {
-              if (job.missingSkills?.includes(s)) missing.push(s);
-              else matched.push(s);
-            });
-          } else {
+          if ((job.matchedSkills && job.matchedSkills.length > 0) || (job.missingSkills && job.missingSkills.length > 0)) {
+            // AI analizi mevcutsa doğrudan kullan
             matched = (job.matchedSkills ?? []).slice(0, 3);
             missing = (job.missingSkills ?? []).slice(0, 2);
+          } else if (job.skills && job.skills.length > 0) {
+            // AI analizi yoksa iş becerilerini missingSkills ile karşılaştır
+            job.skills.slice(0, 4).forEach((s) => {
+              if (job.missingSkills?.includes(s)) {
+                if (missing.length < 2) missing.push(s);
+              } else {
+                if (matched.length < 3) matched.push(s);
+              }
+            });
           }
 
           if (matched.length === 0 && missing.length === 0) return null;
@@ -273,22 +311,15 @@ const JobCard = React.memo(function JobCard({ job, cardHeight }: Props) {
           );
         })()}
 
-        {/* Profil tam uyumlu CTA */}
+        {/* Profil tam uyumlu rozet — duplikat CTA kaldırıldı, sadece görsel indicator */}
         {showProfileMatch && (
-          <TouchableOpacity style={styles.profileMatchBtn} onPress={handleExplore} activeOpacity={0.85}>
-            <View style={styles.profileMatchPlus}>
-              <Text style={styles.profileMatchPlusText}>+</Text>
-            </View>
-            <Text style={styles.profileMatchLabel}>Profil tam uyumlu</Text>
-          </TouchableOpacity>
+          <View style={styles.profileMatchBadge}>
+            <Ionicons name="checkmark-circle-outline" size={15} color={colors.isDark ? colors.text : colors.accent} />
+            <Text style={styles.profileMatchBadgeText}>Profil tam uyumlu</Text>
+          </View>
         )}
 
         <View style={{ flex: 1 }} />
-
-        <TouchableOpacity style={styles.exploreBtn} onPress={handleExplore} activeOpacity={0.8}>
-          <Ionicons name="document-text-outline" size={15} color={colors.text} style={{ marginRight: 6 }} />
-          <Text style={styles.exploreBtnText}>İlanı İncele</Text>
-        </TouchableOpacity>
 
         <ActionButtons
           isApplied={applied}
@@ -350,12 +381,13 @@ function makeStyles(c: ThemeColors) {
       fontSize: FONT_SIZES.md,
       fontWeight: '700',
     },
-    followBadge: {
-      fontSize: 14,
-      color: c.textDim,
-    },
-    followBadgeActive: {
-      color: '#f59e0b',
+    followBtn: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      backgroundColor: c.bgDeep,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     postedAt: {
       fontSize: FONT_SIZES.xs,
@@ -379,6 +411,9 @@ function makeStyles(c: ThemeColors) {
       justifyContent: 'center',
     },
     iconBtnSaved: {
+      backgroundColor: 'rgba(245,158,11,0.12)',
+    },
+    followBtnActive: {
       backgroundColor: 'rgba(245,158,11,0.12)',
     },
     scoreBlock: {
@@ -440,19 +475,29 @@ function makeStyles(c: ThemeColors) {
       textTransform: 'uppercase',
       color: c.text,
     },
-    title: {
-      color: c.text,
-      fontSize: 30,
-      fontWeight: '800',
-      letterSpacing: -0.5,
-      lineHeight: 33,
+    titleRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: 4,
       marginTop: 10,
       marginBottom: SPACING.md + 4,
+    },
+    title: {
+      flex: 1,
+      color: c.text,
+      fontSize: 24,
+      fontWeight: '800',
+      letterSpacing: -0.5,
+      lineHeight: 27,
+    },
+    titleChevron: {
+      marginTop: 6,
+      flexShrink: 0,
     },
     locationPill: {
       flexDirection: 'row',
       alignItems: 'center',
-      alignSelf: 'stretch',
+      alignSelf: 'flex-start',
       backgroundColor: c.bgDeep,
       borderRadius: 14,
       paddingHorizontal: 14,
@@ -522,50 +567,22 @@ function makeStyles(c: ThemeColors) {
       fontSize: FONT_SIZES.xs,
       fontWeight: '500',
     },
-    profileMatchBtn: {
+    profileMatchBadge: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 10,
-      backgroundColor: c.isDark ? '#1a2540' : c.accent,
-      borderRadius: 14,
-      paddingVertical: 14,
-      paddingHorizontal: 20,
+      gap: 6,
+      alignSelf: 'flex-start',
+      backgroundColor: c.isDark ? 'rgba(226,232,245,0.07)' : 'rgba(5,22,80,0.06)',
+      borderRadius: RADII.full,
+      paddingVertical: 6,
+      paddingHorizontal: 12,
       marginBottom: SPACING.sm,
-      borderWidth: c.isDark ? 1 : 0,
-      borderColor: c.cardBorder,
+      borderWidth: 1,
+      borderColor: c.isDark ? 'rgba(226,232,245,0.15)' : 'rgba(5,22,80,0.12)',
     },
-    profileMatchPlus: {
-      width: 26,
-      height: 26,
-      borderRadius: 13,
-      backgroundColor: 'rgba(255,255,255,0.15)',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    profileMatchPlusText: {
-      color: '#ffffff',
-      fontSize: 18,
-      lineHeight: 22,
-      fontWeight: '700',
-    },
-    profileMatchLabel: {
-      color: c.isDark ? c.text : '#ffffff',
-      fontSize: FONT_SIZES.md,
-      fontWeight: '600',
-    },
-    exploreBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: RADII.md,
-      borderWidth: 1.5,
-      borderColor: c.cardBorder,
-      paddingVertical: 13,
-      marginBottom: SPACING.sm,
-    },
-    exploreBtnText: {
-      color: c.text,
-      fontSize: FONT_SIZES.md,
+    profileMatchBadgeText: {
+      color: c.isDark ? c.text : c.accent,
+      fontSize: FONT_SIZES.xs,
       fontWeight: '600',
     },
   });

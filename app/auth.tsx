@@ -17,11 +17,10 @@ import * as AppleAuthentication from 'expo-apple-authentication';
 
 WebBrowser.maybeCompleteAuthSession();
 
-import { LinearGradient } from 'expo-linear-gradient';
 import { useAuthStore } from '@/store/authStore';
 import { useUserStore } from '@/store/userStore';
 import { supabase } from '@/services/supabase';
-import { FONT_SIZES, GRADIENTS, RADII, SPACING, ThemeColors } from '@/constants/theme';
+import { FONT_SIZES, RADII, SPACING, ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 
 export default function AuthScreen() {
@@ -48,7 +47,7 @@ export default function AuthScreen() {
 
   useEffect(() => {
     const unsub = useUserStore.persist.onFinishHydration(() => setUserHydrated(true));
-    return () => unsub();
+    return () => unsub?.();
   }, []);
 
   useEffect(() => {
@@ -66,6 +65,7 @@ export default function AuthScreen() {
     setForgotError('');
     setSignupSent(false);
     setConfirmPassword('');
+    setPassword('');
   }
 
   async function submit() {
@@ -192,9 +192,6 @@ export default function AuthScreen() {
       >
         <View style={styles.inner}>
           <View style={styles.heroSection}>
-            <LinearGradient colors={GRADIENTS[0]} style={styles.logoIcon}>
-              <Text style={styles.logoIconText}>J</Text>
-            </LinearGradient>
             <Text style={styles.logo}>JobReel</Text>
             <Text style={styles.sub}>Şifre Sıfırlama</Text>
           </View>
@@ -244,9 +241,6 @@ export default function AuthScreen() {
     >
       <View style={styles.inner}>
         <View style={styles.heroSection}>
-          <LinearGradient colors={GRADIENTS[0]} style={styles.logoIcon}>
-            <Text style={styles.logoIconText}>J</Text>
-          </LinearGradient>
           <Text style={styles.logo}>JobReel</Text>
           <Text style={styles.sub}>Kariyerini keşfet</Text>
         </View>
@@ -260,8 +254,8 @@ export default function AuthScreen() {
                 : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
             }
             cornerRadius={RADII.full}
-            style={styles.appleBtn}
-            onPress={handleAppleSignIn}
+            style={[styles.appleBtn, busy && { opacity: 0.5 }]}
+            onPress={busy ? () => {} : handleAppleSignIn}
           />
         )}
 
@@ -397,24 +391,6 @@ function makeStyles(c: ThemeColors) {
       alignItems: 'center',
       marginBottom: SPACING.sm,
       gap: SPACING.sm,
-    },
-    logoIcon: {
-      width: 72,
-      height: 72,
-      borderRadius: 20,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: SPACING.xs,
-      shadowColor: '#7c6dfa',
-      shadowOffset: { width: 0, height: c.isDark ? 0 : 6 },
-      shadowOpacity: c.isDark ? 0.55 : 0.22,
-      shadowRadius: c.isDark ? 22 : 12,
-      elevation: c.isDark ? 0 : 4,
-    },
-    logoIconText: {
-      color: '#ffffff',
-      fontSize: 34,
-      fontWeight: '800',
     },
     logo: {
       color: c.isDark ? '#ffffff' : c.text,

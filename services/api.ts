@@ -4,6 +4,7 @@ import { Job } from '@/types';
 export function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
   const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'Az önce';
   if (mins < 60) return `${mins} dakika önce`;
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours} saat önce`;
@@ -57,9 +58,10 @@ async function getToken(): Promise<string | null> {
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
   const token = await getToken();
-  const timeout = new Promise<never>((_, reject) =>
-    setTimeout(() => reject(new Error(`Timeout: ${path}`)), 30000)
-  );
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(`Timeout: ${path}`)), 30000);
+  });
   const fetchPromise = fetch(`${BASE_URL}${path}`, {
     ...options,
     headers: {
@@ -68,12 +70,19 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
       ...(options.headers as Record<string, string>),
     },
   });
-  const res = await Promise.race([fetchPromise, timeout]);
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`HTTP ${res.status}: ${body}`);
+  try {
+    const res = await Promise.race([fetchPromise, timeout]);
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      if (__DEV__) console.warn(`[API] ${res.status} ${path}:`, body);
+      throw new Error(`HTTP ${res.status}`);
+    }
+    return res.json() as Promise<T>;
+  } catch (e) {
+    if (timeoutId !== undefined) clearTimeout(timeoutId);
+    throw e;
   }
-  return res.json() as Promise<T>;
 }
 
 export const api = {
@@ -85,7 +94,15 @@ export const api = {
     work_type?: string;
     seniority?: string;
   }): Promise<{ jobs: Job[]; total: number; partial: boolean }> => {
-    const q = params ? '?' + new URLSearchParams(params as Record<string, string>).toString() : '';
+    const q = params
+      ? '?' + new URLSearchParams(
+          Object.fromEntries(
+            Object.entries(params)
+              .filter(([, v]) => v !== undefined && v !== null && v !== '')
+              .map(([k, v]) => [k, String(v)])
+          )
+        ).toString()
+      : '';
     const data = await request<{ jobs: Record<string, unknown>[]; total: number; partial?: boolean }>(`/feed${q}`);
     return { jobs: data.jobs.map(mapJob), total: data.total, partial: data.partial ?? false };
   },
@@ -133,7 +150,7 @@ export const api = {
   getJobDescription: (jobId: string) =>
     request<{ description: string }>(`/job/${jobId}/description`),
 
-savePushToken: (token: string) =>
+  savePushToken: (token: string) =>
     request<{ success: boolean }>('/profile/push-token', {
       method: 'PUT',
       body: JSON.stringify({ token }),
@@ -148,6 +165,12 @@ savePushToken: (token: string) =>
     request<{ success: boolean }>(`/alerts/${id}`, {
       method: 'PATCH',
       body: JSON.stringify({ enabled }),
+    }),
+
+  updateAlert: (id: string, data: Partial<Omit<JobAlert, 'id' | 'created_at'>>) =>
+    request<JobAlert>(`/alerts/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
     }),
 
   deleteAlert: (id: string) =>
@@ -174,6 +197,12 @@ savePushToken: (token: string) =>
   unfollowCompany: (company_name: string) =>
     request<{ success: boolean }>(`/companies/follow/${encodeURIComponent(company_name)}`, {
       method: 'DELETE',
+    }),
+
+  updateNotifPrefs: (prefs: { notif_follow?: boolean; notif_job_alerts?: boolean }) =>
+    request<{ success: boolean }>('/profile/notif-prefs', {
+      method: 'PUT',
+      body: JSON.stringify(prefs),
     }),
 };
 

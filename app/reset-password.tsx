@@ -9,11 +9,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { router } from 'expo-router';
 import { supabase } from '@/services/supabase';
 import { useAuthStore } from '@/store/authStore';
-import { FONT_SIZES, GRADIENTS, RADII, SPACING, ThemeColors } from '@/constants/theme';
+import { FONT_SIZES, RADII, SPACING, ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 
 export default function ResetPasswordScreen() {
@@ -47,12 +46,7 @@ export default function ResetPasswordScreen() {
     >
       <View style={styles.inner}>
         <View style={styles.heroSection}>
-          <LinearGradient colors={GRADIENTS[0]} style={styles.logoIcon}>
-            <Text style={styles.logoIconText}>J</Text>
-          </LinearGradient>
-          <Text style={styles.logo}>
-            JobReel
-          </Text>
+          <Text style={styles.logo}>JobReel</Text>
           <Text style={styles.sub}>Yeni Şifre Belirle</Text>
         </View>
 
@@ -120,24 +114,6 @@ function makeStyles(c: ThemeColors) {
       alignItems: 'center',
       marginBottom: SPACING.sm,
       gap: SPACING.sm,
-    },
-    logoIcon: {
-      width: 72,
-      height: 72,
-      borderRadius: 20,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: SPACING.xs,
-      shadowColor: '#7c6dfa',
-      shadowOffset: { width: 0, height: c.isDark ? 0 : 6 },
-      shadowOpacity: c.isDark ? 0.55 : 0.22,
-      shadowRadius: c.isDark ? 22 : 12,
-      elevation: c.isDark ? 0 : 4,
-    },
-    logoIconText: {
-      color: '#ffffff',
-      fontSize: 34,
-      fontWeight: '800',
     },
     logo: {
       color: c.isDark ? '#ffffff' : c.text,

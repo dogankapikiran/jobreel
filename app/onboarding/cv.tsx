@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import {
+  Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -64,10 +65,17 @@ export default function CvScreen() {
         work_type: profile.preferences.workType,
         seniority: profile.preferences.seniority,
         location: profile.preferences.location,
+        cities: profile.preferences.cities,
         skills,
       },
-    }).catch(() => {});
-    router.replace('/');
+    }).catch(() => {
+      Alert.alert(
+        'Bağlantı Sorunu',
+        'Profil bilgilerin kaydedilemedi. Profil ayarlarından daha sonra güncelleyebilirsin.',
+      );
+    }).finally(() => {
+      router.replace('/');
+    });
   }
 
   return (

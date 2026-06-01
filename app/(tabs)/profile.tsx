@@ -5,7 +5,6 @@ import {
   Image,
   KeyboardAvoidingView,
   Modal,
-  NativeModules,
   Platform,
   ScrollView,
   StyleSheet,
@@ -15,12 +14,12 @@ import {
   View,
 } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
+import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useAuthStore } from '@/store/authStore';
 import { useUserStore } from '@/store/userStore';
 import { useFeedStore } from '@/store/feedStore';
-import { useCompanyStore } from '@/store/companyStore';
 import { api, CvParsed } from '@/services/api';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ACCENT_GRADIENT, BOTTOM_NAV_HEIGHT, FONT_SIZES, RADII, SPACING, ThemeColors } from '@/constants/theme';
@@ -28,11 +27,37 @@ import { Seniority, WorkType } from '@/types';
 import { useTheme } from '@/contexts/ThemeContext';
 
 const SUGGESTED_SKILLS = [
+  // Yazılım
   'JavaScript', 'TypeScript', 'React', 'React Native', 'Node.js',
   'Python', 'Java', 'Swift', 'Kotlin', 'Go',
-  'PostgreSQL', 'MongoDB', 'Redis', 'Docker', 'Kubernetes',
-  'AWS', 'Figma', 'Product Management', 'Data Science',
+  'PostgreSQL', 'MongoDB', 'Redis', 'Docker', 'Kubernetes', 'AWS',
+  // Tasarım & Ürün
+  'Figma', 'UI/UX Design', 'Sketch', 'Prototyping',
+  'Product Management', 'Agile', 'Scrum', 'Jira',
+  // Veri & AI
+  'Data Science', 'Machine Learning', 'SQL', 'Tableau', 'Power BI', 'Excel',
+  // Pazarlama & İçerik
+  'Digital Marketing', 'SEO', 'Google Analytics', 'Content Writing',
+  'Social Media Marketing', 'HubSpot', 'Salesforce',
+  // İK & Finans
+  'Human Resources', 'Recruitment', 'Financial Modeling', 'Accounting',
+  'Business Analysis', 'Project Management',
 ];
+
+const SECTOR_SKILLS: Record<string, string[]> = {
+  'Yazılım & Teknoloji': ['JavaScript', 'TypeScript', 'React', 'React Native', 'Node.js', 'Python', 'Java', 'Swift', 'Kotlin', 'Go', 'PostgreSQL', 'MongoDB', 'Redis', 'Docker', 'Kubernetes', 'AWS'],
+  'Yapay Zeka & ML': ['Python', 'Machine Learning', 'Data Science', 'SQL', 'Tableau', 'Power BI', 'Docker', 'AWS'],
+  'Veri & Analitik': ['SQL', 'Python', 'Data Science', 'Tableau', 'Power BI', 'Excel', 'Machine Learning', 'PostgreSQL'],
+  'Fintech & Bankacılık': ['Financial Modeling', 'Accounting', 'SQL', 'Python', 'Business Analysis', 'Excel', 'PostgreSQL'],
+  'E-ticaret': ['Digital Marketing', 'SEO', 'Google Analytics', 'Product Management', 'Agile', 'JavaScript', 'React'],
+  'SaaS & B2B': ['Salesforce', 'HubSpot', 'Product Management', 'Agile', 'Business Analysis', 'JavaScript', 'React'],
+  'Reklam & Pazarlama': ['Digital Marketing', 'SEO', 'Google Analytics', 'Content Writing', 'Social Media Marketing', 'HubSpot', 'Salesforce'],
+  'İnsan Kaynakları & HR Tech': ['Human Resources', 'Recruitment', 'Project Management', 'Business Analysis', 'Excel'],
+  'Muhasebe & Finans': ['Financial Modeling', 'Accounting', 'Excel', 'SQL', 'Power BI', 'Business Analysis'],
+  'Eğitim & EdTech': ['Content Writing', 'Product Management', 'Agile', 'JavaScript', 'React', 'Python'],
+  'Sağlık & Biyoteknoloji': ['Python', 'Data Science', 'SQL', 'Machine Learning', 'Business Analysis', 'Excel'],
+  'Gaming & Oyun': ['JavaScript', 'TypeScript', 'Python', 'Java', 'Kotlin', 'Swift', 'Go', 'React', 'Node.js'],
+};
 
 function StatCard({ value, label, colors }: { value: string | number; label: string; colors: ThemeColors }) {
   return (
@@ -49,7 +74,7 @@ export default function ProfileScreen() {
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { profile, setProfile, setPreferences } = useUserStore();
   const { savedJobs, appliedJobs } = useFeedStore();
-  const { following, unfollow } = useCompanyStore();
+
   const signOut = useAuthStore((s) => s.signOut);
 
   const avatarButtonRef = useRef<View>(null);
@@ -59,7 +84,6 @@ export default function ProfileScreen() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [cvParsed, setCvParsed] = useState<CvParsed | null>(null);
   const [cvLoading, setCvLoading] = useState(false);
-  const [showFollowing, setShowFollowing] = useState(false);
   const [showSkillsEditor, setShowSkillsEditor] = useState(false);
   const [draftSkills, setDraftSkills] = useState<string[]>([]);
   const [customSkillInput, setCustomSkillInput] = useState('');
@@ -69,24 +93,36 @@ export default function ProfileScreen() {
   const [draftTitle, setDraftTitle] = useState('');
   const [draftLocation, setDraftLocation] = useState('');
 
+  const skills = profile.skills ?? [];
+  const prefs = profile.preferences ?? { sectors: [], seniority: [], workType: 'any' as WorkType, location: '', salaryMin: 0, skills: [] };
+
+  const [profileLoadError, setProfileLoadError] = useState(false);
+
   useEffect(() => {
+    setProfileLoadError(false);
     api.getProfile().then((data) => {
       if (data.display_name) setProfile({ name: data.display_name as string });
       if (data.title) setProfile({ title: data.title as string });
       if (data.avatar_url) setProfile({ avatarUrl: data.avatar_url as string });
       const prefs = data.preferences as Record<string, unknown> | undefined;
       if (prefs) {
+        const rawWorkType = (prefs.work_type as string) || 'any';
+        const parsedWorkTypes =
+          rawWorkType !== 'any'
+            ? (rawWorkType.split(',').map((s) => s.trim()).filter(Boolean) as WorkType[])
+            : [];
         setPreferences({
           sectors: (prefs.sectors as string[]) || [],
           seniority: (prefs.seniority as Seniority[]) || [],
-          workType: (prefs.work_type as WorkType) || 'any',
+          workType: rawWorkType as WorkType,
+          workTypes: parsedWorkTypes.length > 0 && parsedWorkTypes.length < 3 ? parsedWorkTypes : undefined,
           location: (prefs.location as string) || 'İstanbul',
           salaryMin: (prefs.salary_min as number) || 0,
           skills: (prefs.skills as string[]) || [],
         });
       }
       if (data.cv_parsed) setCvParsed(data.cv_parsed as CvParsed);
-    }).catch(() => {});
+    }).catch(() => { setProfileLoadError(true); });
   }, []);
 
   function startEdit() {
@@ -97,11 +133,17 @@ export default function ProfileScreen() {
   }
 
   async function saveEdit() {
+    if (!draftName.trim()) {
+      Alert.alert('Hata', 'Ad Soyad boş bırakılamaz.');
+      return;
+    }
+    const prevName = profile.name;
+    const prevTitle = profile.title;
+    const prevLocation = prefs.location;
+
     setSaving(true);
     setProfile({ name: draftName, title: draftTitle });
     setPreferences({ location: draftLocation });
-    setEditing(false);
-    setSaving(false);
     api.updateProfile({
       display_name: draftName,
       title: draftTitle,
@@ -112,8 +154,20 @@ export default function ProfileScreen() {
         salary_min: prefs.salaryMin,
         sectors: prefs.sectors,
         skills: prefs.skills,
+        cities: prefs.cities,
       },
-    }).catch(() => {});
+    }).then(() => {
+      setEditing(false);
+    }).catch(() => {
+      setProfile({ name: prevName, title: prevTitle });
+      setPreferences({ location: prevLocation });
+      setDraftName(prevName || '');
+      setDraftTitle(prevTitle || '');
+      setDraftLocation(prevLocation || '');
+      Alert.alert('Bağlantı Hatası', 'Profil kaydedilemedi. İnternet bağlantınızı kontrol edip tekrar deneyin.');
+    }).finally(() => {
+      setSaving(false);
+    });
   }
 
   async function handlePickCv() {
@@ -131,10 +185,14 @@ export default function ProfileScreen() {
       copyToCacheDirectory: true,
     });
     if (result.canceled || !result.assets?.[0]) return;
+    const file = result.assets[0];
+    if (file.size && file.size > 10 * 1024 * 1024) {
+      Alert.alert('Dosya Çok Büyük', 'CV dosyası en fazla 10 MB olabilir. Daha küçük bir PDF seçin.');
+      return;
+    }
 
     setCvLoading(true);
     try {
-      const file = result.assets[0];
       const { signedUrl } = await api.getCvUploadUrl();
 
       const fileResponse = await fetch(file.uri);
@@ -185,15 +243,15 @@ export default function ProfileScreen() {
   }
 
   async function handlePickAvatar() {
-    // NativeModules ile native modülün varlığını senkron kontrol et
-    // expo-image-picker Expo Go'da yok, sadece native build'de çalışır
-    if (!(NativeModules as any).ExponentImagePicker) {
-      Alert.alert('Native Build Gerekli', 'Profil fotoğrafı yüklemek için uygulamanın Xcode ile derlenmiş versiyonunu kullanın.');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    let ImagePicker: typeof import('expo-image-picker');
+    try {
+      const raw = require('expo-image-picker');
+      ImagePicker = raw?.default ?? raw;
+    } catch {
+      Alert.alert('Hata', 'Profil fotoğrafı değiştirmek için App Store\'dan güncel versiyonu kullanın.');
       return;
     }
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const raw = require('expo-image-picker');
-    const ImagePicker: typeof import('expo-image-picker') = raw?.default ?? raw;
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('İzin Gerekli', 'Fotoğraf seçmek için galeri iznine ihtiyaç var.');
@@ -271,9 +329,10 @@ export default function ProfileScreen() {
   async function saveSkills() {
     setSkillsSaving(true);
     const newSkills = draftSkills;
+    const prevSkills = profile.skills ?? [];
+    const prevPrefSkills = prefs.skills ?? [];
     setProfile({ skills: newSkills });
     setPreferences({ skills: newSkills });
-    setShowSkillsEditor(false);
     api.updateProfile({
       skills: newSkills,
       preferences: {
@@ -284,37 +343,49 @@ export default function ProfileScreen() {
         salary_min: prefs.salaryMin,
         skills: newSkills,
       },
-    }).catch(() => {});
-    setSkillsSaving(false);
+    }).then(() => {
+      setShowSkillsEditor(false);
+    }).catch(() => {
+      setProfile({ skills: prevSkills });
+      setPreferences({ skills: prevPrefSkills });
+      Alert.alert('Bağlantı Hatası', 'Yetenekler kaydedilemedi. Tekrar deneyin.');
+    }).finally(() => {
+      setSkillsSaving(false);
+    });
   }
 
-  function handleUnfollow(company: string) {
-    unfollow(company);
-    api.unfollowCompany(company).catch(() => {});
-  }
-
-  const skills = profile.skills ?? [];
-  const prefs = profile.preferences ?? { sectors: [], seniority: [], workType: 'any', location: '', salaryMin: 0, skills: [] };
+  const suggestedSkills = useMemo(() => {
+    const userSectors = prefs.sectors ?? [];
+    if (userSectors.length === 0) return SUGGESTED_SKILLS;
+    const sectorSkills = Array.from(new Set(userSectors.flatMap((s) => SECTOR_SKILLS[s] ?? [])));
+    const prioritized = sectorSkills.filter((s) => SUGGESTED_SKILLS.includes(s));
+    const rest = SUGGESTED_SKILLS.filter((s) => !prioritized.includes(s));
+    return [...prioritized, ...rest];
+  }, [prefs.sectors]);
 
   const completionItems = [
-    { label: 'Ad Soyad', points: 15, done: !!profile.name },
+    { label: 'Ad Soyad', points: 20, done: !!profile.name },
     { label: 'Ünvan', points: 10, done: !!profile.title },
-    { label: 'Yetenek (en az 3)', points: 20, done: skills.length >= 3 },
-    { label: 'Sektör tercihleri', points: 15, done: (prefs.sectors ?? []).length > 0 },
+    { label: 'Yetenek (en az 3)', points: 25, done: skills.length >= 3 },
+    { label: 'Sektör tercihleri', points: 20, done: (prefs.sectors ?? []).length > 0 },
     { label: 'Fotoğraf', points: 10, done: !!profile.avatarUrl },
     { label: 'CV Yükle', points: 10, done: !!cvParsed },
     { label: 'Konum', points: 5, done: !!prefs.location },
   ];
   const completionScore = completionItems.filter((i) => i.done).reduce((sum, i) => sum + i.points, 0);
-  const firstMissing = completionItems.find((i) => !i.done);
+  const missingItems = completionItems.filter((i) => !i.done);
 
   const displayName = profile.name || 'Anonim';
   const initial = displayName.charAt(0).toUpperCase();
 
-  const workTypeLabel =
-    prefs.workType === 'any' ? 'Farketmez' :
-    prefs.workType === 'remote' ? 'Remote' :
-    prefs.workType === 'hybrid' ? 'Hibrit' : 'Ofis';
+  const WT_LABEL: Record<string, string> = { any: 'Farketmez', remote: 'Remote', hybrid: 'Hibrit', office: 'Ofis' };
+  const workTypeDisplay = (() => {
+    if (prefs.workType === 'any' || !prefs.workType) return 'Farketmez';
+    if (prefs.workType.includes(',')) {
+      return prefs.workType.split(',').map((v) => WT_LABEL[v.trim()] ?? v).join(', ');
+    }
+    return WT_LABEL[prefs.workType] ?? 'Belirtilmemiş';
+  })();
 
   const seniorityLabelMap: Record<string, string> = { junior: 'Junior', mid: 'Mid-Level', senior: 'Senior', lead: 'Lead' };
   const seniorityLabel = (Array.isArray(prefs.seniority) ? prefs.seniority : [])
@@ -331,10 +402,22 @@ export default function ProfileScreen() {
           <Text style={styles.headerTitle}>Profil</Text>
           {editing ? (
             <View style={styles.headerActions}>
-              <TouchableOpacity onPress={() => setEditing(false)} style={styles.cancelBtn}>
+              <TouchableOpacity
+                onPress={() => setEditing(false)}
+                style={styles.cancelBtn}
+                disabled={saving}
+                accessibilityRole="button"
+                accessibilityLabel="Düzenlemeyi iptal et"
+              >
                 <Text style={styles.cancelText}>İptal</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={saveEdit} style={styles.saveBtn} disabled={saving}>
+              <TouchableOpacity
+                onPress={saveEdit}
+                style={styles.saveBtn}
+                disabled={saving}
+                accessibilityRole="button"
+                accessibilityLabel="Profili kaydet"
+              >
                 {saving
                   ? <ActivityIndicator color="#ffffff" size="small" />
                   : <Text style={styles.saveText}>Kaydet</Text>
@@ -342,13 +425,23 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </View>
           ) : (
-            <TouchableOpacity onPress={startEdit} style={styles.editIconBtn}>
-              <Text style={styles.editIconText}>✏️ Düzenle</Text>
+            <TouchableOpacity
+              onPress={startEdit}
+              style={styles.editIconBtn}
+              accessibilityRole="button"
+              accessibilityLabel="Profili düzenle"
+            >
+              <Text style={styles.editIconText}>Düzenle</Text>
             </TouchableOpacity>
           )}
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + SPACING.md }]} keyboardShouldPersistTaps="handled">
+          {profileLoadError && (
+            <View style={styles.errorBanner}>
+              <Text style={styles.errorBannerText}>Profil yüklenemedi. Önbellek verileri gösteriliyor.</Text>
+            </View>
+          )}
           {/* Avatar */}
           <View style={styles.hero}>
             <View ref={avatarButtonRef}>
@@ -366,7 +459,7 @@ export default function ProfileScreen() {
                 </View>
               ) : (
                 <View style={styles.avatarEditBadge}>
-                  <Text style={styles.avatarEditIcon}>📷</Text>
+                  <Ionicons name="camera-outline" size={14} color={colors.text} />
                 </View>
               )}
             </TouchableOpacity>
@@ -409,7 +502,12 @@ export default function ProfileScreen() {
           </View>
 
           {/* Profil Tamamlanma */}
-          {completionScore < 100 && (
+          {completionScore >= 100 ? (
+            <View style={styles.completionComplete}>
+              <Ionicons name="checkmark-circle" size={18} color="#2ecc71" />
+              <Text style={styles.completionCompleteText}>Profil %100 tamamlandı</Text>
+            </View>
+          ) : (
             <View style={styles.completionCard}>
               <View style={styles.completionHeader}>
                 <Text style={styles.completionTitle}>Profil Tamamlanma</Text>
@@ -423,10 +521,13 @@ export default function ProfileScreen() {
                   style={[styles.completionFill, { width: `${completionScore}%` }]}
                 />
               </View>
-              {firstMissing && (
-                <Text style={styles.completionHint}>
-                  {firstMissing.label} ekle → +{firstMissing.points} puan
+              {missingItems.slice(0, 3).map((item) => (
+                <Text key={item.label} style={styles.completionHint}>
+                  {item.label} ekle → +{item.points} puan
                 </Text>
+              ))}
+              {missingItems.length > 3 && (
+                <Text style={styles.completionHint}>+{missingItems.length - 3} madde daha...</Text>
               )}
             </View>
           )}
@@ -442,7 +543,16 @@ export default function ProfileScreen() {
 
           {/* Preferences summary */}
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Tercihler</Text>
+            <View style={styles.sectionRow}>
+              <Text style={styles.sectionTitle}>Tercihler</Text>
+              <TouchableOpacity
+                onPress={() => router.push('/onboarding/preferences?edit=1')}
+                activeOpacity={0.7}
+                style={styles.sectionEditBtn}
+              >
+                <Text style={styles.sectionEditText}>Düzenle</Text>
+              </TouchableOpacity>
+            </View>
             <View style={styles.card}>
               <View style={styles.infoRow}>
                 <Text style={styles.infoIcon}>🏷️</Text>
@@ -460,7 +570,7 @@ export default function ProfileScreen() {
                 <Text style={styles.infoIcon}>🏢</Text>
                 <View style={styles.infoContent}>
                   <Text style={styles.infoLabel}>Çalışma Tipi</Text>
-                  <Text style={styles.infoValue}>{workTypeLabel}</Text>
+                  <Text style={styles.infoValue}>{workTypeDisplay}</Text>
                 </View>
               </View>
               <View style={styles.cardDivider} />
@@ -487,7 +597,7 @@ export default function ProfileScreen() {
             <View style={styles.sectionRow}>
               <Text style={styles.sectionTitle}>Yetenekler</Text>
               <TouchableOpacity onPress={openSkillsEditor} activeOpacity={0.7} style={styles.sectionEditBtn}>
-                <Text style={styles.sectionEditText}>{skills.length > 0 ? 'Düzenle' : '+ Ekle'}</Text>
+                <Text style={styles.sectionEditText}>Düzenle</Text>
               </TouchableOpacity>
             </View>
             {skills.length > 0 ? (
@@ -507,7 +617,7 @@ export default function ProfileScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>CV / Özgeçmiş</Text>
             {cvParsed ? (
-              <TouchableOpacity style={styles.card} onPress={handleViewCv} activeOpacity={0.7}>
+              <View style={styles.card}>
                 <View style={styles.infoRow}>
                   <Text style={styles.infoIcon}>📄</Text>
                   <View style={styles.infoContent}>
@@ -519,21 +629,25 @@ export default function ProfileScreen() {
                   {cvLoading ? (
                     <ActivityIndicator size="small" color={colors.textMuted} />
                   ) : (
-                    <View style={{ flexDirection: 'row', gap: SPACING.sm }}>
-                      <Text style={styles.linkedInDisconnect}>Görüntüle</Text>
-                      <TouchableOpacity onPress={handlePickCv} hitSlop={8}>
-                        <Text style={styles.linkedInDisconnect}>Güncelle</Text>
+                    <View style={{ flexDirection: 'row', gap: SPACING.md }}>
+                      <TouchableOpacity onPress={handleViewCv} hitSlop={8} activeOpacity={0.7}>
+                        <Text style={styles.cvActionLink}>Görüntüle</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={handlePickCv} hitSlop={8} activeOpacity={0.7}>
+                        <Text style={styles.cvActionLink}>Güncelle</Text>
                       </TouchableOpacity>
                     </View>
                   )}
                 </View>
-              </TouchableOpacity>
+              </View>
             ) : (
               <TouchableOpacity
                 style={styles.cvUploadBtn}
                 onPress={handlePickCv}
                 activeOpacity={0.8}
                 disabled={cvLoading}
+                accessibilityRole="button"
+                accessibilityLabel="CV yükle, PDF dosyası seç"
               >
                 {cvLoading ? (
                   <ActivityIndicator color={colors.text} />
@@ -551,24 +665,12 @@ export default function ProfileScreen() {
           </View>
 
           <TouchableOpacity
-            style={styles.followingBtn}
-            onPress={() => setShowFollowing(true)}
+            style={styles.settingsBtn}
+            onPress={() => router.push('/job-alerts')}
             activeOpacity={0.8}
           >
-            <Text style={styles.followingBtnText}>🏢  Takip Ettiklerim</Text>
-            {following.length > 0 && (
-              <View style={styles.followingBadge}>
-                <Text style={styles.followingBadgeText}>{following.length}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.editPrefsBtn}
-            onPress={() => router.push('/onboarding/preferences?edit=1')}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.editPrefsBtnText}>Tercihleri Düzenle</Text>
+            <Text style={styles.settingsBtnText}>İş İlanı Uyarısı</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -577,11 +679,21 @@ export default function ProfileScreen() {
             activeOpacity={0.8}
           >
             <Text style={styles.settingsBtnText}>Ayarlar</Text>
+            <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
           </TouchableOpacity>
 
           <TouchableOpacity
             style={styles.signOutBtn}
-            onPress={async () => { await signOut(); router.replace('/auth'); }}
+            onPress={() => {
+              Alert.alert(
+                'Çıkış Yap',
+                'Hesabından çıkmak istediğinden emin misin?',
+                [
+                  { text: 'İptal', style: 'cancel' },
+                  { text: 'Çıkış Yap', style: 'destructive', onPress: async () => { await signOut(); router.replace('/auth'); } },
+                ],
+              );
+            }}
             activeOpacity={0.8}
           >
             <Text style={styles.signOutText}>Çıkış Yap</Text>
@@ -609,7 +721,7 @@ export default function ProfileScreen() {
               <View style={styles.sheetHeader}>
                 <Text style={styles.sheetTitle}>Yetenekler</Text>
                 <TouchableOpacity onPress={() => setShowSkillsEditor(false)} style={styles.sheetCloseBtn}>
-                  <Text style={styles.sheetCloseText}>✕</Text>
+                  <Ionicons name="close" size={16} color={colors.textMuted} />
                 </TouchableOpacity>
               </View>
 
@@ -630,7 +742,7 @@ export default function ProfileScreen() {
 
               <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
                 <View style={styles.skillChipsWrap}>
-                  {SUGGESTED_SKILLS.map((s) => {
+                  {suggestedSkills.map((s) => {
                     const active = draftSkills.includes(s);
                     return (
                       <TouchableOpacity
@@ -644,15 +756,16 @@ export default function ProfileScreen() {
                     );
                   })}
                   {draftSkills
-                    .filter((s) => !SUGGESTED_SKILLS.includes(s))
+                    .filter((s) => !suggestedSkills.includes(s))
                     .map((s) => (
                       <TouchableOpacity
                         key={s}
-                        style={[styles.skillEditorChip, styles.skillEditorChipActive]}
+                        style={[styles.skillEditorChip, styles.skillEditorChipActive, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}
                         onPress={() => toggleDraftSkill(s)}
                         activeOpacity={0.8}
                       >
-                        <Text style={[styles.skillEditorChipText, styles.skillEditorChipTextActive]}>{s} ✕</Text>
+                        <Text style={[styles.skillEditorChipText, styles.skillEditorChipTextActive]}>{s}</Text>
+                        <Ionicons name="close" size={10} color={colors.isDark ? colors.text : '#ffffff'} />
                       </TouchableOpacity>
                     ))}
                 </View>
@@ -672,60 +785,6 @@ export default function ProfileScreen() {
           </KeyboardAvoidingView>
         </Modal>
 
-        {/* Takip Ettiklerim Bottom Sheet */}
-        <Modal
-          visible={showFollowing}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setShowFollowing(false)}
-        >
-          <TouchableOpacity
-            style={styles.sheetBackdrop}
-            activeOpacity={1}
-            onPress={() => setShowFollowing(false)}
-          />
-          <View style={[styles.sheet, { paddingBottom: insets.bottom + SPACING.lg }]}>
-            <View style={styles.sheetHandle} />
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Takip Ettiklerim</Text>
-              <TouchableOpacity onPress={() => setShowFollowing(false)} style={styles.sheetCloseBtn}>
-                <Text style={styles.sheetCloseText}>✕</Text>
-              </TouchableOpacity>
-            </View>
-
-            {following.length === 0 ? (
-              <View style={styles.sheetEmpty}>
-                <Text style={styles.sheetEmptyIcon}>🏢</Text>
-                <Text style={styles.sheetEmptyText}>Henüz takip ettiğin şirket yok.</Text>
-                <Text style={styles.sheetEmptySub}>Feed'deki iş kartlarında şirket adının yanındaki ★ ile takip edebilirsin.</Text>
-              </View>
-            ) : (
-              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                {following.map((company, index) => (
-                  <React.Fragment key={company}>
-                    {index > 0 && <View style={styles.sheetDivider} />}
-                    <View style={styles.sheetRow}>
-                      <View style={styles.companyInitialBox}>
-                        <Text style={styles.companyInitialText}>
-                          {company.charAt(0).toUpperCase()}
-                        </Text>
-                      </View>
-                      <Text style={styles.sheetCompanyName}>{company}</Text>
-                      <TouchableOpacity
-                        onPress={() => handleUnfollow(company)}
-                        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                        activeOpacity={0.6}
-                        style={styles.unfollowBtn}
-                      >
-                        <Text style={styles.unfollowBtnText}>✕</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </React.Fragment>
-                ))}
-              </ScrollView>
-            )}
-          </View>
-        </Modal>
       </View>
     </KeyboardAvoidingView>
   );
@@ -764,16 +823,15 @@ function makeStyles(c: ThemeColors) {
       paddingHorizontal: SPACING.md,
       paddingVertical: SPACING.xs + 2,
       borderRadius: RADII.full,
-      backgroundColor: c.isDark ? c.bgDeep : c.accent,
-      borderWidth: c.isDark ? 1 : 0,
-      borderColor: c.cardBorder,
+      backgroundColor: c.accent,
+      borderWidth: 0,
       minWidth: 68,
       alignItems: 'center',
       shadowColor: '#051650',
       shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: c.isDark ? 0 : 0.22,
+      shadowOpacity: c.isDark ? 0.15 : 0.22,
       shadowRadius: 8,
-      elevation: c.isDark ? 0 : 3,
+      elevation: 3,
     },
     saveText: { color: '#ffffff', fontSize: FONT_SIZES.sm, fontWeight: '700' },
     editIconBtn: {
@@ -813,7 +871,7 @@ function makeStyles(c: ThemeColors) {
     },
     avatarEditBadge: {
       position: 'absolute', bottom: 0, right: 0,
-      width: 26, height: 26, borderRadius: 13,
+      width: 30, height: 30, borderRadius: 15,
       backgroundColor: c.bgDeep,
       borderWidth: 2, borderColor: c.bg,
       alignItems: 'center', justifyContent: 'center',
@@ -823,7 +881,7 @@ function makeStyles(c: ThemeColors) {
       shadowRadius: 4,
       elevation: 2,
     },
-    avatarEditIcon: { fontSize: 13 },
+    avatarEditIcon: { fontSize: 15 },
     avatarText: { color: '#ffffff', fontSize: 32, fontWeight: '800' },
     editFields: { width: '100%', gap: SPACING.sm, marginTop: SPACING.sm },
     editInput: {
@@ -835,7 +893,7 @@ function makeStyles(c: ThemeColors) {
       paddingVertical: SPACING.sm + 2,
       color: c.text,
       fontSize: FONT_SIZES.md,
-      textAlign: 'center',
+      textAlign: 'left',
     },
     name: {
       color: c.text, fontSize: FONT_SIZES.xl,
@@ -914,70 +972,39 @@ function makeStyles(c: ThemeColors) {
       elevation: c.isDark ? 0 : 1,
     },
     skillText: { color: c.text, fontSize: FONT_SIZES.xs, fontWeight: '500' },
-    editPrefsBtn: {
-      backgroundColor: c.isDark ? c.bgDeep : c.accent,
-      borderWidth: c.isDark ? 1 : 0,
-      borderColor: c.cardBorder,
-      borderRadius: RADII.full,
-      paddingVertical: SPACING.sm + 4, alignItems: 'center',
-      shadowColor: '#051650',
-      shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: c.isDark ? 0 : 0.28,
-      shadowRadius: 14,
-      elevation: c.isDark ? 0 : 4,
-    },
-    editPrefsBtnText: { color: '#ffffff', fontSize: FONT_SIZES.md, fontWeight: '700' },
     settingsBtn: {
       backgroundColor: c.bgDeep, borderWidth: 1,
       borderColor: c.cardBorder, borderRadius: RADII.full,
-      paddingVertical: SPACING.sm + 4, alignItems: 'center',
+      paddingVertical: SPACING.sm + 4,
+      paddingHorizontal: SPACING.lg,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: c.isDark ? 0.15 : 0.06,
       shadowRadius: 6,
       elevation: c.isDark ? 0 : 1,
     },
-    settingsBtnText: { color: c.text, fontSize: FONT_SIZES.sm, fontWeight: '600' },
+    settingsBtnText: { flex: 1, textAlign: 'center', color: c.text, fontSize: FONT_SIZES.sm, fontWeight: '600' },
     signOutBtn: {
       backgroundColor: 'rgba(255,59,48,0.07)', borderWidth: 1,
       borderColor: 'rgba(255,59,48,0.2)', borderRadius: RADII.full,
       paddingVertical: SPACING.sm + 4, alignItems: 'center',
     },
     signOutText: { color: '#ef4444', fontSize: FONT_SIZES.sm, fontWeight: '600' },
-    followingBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: c.bgDeep,
-      borderWidth: 1, borderColor: c.cardBorder,
-      borderRadius: RADII.full,
-      paddingVertical: SPACING.sm + 4,
-      paddingHorizontal: SPACING.lg,
-      gap: SPACING.sm,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: c.isDark ? 0.15 : 0.06,
-      shadowRadius: 6,
-      elevation: c.isDark ? 0 : 1,
+    errorBanner: {
+      backgroundColor: 'rgba(239,68,68,0.08)',
+      borderWidth: 1,
+      borderColor: 'rgba(239,68,68,0.2)',
+      borderRadius: RADII.md,
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.sm,
     },
-    followingBtnText: {
-      flex: 1,
-      color: c.text,
-      fontSize: FONT_SIZES.sm,
-      fontWeight: '600',
-    },
-    followingBadge: {
-      backgroundColor: c.isDark ? c.bgDeep : c.accent,
-      borderWidth: c.isDark ? 1 : 0,
-      borderColor: c.cardBorder,
-      borderRadius: RADII.full,
-      minWidth: 22, height: 22,
-      alignItems: 'center', justifyContent: 'center',
-      paddingHorizontal: SPACING.xs,
-    },
-    followingBadgeText: {
-      color: '#ffffff',
+    errorBannerText: {
+      color: '#ef4444',
       fontSize: FONT_SIZES.xs,
-      fontWeight: '700',
+      textAlign: 'center',
     },
     sheetBackdrop: {
       flex: 1,
@@ -1025,69 +1052,6 @@ function makeStyles(c: ThemeColors) {
       borderRadius: 15,
       alignItems: 'center', justifyContent: 'center',
     },
-    sheetCloseText: {
-      color: c.textMuted,
-      fontSize: 13,
-      fontWeight: '700',
-    },
-    sheetDivider: {
-      height: 1,
-      backgroundColor: c.cardBorder,
-    },
-    sheetRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: SPACING.sm + 2,
-      paddingVertical: SPACING.md,
-    },
-    sheetCompanyName: {
-      flex: 1,
-      color: c.text,
-      fontSize: FONT_SIZES.md,
-      fontWeight: '600',
-    },
-    sheetEmpty: {
-      alignItems: 'center',
-      paddingVertical: SPACING.xxl,
-      gap: SPACING.sm,
-    },
-    sheetEmptyIcon: { fontSize: 40 },
-    sheetEmptyText: {
-      color: c.text,
-      fontSize: FONT_SIZES.md,
-      fontWeight: '600',
-      textAlign: 'center',
-    },
-    sheetEmptySub: {
-      color: c.textMuted,
-      fontSize: FONT_SIZES.xs,
-      textAlign: 'center',
-      maxWidth: 260,
-      lineHeight: 18,
-    },
-    companyInitialBox: {
-      width: 36, height: 36, borderRadius: 10,
-      backgroundColor: c.isDark ? 'rgba(226,232,245,0.07)' : 'rgba(5,22,80,0.07)',
-      alignItems: 'center', justifyContent: 'center',
-      flexShrink: 0,
-    },
-    companyInitialText: {
-      fontSize: FONT_SIZES.md,
-      fontWeight: '800',
-      color: c.text,
-    },
-    unfollowBtn: {
-      width: 28, height: 28, borderRadius: 14,
-      backgroundColor: c.bgDeep,
-      borderWidth: 1, borderColor: c.cardBorder,
-      alignItems: 'center', justifyContent: 'center',
-      flexShrink: 0,
-    },
-    unfollowBtnText: {
-      color: c.textMuted,
-      fontSize: 11,
-      fontWeight: '700',
-    },
     cvUploadBtn: {
       backgroundColor: c.bgDeep,
       borderWidth: 1.5,
@@ -1103,24 +1067,11 @@ function makeStyles(c: ThemeColors) {
     cvUploadIcon: { fontSize: 24 },
     cvUploadText: { color: c.text, fontSize: FONT_SIZES.md, fontWeight: '700' },
     cvUploadSub: { color: c.textMuted, fontSize: FONT_SIZES.xs, marginTop: 2 },
-    linkedInBtn: {
-      backgroundColor: 'rgba(10, 102, 194, 0.08)',
-      borderWidth: 1,
-      borderColor: 'rgba(10, 102, 194, 0.25)',
-      borderRadius: RADII.lg,
-      padding: SPACING.md,
-      alignItems: 'center',
-      gap: SPACING.xs,
+    cvActionLink: {
+      color: c.isDark ? c.textMuted : c.accent,
+      fontSize: FONT_SIZES.xs,
+      fontWeight: '600',
     },
-    linkedInBtnText: { color: '#0A66C2', fontSize: FONT_SIZES.md, fontWeight: '700' },
-    linkedInBtnSub: { color: c.textMuted, fontSize: FONT_SIZES.xs },
-    linkedInBadge: {
-      width: 30, height: 30, borderRadius: 6,
-      backgroundColor: '#0A66C2',
-      alignItems: 'center', justifyContent: 'center',
-    },
-    linkedInBadgeText: { color: '#ffffff', fontWeight: '800', fontSize: 14 },
-    linkedInDisconnect: { color: c.textMuted, fontSize: FONT_SIZES.xs },
     completionCard: {
       backgroundColor: c.bgDeep,
       borderWidth: 1,
@@ -1164,6 +1115,21 @@ function makeStyles(c: ThemeColors) {
     completionHint: {
       color: c.textMuted,
       fontSize: FONT_SIZES.xs,
+    },
+    completionComplete: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.xs,
+      backgroundColor: 'rgba(46,204,113,0.08)',
+      borderWidth: 1,
+      borderColor: 'rgba(46,204,113,0.25)',
+      borderRadius: RADII.lg,
+      padding: SPACING.md,
+    },
+    completionCompleteText: {
+      color: '#2ecc71',
+      fontSize: FONT_SIZES.sm,
+      fontWeight: '600',
     },
     sheetKeyboard: {
       position: 'absolute',
@@ -1213,20 +1179,20 @@ function makeStyles(c: ThemeColors) {
       borderColor: c.cardBorder,
     },
     skillEditorChipActive: {
-      backgroundColor: c.isDark ? c.bgDeep : c.accent,
-      borderColor: c.isDark ? 'rgba(255,255,255,0.25)' : c.accent,
+      backgroundColor: c.isDark ? 'rgba(226,232,245,0.18)' : c.accent,
+      borderColor: c.isDark ? 'rgba(226,232,245,0.35)' : c.accent,
     },
     skillEditorChipText: {
       color: c.textMuted,
       fontSize: FONT_SIZES.sm,
       fontWeight: '500',
     },
-    skillEditorChipTextActive: { color: '#ffffff' },
+    skillEditorChipTextActive: { color: c.isDark ? c.text : '#ffffff' },
     skillsSaveBtn: {
       height: 52,
-      backgroundColor: c.isDark ? c.bgDeep : c.accent,
+      backgroundColor: c.isDark ? 'rgba(226,232,245,0.15)' : c.accent,
       borderWidth: c.isDark ? 1 : 0,
-      borderColor: c.cardBorder,
+      borderColor: 'rgba(226,232,245,0.30)',
       borderRadius: RADII.full,
       alignItems: 'center',
       justifyContent: 'center',

@@ -1,7 +1,7 @@
-export type WorkType = 'remote' | 'hybrid' | 'office' | 'unknown';
+export type WorkType = 'remote' | 'hybrid' | 'office' | 'unknown' | 'any';
 export type Seniority = 'junior' | 'mid' | 'senior' | 'lead' | 'unknown';
 export type EmploymentType = 'fulltime' | 'parttime' | 'contract' | 'internship' | '';
-export type InteractionAction = 'view' | 'save' | 'apply' | 'skip';
+export type InteractionAction = 'view' | 'save' | 'unsave' | 'apply' | 'skip';
 
 export interface Job {
   id: string;
@@ -34,7 +34,7 @@ export interface Job {
 export interface UserPreferences {
   sectors: string[];
   seniority: Seniority[];
-  workType: WorkType | 'any';
+  workType: WorkType;
   workTypes?: WorkType[];
   location: string;
   cities?: string[];

@@ -1,10 +1,32 @@
 import { useEffect, useRef, useState } from 'react';
-import { Animated, Image, StyleSheet, Text, View } from 'react-native';
+import { Animated, ImageBackground, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/store/authStore';
 import { useUserStore } from '@/store/userStore';
 import { useFeedStore } from '@/store/feedStore';
 import { api } from '@/services/api';
+import { WorkType, Seniority } from '@/types';
+
+const LOCATION_MAP: Record<string, string> = {
+  'İstanbul': 'Istanbul, Turkey', 'istanbul': 'Istanbul, Turkey',
+  'Ankara': 'Ankara, Turkey', 'ankara': 'Ankara, Turkey',
+  'İzmir': 'Izmir, Turkey', 'izmir': 'Izmir, Turkey',
+  'Bursa': 'Bursa, Turkey', 'Antalya': 'Antalya, Turkey',
+  'Adana': 'Adana, Turkey', 'Konya': 'Konya, Turkey',
+  'Gaziantep': 'Gaziantep, Turkey', 'Kayseri': 'Kayseri, Turkey',
+  'Mersin': 'Mersin, Turkey', 'Kocaeli': 'Kocaeli, Turkey',
+  'Samsun': 'Samsun, Turkey', 'Trabzon': 'Trabzon, Turkey',
+  'Eskişehir': 'Eskişehir, Turkey', 'Remote': 'Remote', 'remote': 'Remote',
+};
+
+function normalizeApiLocation(loc: string): string {
+  if (!loc) return 'Istanbul, Turkey';
+  const trimmed = loc.trim();
+  if (LOCATION_MAP[trimmed]) return LOCATION_MAP[trimmed];
+  if (trimmed.includes(', Turkey') || trimmed.toLowerCase() === 'remote') return trimmed;
+  const firstCity = trimmed.split(',')[0].trim();
+  return LOCATION_MAP[firstCity] ?? (firstCity ? `${firstCity}, Turkey` : 'Istanbul, Turkey');
+}
 
 const SPLASH_BG = '#0d0d14';
 
@@ -13,6 +35,8 @@ export default function Index() {
   const hasCompletedOnboarding = useUserStore((s) => s.hasCompletedOnboarding);
   const completedOnboardingUserIds = useUserStore((s) => s.completedOnboardingUserIds);
   const markOnboardingComplete = useUserStore((s) => s.markOnboardingComplete);
+  const setProfile = useUserStore((s) => s.setProfile);
+  const setPreferences = useUserStore((s) => s.setPreferences);
   const profile = useUserStore((s) => s.profile);
   const { setJobs, setLoading } = useFeedStore();
 
@@ -38,7 +62,13 @@ export default function Index() {
   }, [session?.user.id, hasCompletedOnboarding]);
 
   useEffect(() => {
-    if (isLoading || !userHydrated || isRecoveryMode) return;
+    if (isLoading || !userHydrated) return;
+
+    if (isRecoveryMode) {
+      fetchStarted.current = false;
+      router.replace('/auth');
+      return;
+    }
 
     if (!session) {
       router.replace('/auth');
@@ -58,23 +88,49 @@ export default function Index() {
 
     setShowLoadingSplash(true);
 
-    // İlanlar yüklenirken fake progress: 0 → 80%
+    // İlanlar yüklenirken fake progress: 0 → 65%
     Animated.timing(progress, {
-      toValue: 0.8,
-      duration: 2500,
+      toValue: 0.65,
+      duration: 1800,
       useNativeDriver: false,
     }).start();
 
-    const { sectors, location } = profile.preferences;
     setLoading(true);
 
-    api
-      .feed({
-        page: 1,
-        location: location || 'Istanbul, Turkey',
-        sectors: sectors.join(','),
-        work_type: 'any',
-        seniority: '',
+    // Önce profil çek — fresh tercihlerle feed yükle (ilk kurulum veya cache sıfırlama sonrası)
+    api.getProfile()
+      .catch(() => null)
+      .then((data) => {
+        if (data) {
+          if (data.display_name) setProfile({ name: data.display_name as string });
+          if (data.title) setProfile({ title: data.title as string });
+          if (data.avatar_url) setProfile({ avatarUrl: data.avatar_url as string });
+          const p = data.preferences as Record<string, unknown> | undefined;
+          if (p) {
+            const rawWorkType = (p.work_type as string) || 'any';
+            setPreferences({
+              sectors: (p.sectors as string[]) || [],
+              seniority: (p.seniority as Seniority[]) || [],
+              workType: rawWorkType as WorkType,
+              location: (p.location as string) || '',
+              cities: (p.cities as string[]) || [],
+              skills: (p.skills as string[]) || [],
+            });
+          }
+        }
+        const freshPrefs = (data?.preferences as Record<string, unknown> | undefined) ?? {};
+        const feedSectors =
+          (freshPrefs.sectors as string[] | undefined) ?? profile?.preferences?.sectors ?? [];
+        const rawFeedLocation =
+          (freshPrefs.location as string | undefined) || profile?.preferences?.location || '';
+        const feedLocation = normalizeApiLocation(rawFeedLocation);
+        return api.feed({
+          page: 1,
+          location: feedLocation,
+          sectors: feedSectors.join(','),
+          work_type: 'any',
+          seniority: '',
+        });
       })
       .then(({ jobs }) => {
         setJobs(jobs);
@@ -84,49 +140,54 @@ export default function Index() {
       })
       .finally(() => {
         setLoading(false);
-        // Progress 80% → 100%, sonra fade out ve navigate
-        Animated.timing(progress, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: false,
-        }).start(() => {
-          Animated.timing(opacity, {
-            toValue: 0,
-            duration: 250,
-            useNativeDriver: true,
+        const navigate = () => router.replace('/(tabs)');
+        try {
+          Animated.timing(progress, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: false,
           }).start(() => {
-            router.replace('/(tabs)');
+            try {
+              Animated.timing(opacity, {
+                toValue: 0,
+                duration: 250,
+                useNativeDriver: true,
+              }).start(() => navigate());
+            } catch {
+              navigate();
+            }
           });
-        });
+        } catch {
+          navigate();
+        }
       });
   }, [session, isLoading, hasCompletedOnboarding, completedOnboardingUserIds, userHydrated, isRecoveryMode]);
 
   if (showLoadingSplash) {
     return (
       <Animated.View style={[styles.container, { opacity }]}>
-        <View style={styles.logoArea}>
-          <Image
-            source={require('../assets/icon.png')}
-            style={styles.logo}
-            resizeMode="contain"
-          />
-        </View>
-        <View style={styles.bottomArea}>
-          <Text style={styles.loadingText}>Yükleniyor...</Text>
-          <View style={styles.progressTrack}>
-            <Animated.View
-              style={[
-                styles.progressFill,
-                {
-                  width: progress.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: ['0%', '100%'],
-                  }),
-                },
-              ]}
-            />
+        <ImageBackground
+          source={require('../assets/splash.png')}
+          style={styles.splash}
+          resizeMode="cover"
+        >
+          <View style={styles.bottomArea}>
+            <Text style={styles.loadingText}>Yükleniyor...</Text>
+            <View style={styles.progressTrack}>
+              <Animated.View
+                style={[
+                  styles.progressFill,
+                  {
+                    width: progress.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ['0%', '100%'],
+                    }),
+                  },
+                ]}
+              />
+            </View>
           </View>
-        </View>
+        </ImageBackground>
       </Animated.View>
     );
   }
@@ -139,15 +200,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: SPLASH_BG,
   },
-  logoArea: {
+  splash: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  logo: {
-    width: 110,
-    height: 110,
-    borderRadius: 24,
+    justifyContent: 'flex-end',
   },
   bottomArea: {
     paddingHorizontal: 40,

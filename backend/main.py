@@ -78,12 +78,16 @@ async def send_expo_push(token: str, title: str, body: str, data: dict | None = 
         return
     async with httpx.AsyncClient() as client:
         try:
-            await client.post(
+            resp = await client.post(
                 "https://exp.host/--/api/v2/push/send",
                 json={"to": token, "title": title, "body": body, "data": data or {}, "sound": "default"},
                 headers={"Content-Type": "application/json"},
                 timeout=10,
             )
+            if resp.status_code == 200:
+                result = resp.json().get("data", {})
+                if result.get("status") == "error":
+                    print(f"[Push] Delivery error for {token[:30]}: {result.get('message')}")
         except Exception as e:
             print(f"[Push] Error: {e}")
 
@@ -101,14 +105,14 @@ async def send_daily_alerts() -> None:
     user_ids = list({a["user_id"] for a in alerts})
     tokens_res = (
         db.table("profiles")
-        .select("user_id, push_token")
+        .select("user_id, push_token, notif_job_alerts")
         .in_("user_id", user_ids)
         .execute()
     )
     token_map = {
         r["user_id"]: r["push_token"]
         for r in (tokens_res.data or [])
-        if r.get("push_token")
+        if r.get("push_token") and r.get("notif_job_alerts", True)
     }
 
     for alert in alerts:
@@ -158,25 +162,30 @@ async def send_company_alerts() -> None:
     user_ids = list({f["user_id"] for f in follows})
     tokens_res = (
         db.table("profiles")
-        .select("user_id, push_token")
+        .select("user_id, push_token, notif_follow, preferences")
         .in_("user_id", user_ids)
         .execute()
     )
     token_map = {
-        r["user_id"]: r["push_token"]
+        r["user_id"]: {
+            "push_token": r["push_token"],
+            "location": (r.get("preferences") or {}).get("location") or "Istanbul, Turkey",
+        }
         for r in (tokens_res.data or [])
-        if r.get("push_token")
+        if r.get("push_token") and r.get("notif_follow", True)
     }
 
     for follow in follows:
-        push_token = token_map.get(follow["user_id"])
-        if not push_token:
+        user_data = token_map.get(follow["user_id"])
+        if not user_data:
             continue
+        push_token = user_data["push_token"]
+        user_location = user_data["location"]
         company = follow["company_name"]
         try:
             _, total, _ = await fetch_jobs(
                 keyword=company,
-                location="Istanbul, Turkey",
+                location=user_location,
                 sectors=[],
                 extra_keywords=[],
                 work_type="any",
@@ -245,7 +254,7 @@ async def _parse_cv_with_groq(text: str) -> dict:
             },
             {
                 "role": "user",
-                "content": f"Parse this CV:\n\n{text[:4000]}",
+                "content": f"Parse this CV:\n\n{text[:10000]}",
             },
         ],
     )
@@ -351,8 +360,13 @@ def _calculate_preference_score(
         elif job_sector:
             score -= 15
 
-    if eff_work_type != "any" and job_wt != "unknown":
-        if job_wt == eff_work_type:
+    eff_work_types = (
+        [w.strip() for w in eff_work_type.split(",") if w.strip()]
+        if eff_work_type not in ("any", "")
+        else []
+    )
+    if eff_work_types and job_wt != "unknown":
+        if job_wt in eff_work_types:
             score += 5
         else:
             score -= 5
@@ -564,8 +578,8 @@ async def _feed_impl(
     cv_parsed: dict | None = None
 
     if keyword:
-        # Manuel arama: tek keyword, mevcut davranış
-        jobs, total, partial = await fetch_jobs(
+        # Manuel arama: jobs çek, kullanıcı varsa CV/prefs'i de yükle (scoring için)
+        fetch_coro = fetch_jobs(
             keyword=keyword,
             location=location,
             sectors=sectors_list,
@@ -574,6 +588,13 @@ async def _feed_impl(
             seniority_list=seniority_list,
             page=page,
         )
+        if user:
+            (jobs, total, partial), (_, user_prefs, cv_parsed) = await asyncio.gather(
+                fetch_coro,
+                _get_user_context(user["sub"], get_supabase()),
+            )
+        else:
+            jobs, total, partial = await fetch_coro
     elif user:
         weighted_terms, user_prefs, cv_parsed = await _get_user_context(user["sub"], get_supabase())
 
@@ -695,7 +716,7 @@ async def job_description(job_id: str, user: dict = Depends(get_current_user)):
 async def get_profile(user: dict = Depends(get_current_user)):
     db = get_supabase()
     res = db.table("profiles").select(
-        "user_id, display_name, title, avatar_url, preferences, skills, cv_url, cv_parsed"
+        "user_id, display_name, title, avatar_url, preferences, cv_url, cv_parsed"
     ).eq("user_id", user["sub"]).maybe_single().execute()
     return res.data or {}
 
@@ -782,7 +803,7 @@ async def cv_signed_url(user: dict = Depends(get_current_user)):
 @app.post("/api/profile/cv-parse")
 @limiter.limit("5/hour")
 async def parse_cv(request: Request, user: dict = Depends(get_current_user)):
-    """Download user's CV from storage, parse with pdfplumber + Claude Haiku, save to profile."""
+    """Download user's CV from storage, parse with pdfplumber + Groq Llama, save to profile."""
     if not GROQ_API_KEY:
         raise HTTPException(status_code=503, detail="AI parse not configured")
     db = get_supabase()
@@ -832,14 +853,28 @@ async def post_interaction(request: Request, body: dict, user: dict = Depends(ge
     action = body.get("action", "")
     if action not in ALLOWED_ACTIONS:
         raise HTTPException(status_code=400, detail="Geçersiz aksiyon")
+    job_id = _str_field(body.get("job_id"), 128)
+    if not job_id:
+        raise HTTPException(status_code=400, detail="job_id zorunludur")
     raw_url = body.get("job_url")
     safe_url = raw_url[:2048] if raw_url and _is_safe_url(raw_url) else None
     raw_duration = body.get("duration_seconds")
     duration = int(raw_duration) if isinstance(raw_duration, (int, float)) else None
     db = get_supabase()
+    # save aksiyonu için duplicate'i önle — aynı iş zaten kaydedilmişse tekrar ekleme
+    if action == "save":
+        existing = db.table("interactions") \
+            .select("id") \
+            .eq("user_id", user["sub"]) \
+            .eq("job_id", job_id) \
+            .eq("action", "save") \
+            .limit(1) \
+            .execute()
+        if existing.data:
+            return {"success": True}
     db.table("interactions").insert({
         "user_id": user["sub"],
-        "job_id": _str_field(body.get("job_id"), 128),
+        "job_id": job_id,
         "action": action,
         "duration_seconds": duration,
         "job_title": _str_field(body.get("job_title"), 200),
@@ -919,10 +954,14 @@ async def create_alert(request: Request, body: dict, user: dict = Depends(get_cu
     if isinstance(sectors, str):
         sectors = [s.strip() for s in sectors.split(",") if s.strip()]
 
+    keyword_clean = body.get("keyword", "").strip()
+    if not keyword_clean and not sectors:
+        raise HTTPException(status_code=400, detail="Anahtar kelime veya sektör gerekli")
+
     res = db.table("job_alerts").insert({
         "user_id": user["sub"],
         "label": body.get("label", "").strip(),
-        "keyword": body.get("keyword", "").strip(),
+        "keyword": keyword_clean,
         "location": body.get("location", "Istanbul, Turkey").strip(),
         "work_type": body.get("work_type", "any"),
         "seniority": seniority,
@@ -935,22 +974,41 @@ async def create_alert(request: Request, body: dict, user: dict = Depends(get_cu
 @app.patch("/api/alerts/{alert_id}")
 async def toggle_alert(alert_id: str, body: dict, user: dict = Depends(get_current_user)):
     db = get_supabase()
-    db.table("job_alerts") \
-        .update({"enabled": body.get("enabled", True)}) \
+    update_data: dict = {}
+    if "enabled" in body:
+        update_data["enabled"] = body["enabled"]
+    if "keyword" in body:
+        update_data["keyword"] = body["keyword"]
+    if "location" in body:
+        update_data["location"] = body["location"]
+    if "work_type" in body:
+        update_data["work_type"] = body["work_type"]
+    if "seniority" in body:
+        update_data["seniority"] = body["seniority"]
+    if "sectors" in body:
+        update_data["sectors"] = body["sectors"]
+    if not update_data:
+        return {"success": True}
+    res = db.table("job_alerts") \
+        .update(update_data) \
         .eq("id", alert_id) \
         .eq("user_id", user["sub"]) \
         .execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="Alarm bulunamadı")
     return {"success": True}
 
 
 @app.delete("/api/alerts/{alert_id}")
 async def delete_alert(alert_id: str, user: dict = Depends(get_current_user)):
     db = get_supabase()
-    db.table("job_alerts") \
+    res = db.table("job_alerts") \
         .delete() \
         .eq("id", alert_id) \
         .eq("user_id", user["sub"]) \
         .execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="Alarm bulunamadı")
     return {"success": True}
 
 
@@ -976,7 +1034,7 @@ async def follow_company(body: dict, user: dict = Depends(get_current_user)):
     db.table("company_follows").upsert({
         "user_id": user["sub"],
         "company_name": name,
-    }).execute()
+    }, on_conflict="user_id,company_name").execute()
     return {"success": True}
 
 
@@ -988,6 +1046,22 @@ async def unfollow_company(company_name: str, user: dict = Depends(get_current_u
         .eq("user_id", user["sub"]) \
         .eq("company_name", company_name) \
         .execute()
+    return {"success": True}
+
+
+# ── Notification Preferences ─────────────────────────────────────────────────
+
+class NotifPrefsUpdate(BaseModel):
+    notif_follow: bool | None = None
+    notif_job_alerts: bool | None = None
+
+@app.put("/api/profile/notif-prefs")
+async def update_notif_prefs(body: NotifPrefsUpdate, user: dict = Depends(get_current_user)):
+    update_data = body.model_dump(exclude_none=True)
+    if not update_data:
+        return {"success": True}
+    db = get_supabase()
+    db.table("profiles").update(update_data).eq("user_id", user["sub"]).execute()
     return {"success": True}
 
 
