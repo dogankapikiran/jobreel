@@ -15,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUserStore } from '@/store/userStore';
 import { useAuthStore } from '@/store/authStore';
 import { api } from '@/services/api';
+import { track } from '@/services/analytics';
 import { FONT_SIZES, RADII, SPACING, ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 
@@ -53,6 +54,7 @@ export default function CvScreen() {
   }
 
   function handleFinish() {
+    track('Onboarding Completed', { skill_count: skills.length, has_cv: profile.skills.length > 0 });
     setProfile({ name, title, summary, skills });
     setPreferences({ skills });
     completeOnboarding();

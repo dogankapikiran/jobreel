@@ -21,6 +21,7 @@ import { FONT_SIZES, RADII, SPACING, ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 import CompanyLogo from '@/components/CompanyLogo';
 import TagBadge from '@/components/TagBadge';
+import { track } from '@/services/analytics';
 
 function safeOpenURL(url: string): void {
   try {
@@ -127,6 +128,11 @@ export default function JobDetailScreen() {
 
   useEffect(() => {
     if (!job) return;
+    track('Job Viewed', { job_id: job.id, company: job.company, title: job.title, sector: job.sector });
+  }, [job?.id]);
+
+  useEffect(() => {
+    if (!job) return;
     if (description.trim().length > 30) return;
     setDescLoading(true);
     setDescError(false);
@@ -179,6 +185,7 @@ export default function JobDetailScreen() {
                   markApplied(job!);
                   addInteraction({ jobId: job!.id, action: 'apply', timestamp: Date.now() });
                   api.postInteraction(job!.id, 'apply', job!).catch(() => {});
+                  track('Job Applied', { job_id: job!.id, company: job!.company, title: job!.title, sector: job!.sector });
                 },
               },
               { text: 'Hayır', style: 'cancel' },

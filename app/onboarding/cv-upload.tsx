@@ -13,6 +13,7 @@ import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUserStore } from '@/store/userStore';
 import { api } from '@/services/api';
+import { track } from '@/services/analytics';
 import { FONT_SIZES, RADII, SPACING, ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 
@@ -81,6 +82,7 @@ export default function CvUploadScreen() {
 
       setParsedSkillCount(parsed.skills?.length ?? 0);
       setUploaded(true);
+      track('CV Uploaded', { skill_count: parsed.skills?.length ?? 0 });
     } catch (e: any) {
       if (e?.name === 'AbortError' || e?.message?.includes('abort')) {
         Alert.alert('Zaman Aşımı', 'CV yükleme çok uzun sürdü. İnternet bağlantınızı kontrol edip tekrar deneyin.');

@@ -22,6 +22,7 @@ import { useUserStore } from '@/store/userStore';
 import { supabase } from '@/services/supabase';
 import { FONT_SIZES, RADII, SPACING, ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
+import { track } from '@/services/analytics';
 
 export default function AuthScreen() {
   const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>('signin');
@@ -92,7 +93,10 @@ export default function AuthScreen() {
       await signIn(email.trim(), password);
     } else {
       const ok = await signUp(email.trim(), password);
-      if (ok) setSignupSent(true);
+      if (ok) {
+        track('User Signed Up', { method: 'email' });
+        setSignupSent(true);
+      }
     }
     setBusy(false);
   }
@@ -112,6 +116,7 @@ export default function AuthScreen() {
         token: credential.identityToken,
       });
       if (error) throw error;
+      track('User Signed In', { method: 'apple' });
       const user = data.session?.user;
       if (user && credential.fullName) {
         const name = [credential.fullName.givenName, credential.fullName.familyName]
@@ -148,7 +153,7 @@ export default function AuthScreen() {
         if (!access_token || !refresh_token) throw new Error('Oturum bilgisi alınamadı');
         const { data: sessionData, error: sessionError } = await supabase.auth.setSession({ access_token, refresh_token });
         if (sessionError) throw sessionError;
-
+        track('User Signed In', { method: 'google' });
         const user = sessionData.session?.user;
         if (user) {
           const meta = user.user_metadata ?? {};
