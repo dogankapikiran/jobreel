@@ -410,10 +410,10 @@ async def _generate_groq_batch(
         f"CV: başlık={cv_title}, yetenekler={cv_skills}, geçmiş_roller={cv_roles}\n\n"
         "Aşağıdaki iş ilanları için bu CV'ye göre değerlendir:\n"
         "- score (0-50): sadece CV'nin ilana semantik uyumu — tercihler değil, dil fark etmez\n"
-        "- reason: kısa Türkçe gerekçe (max 8 kelime)\n"
+        "- reason: kısa Türkçe gerekçe (max 5 kelime, sadece harf ve boşluk, noktalama isareti kullanma)\n"
         "- matched_skills: CV'de olan ve bu ilan için gerekli yetenekler (string listesi, maks 5)\n"
         "- missing_skills: ilanın gerektirdiği ancak CV'de olmayan yetenekler (string listesi, maks 5)\n\n"
-        'Sadece JSON döndür: {"0": {"score": 35, "reason": "...", "matched_skills": [...], "missing_skills": [...]}, "1": {...}, ...}\n\n'
+        'Sadece JSON dondur: {"0": {"score": 35, "reason": "kısa gerekce", "matched_skills": [...], "missing_skills": [...]}, "1": {...}, ...}\n\n'
         + "\n".join(job_lines)
     )
 
@@ -427,9 +427,10 @@ async def _generate_groq_batch(
                 {
                     "role": "system",
                     "content": (
-                        "CV-iş uyum değerlendirmesi yap. "
-                        "Score 0-50 arası olmalı. İngilizce ve Türkçe ilanları aynı şekilde değerlendir. "
-                        "Sadece JSON döndür."
+                        "CV-is uyum degerlendirmesi yap. "
+                        "Score 0-50 arasi olmali. Ingilizce ve Turkce ilanlari ayni sekilde degerlendir. "
+                        "reason alanina kesinlikle kesme isareti, tirnak veya noktalama koyma — sadece duz kelimeler. "
+                        "Sadece JSON dondur."
                     ),
                 },
                 {"role": "user", "content": prompt},
