@@ -2,13 +2,8 @@
 
 set -e
 
-# Install Homebrew if not present
-if ! command -v brew &>/dev/null; then
-    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-fi
-
-# Install CocoaPods
-brew install cocoapods
+# Install CocoaPods via gem (more reliable on Xcode Cloud than brew)
+sudo gem install cocoapods --no-document
 
 # Install pods
 cd "$CI_PRIMARY_REPOSITORY_PATH/ios"
