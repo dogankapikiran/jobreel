@@ -49,6 +49,14 @@ jobs:
             echo "type=reels" >> $GITHUB_OUTPUT
           fi
 
+      - name: Debug token
+        env:
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+        run: |
+          echo "Token uzunluğu: ${#INSTAGRAM_ACCESS_TOKEN}"
+          echo "Token başı: ${INSTAGRAM_ACCESS_TOKEN:0:6}"
+          curl -s "https://graph.instagram.com/v21.0/me?fields=id,username&access_token=$INSTAGRAM_ACCESS_TOKEN"
+
       - name: Run content pipeline
         working-directory: instagram-agent
         env:
