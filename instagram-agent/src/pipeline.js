@@ -156,7 +156,9 @@ async function runPipeline() {
     // ADIM 5: Başarı Bildirimi
     // ─────────────────────────────────────
     if (!dryRun) {
-      await sendPublishNotification(finalContent, publishResult.url, runId);
+      await sendPublishNotification(finalContent, publishResult.url, runId).catch((e) =>
+        console.warn(`[Telegram] Bildirim gönderilemedi: ${e.message}`)
+      );
     }
 
     saveRunLog(runId, runLog);
