@@ -2,8 +2,29 @@
 // Post hazırlandığında Telegram'a önizleme gönderir ve onay bekler
 
 import TelegramBot from 'node-telegram-bot-api';
+import { refineContent } from './content-agent.js';
+import { generateImage } from './image-agent.js';
 
 const APPROVAL_TIMEOUT_MS = 4 * 60 * 60 * 1000; // 4 saat
+const INPUT_TIMEOUT_MS = 10 * 60 * 1000;        // 10 dk — talimat yazma süresi
+
+function buildKeyboard(runId) {
+  return {
+    inline_keyboard: [
+      [
+        { text: '✅ Onayla ve Yayınla', callback_data: `approve:${runId}` },
+        { text: '❌ İptal Et', callback_data: `reject:${runId}` },
+      ],
+      [
+        { text: '✏️ İçerik Düzenle', callback_data: `edit_content:${runId}` },
+        { text: '🎨 Görsel Değiştir', callback_data: `edit_image:${runId}` },
+      ],
+      [
+        { text: '🔄 Yeni İçerik Üret', callback_data: `regenerate:${runId}` },
+      ],
+    ],
+  };
+}
 
 export async function sendForApproval(content, mediaResult, runId) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -18,7 +39,6 @@ export async function sendForApproval(content, mediaResult, runId) {
   const postType = content.postType === 'reels' ? '🎬 Reels' : '🖼️ Görsel Post';
   const emoji = content.engagement_prediction === 'high' ? '🔥' : content.engagement_prediction === 'medium' ? '👍' : '📊';
 
-  // Önizleme mesajı
   const previewText = `
 *JobReel Instagram Post Onayı* ${emoji}
 
@@ -31,41 +51,26 @@ export async function sendForApproval(content, mediaResult, runId) {
 *📝 CAPTION ÖNİZLEME:*
 ${content.caption.slice(0, 500)}${content.caption.length > 500 ? '...' : ''}
 
-*🏷️ HASHTAG'LER (${content.hashtags?.length}):'*
+*🏷️ HASHTAG'LER (${content.hashtags?.length}):*
 ${content.hashtags?.slice(0, 10).join(' ')} ...
 
 ─────────────────
 *Ne yapmak istiyorsun?*
   `.trim();
 
-  const keyboard = {
-    inline_keyboard: [
-      [
-        { text: '✅ Onayla ve Yayınla', callback_data: `approve:${runId}` },
-        { text: '✏️ Caption Düzenle', callback_data: `edit_caption:${runId}` },
-      ],
-      [
-        { text: '🔄 Yeni İçerik Üret', callback_data: `regenerate:${runId}` },
-        { text: '❌ Bu Postu İptal Et', callback_data: `reject:${runId}` },
-      ],
-    ],
-  };
-
-  // Görseli gönder
   let sentMessage;
   try {
     if (mediaResult.isStatic || content.postType === 'image') {
       sentMessage = await bot.sendPhoto(chatId, mediaResult.url, {
         caption: previewText,
         parse_mode: 'Markdown',
-        reply_markup: keyboard,
+        reply_markup: buildKeyboard(runId),
       });
     } else {
-      // Video
       sentMessage = await bot.sendVideo(chatId, mediaResult.url, {
         caption: previewText,
         parse_mode: 'Markdown',
-        reply_markup: keyboard,
+        reply_markup: buildKeyboard(runId),
         supports_streaming: true,
       });
     }
@@ -73,69 +78,128 @@ ${content.hashtags?.slice(0, 10).join(' ')} ...
     console.warn('[TelegramApproval] Medya gönderilemedi, text olarak deniyor:', mediaErr.message);
     sentMessage = await bot.sendMessage(chatId, previewText + `\n\n*Görsel URL:* ${mediaResult.url}`, {
       parse_mode: 'Markdown',
-      reply_markup: keyboard,
+      reply_markup: buildKeyboard(runId),
     });
   }
 
   console.log(`[TelegramApproval] ✅ Onay mesajı gönderildi (message_id: ${sentMessage.message_id})`);
 
-  // Callback bekleme (polling ile)
-  return waitForApproval(bot, chatId, runId, content, sentMessage.message_id);
+  return waitForApproval(bot, chatId, runId, content, mediaResult);
 }
 
-function waitForApproval(bot, chatId, runId, content, messageId) {
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
+function waitForApproval(bot, chatId, runId, initialContent, initialMedia) {
+  return new Promise((resolve) => {
+    let currentContent = { ...initialContent };
+    let currentMedia = { ...initialMedia };
+    let expectingTextFor = null; // 'content_edit' | 'image_edit' | null
+    let isProcessing = false;
+
+    const mainTimeout = setTimeout(() => {
       bot.stopPolling();
-      console.log('[TelegramApproval] ⏰ Timeout: 4 saat içinde yanıt gelmedi, post atlandı');
+      console.log('[TelegramApproval] ⏰ Timeout: 4 saat içinde yanıt gelmedi');
       resolve({ action: 'timeout', runId });
     }, APPROVAL_TIMEOUT_MS);
 
-    // Polling başlat
+    function finish(result) {
+      clearTimeout(mainTimeout);
+      bot.stopPolling();
+      resolve(result);
+    }
+
     bot.startPolling({ timeout: 60, allowed_updates: ['callback_query', 'message'] });
 
     bot.on('callback_query', async (query) => {
-      if (!query.data.includes(runId)) return; // Başka run'ın callback'i
-
-      clearTimeout(timeout);
-      bot.stopPolling();
+      if (!query.data.endsWith(`:${runId}`)) return;
+      if (isProcessing) {
+        await bot.answerCallbackQuery(query.id, { text: '⏳ İşlem devam ediyor...' }).catch(() => {});
+        return;
+      }
 
       const [action] = query.data.split(':');
-
-      // Butonu devre dışı bırak
-      await bot.editMessageReplyMarkup(
-        { inline_keyboard: [[{ text: `→ ${getActionLabel(action)}`, callback_data: 'done' }]] },
-        { chat_id: chatId, message_id: messageId }
-      ).catch(() => {});
-
-      await bot.answerCallbackQuery(query.id, { text: getActionLabel(action) });
+      await bot.answerCallbackQuery(query.id, { text: getActionLabel(action) }).catch(() => {});
 
       if (action === 'approve') {
         await bot.sendMessage(chatId, '🚀 Post yayınlanıyor...');
-        resolve({ action: 'approve', runId });
-
-      } else if (action === 'edit_caption') {
-        await bot.sendMessage(chatId, '✏️ Yeni caption\'ı yaz (sonraki mesajın caption olarak kaydedilecek):');
-
-        // Sonraki text mesajını caption olarak al
-        bot.startPolling();
-        bot.once('message', async (msg) => {
-          bot.stopPolling();
-          if (msg.chat.id.toString() === chatId.toString() && msg.text) {
-            content.caption = msg.text;
-            await bot.sendMessage(chatId, '✅ Caption güncellendi, yayınlanıyor...');
-            resolve({ action: 'approve', runId, updatedContent: content });
-          }
-        });
-
-      } else if (action === 'regenerate') {
-        await bot.sendMessage(chatId, '🔄 Yeni içerik üretiliyor, bekle...');
-        resolve({ action: 'regenerate', runId });
+        finish({ action: 'approve', runId, updatedContent: currentContent, updatedMedia: currentMedia });
 
       } else if (action === 'reject') {
         await bot.sendMessage(chatId, '❌ Post iptal edildi.');
-        resolve({ action: 'reject', runId });
+        finish({ action: 'reject', runId });
+
+      } else if (action === 'regenerate') {
+        await bot.sendMessage(chatId, '🔄 Yeni içerik üretiliyor, bekle...');
+        finish({ action: 'regenerate', runId });
+
+      } else if (action === 'edit_content') {
+        expectingTextFor = 'content_edit';
+        await bot.sendMessage(chatId,
+          '✏️ *İçerik talimatını yaz:*\n\nÖrn: "daha kısa yap", "daha enerjik ton kullan", "CTA güçlendir", "hashtag\'leri güncelle"',
+          { parse_mode: 'Markdown' }
+        );
+
+      } else if (action === 'edit_image') {
+        expectingTextFor = 'image_edit';
+        await bot.sendMessage(chatId,
+          '🎨 *Görsel talimatını yaz:*\n\nÖrn: "daha aydınlık zemin", "kadın karakter ekle", "İstanbul silueti arka planda"',
+          { parse_mode: 'Markdown' }
+        );
       }
+    });
+
+    bot.on('message', async (msg) => {
+      if (msg.chat.id.toString() !== chatId.toString()) return;
+      if (!msg.text || !expectingTextFor || isProcessing) return;
+
+      const instruction = msg.text;
+      const mode = expectingTextFor;
+      expectingTextFor = null;
+      isProcessing = true;
+
+      if (mode === 'content_edit') {
+        await bot.sendMessage(chatId, `⏳ Groq işliyor: _"${instruction}"_`, { parse_mode: 'Markdown' });
+        try {
+          currentContent = await refineContent(currentContent, instruction);
+
+          const captionPreview = currentContent.caption.slice(0, 800);
+          const hasMore = currentContent.caption.length > 800;
+          await bot.sendMessage(chatId,
+            `✅ *İçerik güncellendi:*\n\n${captionPreview}${hasMore ? '...' : ''}\n\n*Hashtag'ler:* ${currentContent.hashtags?.slice(0, 8).join(' ')}`,
+            { parse_mode: 'Markdown', reply_markup: buildKeyboard(runId) }
+          );
+        } catch (err) {
+          console.error('[TelegramApproval] refineContent hatası:', err.message);
+          await bot.sendMessage(chatId,
+            `❌ Groq hatası: ${err.message}\n\nOrijinal içerik korundu.`,
+            { reply_markup: buildKeyboard(runId) }
+          );
+        }
+
+      } else if (mode === 'image_edit') {
+        await bot.sendMessage(chatId, `⏳ Görsel prompt güncelleniyor ve görsel üretiliyor: _"${instruction}"_`, { parse_mode: 'Markdown' });
+        try {
+          // image_prompt'u Groq ile güncelle
+          const refined = await refineContent(currentContent, `Sadece image_prompt alanını şu talimata göre güncelle, diğer alanları aynen koru: ${instruction}`);
+          currentContent = { ...currentContent, image_prompt: refined.image_prompt };
+
+          // Yeni görseli üret
+          const imageFormat = currentContent.postType === 'reels' ? 'story' : 'portrait';
+          currentMedia = await generateImage(currentContent, { format: imageFormat });
+
+          await bot.sendPhoto(chatId, currentMedia.url, {
+            caption: `🎨 *Yeni görsel hazır*\n\n_Prompt: ${currentContent.image_prompt.slice(0, 200)}_`,
+            parse_mode: 'Markdown',
+            reply_markup: buildKeyboard(runId),
+          });
+        } catch (err) {
+          console.error('[TelegramApproval] görsel üretim hatası:', err.message);
+          await bot.sendMessage(chatId,
+            `❌ Görsel üretim hatası: ${err.message}\n\nEski görsel korundu.`,
+            { reply_markup: buildKeyboard(runId) }
+          );
+        }
+      }
+
+      isProcessing = false;
     });
   });
 }
@@ -143,7 +207,8 @@ function waitForApproval(bot, chatId, runId, content, messageId) {
 function getActionLabel(action) {
   const labels = {
     approve: '✅ Onaylandı',
-    edit_caption: '✏️ Caption Düzenleniyor',
+    edit_content: '✏️ İçerik Düzenleniyor',
+    edit_image: '🎨 Görsel Değiştiriliyor',
     regenerate: '🔄 Yeniden Üretiliyor',
     reject: '❌ İptal Edildi',
     timeout: '⏰ Zaman Aşımı',
@@ -151,7 +216,6 @@ function getActionLabel(action) {
   return labels[action] || action;
 }
 
-// Post yayınlandıktan sonra bildirim gönder
 export async function sendPublishNotification(content, postUrl, runId) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_CHAT_ID;

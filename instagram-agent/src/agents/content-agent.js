@@ -148,6 +148,54 @@ function getMockContent(theme, postType) {
   };
 }
 
+export async function refineContent(existingContent, instruction) {
+  if (process.env.DRY_RUN === 'true') {
+    return { ...existingContent, caption: `[REFINED: ${instruction}]\n\n${existingContent.caption}` };
+  }
+
+  const systemPrompt = `Sen JobReel Instagram içerik editörüsün. Mevcut post içeriğini verilen talimata göre düzenle.
+
+Sadece talimatla ilgili alanları güncelle, diğerlerini aynen koru.
+Marka renkleri: Koyu lacivert (#0A1628), canlı turuncu (#FF6B35).
+Caption Türkçe, image_prompt İngilizce olmalı.
+Mutlaka valid JSON döndür, başka hiçbir şey yazma.`;
+
+  const userPrompt = `Mevcut içerik:
+\`\`\`json
+${JSON.stringify({
+    caption: existingContent.caption,
+    hashtags: existingContent.hashtags,
+    image_prompt: existingContent.image_prompt,
+  }, null, 2)}
+\`\`\`
+
+Talimat: ${instruction}
+
+Yalnızca şu 3 alanı içeren JSON döndür (sadece değiştirilenleri güncelle, diğerlerini koru):
+{ "caption": "...", "hashtags": [...], "image_prompt": "..." }`;
+
+  const response = await client.chat.completions.create({
+    model: 'llama-3.3-70b-versatile',
+    max_tokens: 1500,
+    temperature: 0.7,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ],
+  });
+
+  const rawText = response.choices[0].message.content.trim();
+  const jsonText = rawText.replace(/```json\n?|\n?```/g, '').trim();
+  const refined = JSON.parse(jsonText);
+
+  return {
+    ...existingContent,
+    ...(refined.caption && { caption: refined.caption }),
+    ...(refined.hashtags?.length && { hashtags: refined.hashtags }),
+    ...(refined.image_prompt && { image_prompt: refined.image_prompt }),
+  };
+}
+
 // CLI çalıştırma
 if (process.argv[1].includes('content-agent.js')) {
   const dryRun = process.argv.includes('--dry-run');

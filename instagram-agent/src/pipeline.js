@@ -119,8 +119,9 @@ async function runPipeline() {
       return;
     }
 
-    // Caption güncellendiyse kullan
+    // İçerik veya görsel Telegram'dan güncellendiyse kullan
     const finalContent = approvalResult.updatedContent || content;
+    const finalMedia = approvalResult.updatedMedia || mediaResult;
     log('success', 'Onay alındı, yayınlanıyor...');
 
     // ─────────────────────────────────────
@@ -132,18 +133,14 @@ async function runPipeline() {
     if (dryRun) {
       log('info', 'DRY RUN: Yayın simüle ediliyor');
       publishResult = { mediaId: 'mock-123', url: 'https://instagram.com/p/mock', type: postType.toUpperCase() };
-    } else if (postType === 'reels' && !mediaResult.isStatic) {
+    } else if (postType === 'reels' && !finalMedia.isStatic) {
       publishResult = await publishReels(
         finalContent,
-        mediaResult.url,
-        mediaResult.cover_url
+        finalMedia.url,
+        finalMedia.cover_url
       );
-    } else if (finalContent.carousel_slides?.length > 1 && postType === 'image') {
-      // Carousel için aynı görseli birden fazla slide olarak kullan
-      // Gerçek kullanımda her slide için ayrı görsel üretilmeli
-      publishResult = await publishImagePost(finalContent, mediaResult.url);
     } else {
-      publishResult = await publishImagePost(finalContent, mediaResult.url);
+      publishResult = await publishImagePost(finalContent, finalMedia.url);
     }
 
     runLog.steps.publishing = publishResult;
