@@ -33,11 +33,15 @@ export async function generateImage(content, options = {}) {
   const seed = Date.now() % 1000000;
   const url = `${POLLINATIONS_BASE}/${encodeURIComponent(fullPrompt)}?width=${dims.width}&height=${dims.height}&seed=${seed}&model=flux&nologo=true`;
 
-  // URL'nin erişilebilir olduğunu doğrula
-  const response = await fetch(url, { method: 'HEAD' });
-  if (!response.ok) throw new Error(`Pollinations error ${response.status}`);
+  console.log(`[ImageAgent] URL: ${url.slice(0, 100)}...`);
 
-  console.log(`[ImageAgent] ✅ Görsel hazır`);
+  // Görseli tam olarak indir — Instagram fetch ettiğinde cache'de hazır olsun
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Pollinations error ${response.status}`);
+  const contentType = response.headers.get('content-type') || '';
+  if (!contentType.includes('image')) throw new Error(`Pollinations beklenmedik içerik: ${contentType}`);
+
+  console.log(`[ImageAgent] ✅ Görsel hazır (${contentType})`);
   return {
     url,
     width: dims.width,

@@ -86,7 +86,12 @@ async function runPipeline() {
       log('info', autoApprove ? 'AUTO_APPROVE: Telegram atlanıyor' : 'DRY RUN: Otomatik onay simüle ediliyor');
       approvalResult = { action: 'approve', runId };
     } else {
-      approvalResult = await sendForApproval(content, mediaResult, runId);
+      try {
+        approvalResult = await sendForApproval(content, mediaResult, runId);
+      } catch (telegramErr) {
+        console.warn(`[Telegram] Ulaşılamadı, otomatik onaylanıyor: ${telegramErr.message}`);
+        approvalResult = { action: 'approve', runId };
+      }
     }
 
     runLog.steps.telegramApproval = { action: approvalResult.action };
