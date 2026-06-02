@@ -168,23 +168,46 @@ function formatCaption(content) {
   return combined.slice(0, 2200);
 }
 
-// Token geçerliliğini kontrol et
+// Token geçerliliğini kontrol et + otomatik yenile
 export async function checkTokenValidity() {
   const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN;
+
+  if (!accessToken) {
+    return { valid: false, error: 'INSTAGRAM_ACCESS_TOKEN env değişkeni eksik' };
+  }
+
   try {
+    // debug_token yerine doğrudan /me endpoint'ini kullan
     const info = await igRequest(
-      `https://graph.facebook.com/debug_token?input_token=${accessToken}&access_token=${accessToken}`
+      `https://graph.instagram.com/v21.0/me?fields=id,username&access_token=${accessToken}`
     );
-    const expiresAt = new Date(info.data?.expires_at * 1000);
-    const daysLeft = Math.floor((expiresAt - Date.now()) / (1000 * 60 * 60 * 24));
 
-    console.log(`[Instagram] Token geçerli. ${daysLeft} gün kaldı (${expiresAt.toLocaleDateString('tr-TR')})`);
+    console.log(`[Instagram] Token geçerli. Kullanıcı: @${info.username}`);
 
-    if (daysLeft < 10) {
-      console.warn('[Instagram] ⚠️ Token 10 günden az kaldı! Yenilemeyi unutma.');
+    // Token'ı yenilemeyi dene (60 gün içindeyse yenilenir)
+    try {
+      const refreshed = await igRequest(
+        `https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=${accessToken}`
+      );
+
+      if (refreshed.access_token) {
+        process.env.INSTAGRAM_ACCESS_TOKEN = refreshed.access_token;
+
+        const expiresInDays = Math.floor(refreshed.expires_in / 86400);
+        console.log(`[Instagram] ✅ Token yenilendi! ${expiresInDays} gün daha geçerli.`);
+
+        if (refreshed.access_token !== accessToken) {
+          console.warn('[Instagram] ⚠️ Yeni token aşağıda — GitHub Secret\'ı güncelle:');
+          console.warn(`NEW_TOKEN=${refreshed.access_token}`);
+        }
+      }
+    } catch (refreshErr) {
+      // Refresh başarısız olsa da token hâlâ geçerliyse devam et
+      console.warn(`[Instagram] Token yenilenemedi (önemli değil): ${refreshErr.message}`);
     }
 
-    return { valid: true, daysLeft, expiresAt };
+    return { valid: true };
+
   } catch (err) {
     console.error('[Instagram] ❌ Token geçersiz:', err.message);
     return { valid: false, error: err.message };
