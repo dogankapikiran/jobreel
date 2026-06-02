@@ -1,0 +1,57 @@
+name: JobReel Instagram Story
+
+on:
+  schedule:
+    # Her gün 09:00 Istanbul (UTC+3 = 06:00 UTC)
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (no publish)'
+        required: false
+        default: 'false'
+      auto_approve:
+        description: 'Telegram onayı atla, direkt yayınla'
+        required: false
+        default: 'false'
+
+jobs:
+  post-story:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: instagram-agent/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: instagram-agent
+
+      - name: Run story pipeline
+        working-directory: instagram-agent
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+          POST_TYPE: story
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          AUTO_APPROVE: ${{ github.event.inputs.auto_approve || 'false' }}
+        run: node src/pipeline.js
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: story-output-${{ github.run_id }}
+          path: instagram-agent/output/
+          retention-days: 7

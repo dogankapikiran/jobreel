@@ -6,7 +6,7 @@ import { randomUUID } from 'crypto';
 import { generateContent } from './agents/content-agent.js';
 import { generateImage, generateReelsVideo } from './agents/image-agent.js';
 import { sendForApproval, sendPublishNotification, sendErrorNotification } from './agents/telegram-approval.js';
-import { publishImagePost, publishCarouselPost, publishReels, checkTokenValidity } from './publishers/instagram.js';
+import { publishImagePost, publishCarouselPost, publishReels, publishStory, checkTokenValidity } from './publishers/instagram.js';
 import { saveRunLog, log } from './utils/logger.js';
 
 async function runPipeline() {
@@ -60,11 +60,10 @@ async function runPipeline() {
 
     if (postType === 'reels') {
       mediaResult = await generateReelsVideo(content, { dryRun });
+    } else if (postType === 'story') {
+      mediaResult = await generateImage(content, { format: 'story', dryRun });
     } else {
-      mediaResult = await generateImage(content, {
-        format: 'portrait',
-        dryRun,
-      });
+      mediaResult = await generateImage(content, { format: 'portrait', dryRun });
     }
 
     runLog.steps.mediaGeneration = {
@@ -133,12 +132,10 @@ async function runPipeline() {
     if (dryRun) {
       log('info', 'DRY RUN: Yayın simüle ediliyor');
       publishResult = { mediaId: 'mock-123', url: 'https://instagram.com/p/mock', type: postType.toUpperCase() };
+    } else if (postType === 'story') {
+      publishResult = await publishStory(finalContent, finalMedia.url);
     } else if (postType === 'reels' && !finalMedia.isStatic) {
-      publishResult = await publishReels(
-        finalContent,
-        finalMedia.url,
-        finalMedia.cover_url
-      );
+      publishResult = await publishReels(finalContent, finalMedia.url, finalMedia.cover_url);
     } else {
       publishResult = await publishImagePost(finalContent, finalMedia.url);
     }

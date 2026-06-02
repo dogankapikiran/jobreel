@@ -36,7 +36,8 @@ export async function sendForApproval(content, mediaResult, runId) {
 
   const bot = new TelegramBot(token, { polling: false });
 
-  const postType = content.postType === 'reels' ? '🎬 Reels' : '🖼️ Görsel Post';
+  const postTypeLabels = { reels: '🎬 Reels', story: '📱 Story', image: '🖼️ Görsel Post' };
+  const postType = postTypeLabels[content.postType] || '🖼️ Görsel Post';
   const emoji = content.engagement_prediction === 'high' ? '🔥' : content.engagement_prediction === 'medium' ? '👍' : '📊';
 
   const previewText = `
@@ -182,7 +183,7 @@ function waitForApproval(bot, chatId, runId, initialContent, initialMedia) {
           currentContent = { ...currentContent, image_prompt: refined.image_prompt };
 
           // Yeni görseli üret
-          const imageFormat = currentContent.postType === 'reels' ? 'story' : 'portrait';
+          const imageFormat = (currentContent.postType === 'reels' || currentContent.postType === 'story') ? 'story' : 'portrait';
           currentMedia = await generateImage(currentContent, { format: imageFormat });
 
           await bot.sendPhoto(chatId, currentMedia.url, {

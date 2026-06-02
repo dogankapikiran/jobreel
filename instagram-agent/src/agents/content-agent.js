@@ -18,8 +18,25 @@ export async function generateContent(options = {}) {
   console.log(`[ContentAgent] Theme: ${selectedTheme.id} | Type: ${postType}`);
 
   const isReels = postType === 'reels';
+  const isStory = postType === 'story';
 
-  const systemPrompt = `Sen JobReel için Instagram içerik üreten uzman bir sosyal medya editörüsün.
+  const systemPrompt = isStory
+    ? `Sen JobReel için Instagram Story içeriği üreten uzman bir sosyal medya editörüsün.
+
+${BRAND_VOICE}
+
+Görevin: Verilen tema için çarpıcı bir Story üretmek.
+
+ÇIKTI FORMATI: Yalnızca aşağıdaki JSON yapısını döndür, başka hiçbir şey yazma:
+{
+  "caption": "Story açıklaması (sadece iç takip için, max 100 karakter)",
+  "hashtags": ["#tag1", "#tag2"],
+  "image_prompt": "9:16 dikey Story görseli için İngilizce prompt (çok detaylı, bold typography uyumlu)",
+  "alt_text": "Görsel için erişilebilirlik metni (Türkçe)",
+  "story_hook": "Ekrana büyük yazılacak tek cümle (max 8 kelime, Türkçe, dikkat çekici)",
+  "engagement_prediction": "low/medium/high"
+}`
+    : `Sen JobReel için Instagram içerik üreten uzman bir sosyal medya editörüsün.
 
 ${BRAND_VOICE}
 
@@ -51,7 +68,19 @@ Görevin: Verilen tema için eksiksiz bir Instagram post paketi üretmek.
   "ab_caption_variant": "Alternatif caption versiyonu"
 }`;
 
-  const userPrompt = `Bu hafta için post üret:
+  const userPrompt = isStory
+    ? `Bugün için bir Story üret:
+
+Tema ID: ${selectedTheme.id}
+Tema Başlığı: ${selectedTheme.title}
+Hook: ${selectedTheme.hook}
+Açı: ${selectedTheme.angle}
+
+Önemli notlar:
+- story_hook: Bold yazılacak, max 8 kelime, vurucu
+- image_prompt: 9:16 dikey, koyu lacivert (#0A1628) ağırlıklı, turuncu (#FF6B35) aksanlar, flat design, metin alanı için sade zemin
+- JobReel marka estetiği: modern, minimal, Türk iş dünyası`
+    : `Bu hafta için post üret:
 
 Tema ID: ${selectedTheme.id}
 Tema Başlığı: ${selectedTheme.title}
@@ -111,6 +140,22 @@ Gün: ${isReels ? 'Cuma' : 'Salı'}
 }
 
 function getMockContent(theme, postType) {
+  if (postType === 'story') {
+    return {
+      caption: `[MOCK] ${theme.title}`,
+      hashtags: ['#jobreel', '#kariyer'],
+      image_prompt:
+        'Vertical 9:16 story format, dark navy blue background #0A1628, large bold orange text area #FF6B35, minimal flat design, Turkish professional context, no clutter',
+      alt_text: `${theme.title} hakkında JobReel Story görseli`,
+      story_hook: theme.hook.slice(0, 50),
+      engagement_prediction: 'medium',
+      theme,
+      postType,
+      generatedAt: new Date().toISOString(),
+      _mock: true,
+    };
+  }
+
   return {
     caption: `🎯 ${theme.hook}\n\n${theme.angle}\n\n${theme.cta} 👇\n\n#jobreel #kariyer`,
     hashtags: ['#jobreel', '#kariyer', '#iş', '#işbul'],

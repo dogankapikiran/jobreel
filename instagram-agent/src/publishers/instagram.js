@@ -61,6 +61,39 @@ export async function publishImagePost(content, imageUrl) {
   };
 }
 
+// Story post
+export async function publishStory(content, imageUrl) {
+  const accountId = process.env.INSTAGRAM_ACCOUNT_ID;
+  const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN;
+
+  if (!accountId || !accessToken) {
+    throw new Error('INSTAGRAM_ACCOUNT_ID veya INSTAGRAM_ACCESS_TOKEN eksik');
+  }
+
+  console.log('[Instagram] Story container oluşturuluyor...');
+
+  const container = await igRequest(`/${accountId}/media?access_token=${accessToken}`, 'POST', {
+    image_url: imageUrl,
+    media_type: 'STORIES',
+  });
+
+  if (!container.id) throw new Error('Story container ID alınamadı');
+  console.log(`[Instagram] Story container: ${container.id}`);
+
+  await waitForContainer(container.id, accessToken);
+
+  const publish = await igRequest(`/${accountId}/media_publish?access_token=${accessToken}`, 'POST', {
+    creation_id: container.id,
+  });
+
+  console.log(`[Instagram] ✅ Story yayınlandı! Media ID: ${publish.id}`);
+  return {
+    mediaId: publish.id,
+    url: `https://www.instagram.com/stories/jobreel/${publish.id}`,
+    type: 'STORY',
+  };
+}
+
 // Carousel post (birden fazla görsel)
 export async function publishCarouselPost(content, imageUrls) {
   const accountId = process.env.INSTAGRAM_ACCOUNT_ID;
