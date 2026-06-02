@@ -80,8 +80,10 @@ async function runPipeline() {
     log('info', 'ADIM 3: Telegram onayı bekleniyor...');
     let approvalResult;
 
-    if (dryRun) {
-      log('info', 'DRY RUN: Otomatik onay simüle ediliyor');
+    const autoApprove = process.env.AUTO_APPROVE === 'true';
+
+    if (dryRun || autoApprove) {
+      log('info', autoApprove ? 'AUTO_APPROVE: Telegram atlanıyor' : 'DRY RUN: Otomatik onay simüle ediliyor');
       approvalResult = { action: 'approve', runId };
     } else {
       approvalResult = await sendForApproval(content, mediaResult, runId);

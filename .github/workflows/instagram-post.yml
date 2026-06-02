@@ -16,6 +16,10 @@ on:
         description: 'Dry run (no publish)'
         required: false
         default: 'false'
+      auto_approve:
+        description: 'Telegram onayı atla, direkt yayınla'
+        required: false
+        default: 'false'
 
 jobs:
   generate-and-queue:
@@ -59,6 +63,7 @@ jobs:
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           POST_TYPE: ${{ steps.post-type.outputs.type }}
           DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+          AUTO_APPROVE: ${{ github.event.inputs.auto_approve || 'false' }}
         run: node src/pipeline.js
 
       - name: Upload artifacts
