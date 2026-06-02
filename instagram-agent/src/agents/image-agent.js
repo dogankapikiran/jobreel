@@ -67,11 +67,9 @@ export async function generateImage(content, options = {}) {
     // FLUX ile yüksek kaliteli görsel üret
     const result = await falRequest('fal-ai/flux/schnell', {
       prompt: fullPrompt,
-      negative_prompt: negativePrompt,
-      image_size: `${dims.width}x${dims.height}`,
+      image_size: { width: dims.width, height: dims.height },
       num_images: 1,
-      num_inference_steps: 4, // schnell için optimal
-      guidance_scale: 3.5,
+      num_inference_steps: 4,
     });
 
     const imageUrl = result.images?.[0]?.url;
@@ -86,23 +84,8 @@ export async function generateImage(content, options = {}) {
       prompt: fullPrompt,
     };
   } catch (err) {
-    console.error('[ImageAgent] ❌ FLUX başarısız, SD fallback deneniyor...');
-
-    // Fallback: Stable Diffusion XL
-    try {
-      const result = await falRequest('fal-ai/stable-diffusion-xl', {
-        prompt: fullPrompt,
-        negative_prompt: negativePrompt,
-        width: dims.width,
-        height: dims.height,
-        num_images: 1,
-      });
-
-      const imageUrl = result.images?.[0]?.url;
-      return { url: imageUrl, width: dims.width, height: dims.height, model: 'sdxl' };
-    } catch (fallbackErr) {
-      throw new Error(`Görsel üretim başarısız: ${fallbackErr.message}`);
-    }
+    console.error(`[ImageAgent] ❌ FLUX başarısız: ${err.message}`);
+    throw new Error(`Görsel üretim başarısız: ${err.message}`);
   }
 }
 
