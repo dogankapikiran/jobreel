@@ -1,10 +1,10 @@
 // src/agents/content-agent.js
 // Claude API kullanarak post içeriği ve görsel promptu üretir
 
-import Anthropic from '@anthropic-ai/sdk';
+import Groq from 'groq-sdk';
 import { getThemeForDate, BRAND_VOICE, HASHTAG_POOLS } from '../../templates/content-themes.js';
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+const client = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 export async function generateContent(options = {}) {
   const {
@@ -75,14 +75,16 @@ Gün: ${isReels ? 'Cuma' : 'Salı'}
   }
 
   try {
-    const response = await client.messages.create({
-      model: 'claude-opus-4-5',
+    const response = await client.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
       max_tokens: 2000,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }],
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userPrompt },
+      ],
     });
 
-    const rawText = response.content[0].text.trim();
+    const rawText = response.choices[0].message.content.trim();
 
     // JSON fence temizle
     const jsonText = rawText.replace(/```json\n?|\n?```/g, '').trim();
