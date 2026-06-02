@@ -1,0 +1,71 @@
+name: JobReel Instagram Post
+
+on:
+  schedule:
+    # Salı 10:00 Istanbul (UTC+3 = 07:00 UTC)
+    - cron: '0 7 * * 2'
+    # Cuma 10:00 Istanbul
+    - cron: '0 7 * * 5'
+  workflow_dispatch:
+    inputs:
+      post_type:
+        description: 'Post type: image or reels'
+        required: false
+        default: 'auto'
+      dry_run:
+        description: 'Dry run (no publish)'
+        required: false
+        default: 'false'
+
+jobs:
+  generate-and-queue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: instagram-agent/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: instagram-agent
+
+      - name: Determine post type
+        id: post-type
+        run: |
+          DAY=$(date +%u)
+          if [ "${{ github.event.inputs.post_type }}" != "" ] && [ "${{ github.event.inputs.post_type }}" != "auto" ]; then
+            echo "type=${{ github.event.inputs.post_type }}" >> $GITHUB_OUTPUT
+          elif [ "$DAY" = "2" ]; then
+            echo "type=image" >> $GITHUB_OUTPUT
+          else
+            echo "type=reels" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run content pipeline
+        working-directory: instagram-agent
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          FAL_API_KEY: ${{ secrets.FAL_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
+          INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
+          POST_TYPE: ${{ steps.post-type.outputs.type }}
+          DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
+        run: node src/pipeline.js
+
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pipeline-output-${{ github.run_id }}
+          path: instagram-agent/output/
+          retention-days: 7
