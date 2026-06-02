@@ -34,12 +34,12 @@ export async function publishImagePost(content, imageUrl) {
 
   const caption = formatCaption(content);
   console.log('[Instagram] Görsel container oluşturuluyor...');
+  console.log(`[Instagram] Görsel URL: ${imageUrl.slice(0, 80)}...`);
 
   // Step 1: Media container oluştur
   const container = await igRequest(`/${accountId}/media?access_token=${accessToken}`, 'POST', {
     image_url: imageUrl,
     caption: caption,
-    media_type: 'IMAGE',
   });
 
   if (!container.id) throw new Error('Container ID alınamadı');
