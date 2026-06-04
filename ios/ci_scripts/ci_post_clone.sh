@@ -13,6 +13,6 @@ nvm use --lts
 cd "$CI_PRIMARY_REPOSITORY_PATH"
 npm install
 
-# Install CocoaPods dependencies
+# Install CocoaPods dependencies (--clean-install prevents stale hermes-engine rsync errors)
 cd "$CI_PRIMARY_REPOSITORY_PATH/ios"
-pod install
+pod install --clean-install
