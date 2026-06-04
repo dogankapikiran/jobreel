@@ -10,7 +10,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.jobreel.app",
-      "buildNumber": "22",
+      "buildNumber": "27",
       "minimumOsVersion": "15.1",
       "entitlements": {
         "aps-environment": "production"
