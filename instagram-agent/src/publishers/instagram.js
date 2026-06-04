@@ -26,7 +26,11 @@ function getCredentials() {
 }
 
 async function igRequest(endpoint, method = 'GET', body = null) {
-  const url = endpoint.startsWith('http') ? endpoint : `${IG_API_BASE}${endpoint}`;
+  const { accessToken } = getCredentials();
+  const isIGToken = accessToken.startsWith('IGAA') || accessToken.startsWith('IGQV') || accessToken.startsWith('IGAAV');
+  const apiBase = isIGToken ? 'https://graph.instagram.com/v21.0' : 'https://graph.facebook.com/v21.0';
+
+  const url = endpoint.startsWith('http') ? endpoint : `${apiBase}${endpoint}`;
 
   const options = {
     method,
@@ -245,9 +249,9 @@ export async function checkTokenValidity() {
   }
 
   try {
-    // graph.facebook.com üzerinden token'ı doğrula
+    // graph.facebook.com veya graph.instagram.com üzerinden token'ı doğrula
     const info = await igRequest(
-      `${IG_API_BASE}/${accountId}?fields=id,username,name,profile_picture_url&access_token=${encodeURIComponent(accessToken)}`
+      `/${accountId}?fields=id,username,name,profile_picture_url&access_token=${encodeURIComponent(accessToken)}`
     );
 
     console.log(`[Instagram] ✅ Token geçerli. Kullanıcı: @${info.username || info.name || info.id}`);
@@ -255,7 +259,7 @@ export async function checkTokenValidity() {
     // Token'ın kalan süresini kontrol et
     try {
       const debugInfo = await igRequest(
-        `${IG_API_BASE}/debug_token?input_token=${encodeURIComponent(accessToken)}&access_token=${encodeURIComponent(accessToken)}`
+        `/debug_token?input_token=${encodeURIComponent(accessToken)}&access_token=${encodeURIComponent(accessToken)}`
       );
       if (debugInfo.data?.expires_at) {
         const expiresAt = new Date(debugInfo.data.expires_at * 1000);
@@ -270,7 +274,7 @@ export async function checkTokenValidity() {
     }
 
     // Token yenilemeyi dene — IGAAV tokenlar için Instagram endpoint, EAA için Facebook
-    const isIGToken = accessToken.startsWith('IGAA') || accessToken.startsWith('IGQV');
+    const isIGToken = accessToken.startsWith('IGAA') || accessToken.startsWith('IGQV') || accessToken.startsWith('IGAAV');
     try {
       let refreshed;
       if (isIGToken) {
@@ -281,7 +285,7 @@ export async function checkTokenValidity() {
       } else {
         // EAA token → Facebook fb_exchange_token
         refreshed = await igRequest(
-          `${IG_API_BASE}/oauth/access_token?grant_type=fb_exchange_token&client_id=${encodeURIComponent(process.env.META_APP_ID || '')}&client_secret=${encodeURIComponent(process.env.META_APP_SECRET || '')}&fb_exchange_token=${encodeURIComponent(accessToken)}`
+          `/oauth/access_token?grant_type=fb_exchange_token&client_id=${encodeURIComponent(process.env.META_APP_ID || '')}&client_secret=${encodeURIComponent(process.env.META_APP_SECRET || '')}&fb_exchange_token=${encodeURIComponent(accessToken)}`
         );
       }
 
