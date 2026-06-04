@@ -1,0 +1,1199 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JobReel Instagram Yönetim Paneli</title>
+  <meta name="description" content="JobReel Instagram otomasyon pipeline yönetim paneli" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --navy: #0A1628;
+      --navy-light: #0F1F38;
+      --navy-mid: #152747;
+      --orange: #FF6B35;
+      --orange-glow: #FF8B5E;
+      --blue: #2563EB;
+      --blue-light: #3B82F6;
+      --green: #10B981;
+      --red: #EF4444;
+      --yellow: #F59E0B;
+      --gray-100: #F3F4F6;
+      --gray-200: #E5E7EB;
+      --gray-300: #D1D5DB;
+      --gray-400: #9CA3AF;
+      --gray-500: #6B7280;
+      --gray-600: #4B5563;
+      --glass-bg: rgba(15, 31, 56, 0.6);
+      --glass-border: rgba(255, 107, 53, 0.15);
+      --shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+      --radius: 16px;
+      --radius-sm: 10px;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--navy);
+      color: var(--gray-100);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      top: -50%;
+      right: -20%;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(255,107,53,0.08) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    body::after {
+      content: '';
+      position: fixed;
+      bottom: -30%;
+      left: -10%;
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(37,99,235,0.06) 0%, transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .app { max-width: 1100px; margin: 0 auto; padding: 24px 20px 60px; position: relative; z-index: 1; }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 32px;
+      flex-wrap: wrap;
+    }
+
+    .header-left { display: flex; align-items: center; gap: 14px; }
+
+    .logo {
+      width: 44px; height: 44px;
+      background: linear-gradient(135deg, var(--orange), var(--orange-glow));
+      border-radius: 12px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px; font-weight: 800; color: white;
+      box-shadow: 0 4px 20px rgba(255,107,53,0.3);
+    }
+
+    .header h1 {
+      font-size: 22px; font-weight: 700;
+      background: linear-gradient(135deg, #fff 30%, var(--orange-glow));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .header h1 span { font-weight: 400; opacity: 0.7; font-size: 14px; display: block; -webkit-text-fill-color: var(--gray-400); }
+
+    .header-actions { display: flex; gap: 10px; align-items: center; }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 10px 20px; border: none; border-radius: var(--radius-sm);
+      font-family: inherit; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: all 0.25s ease;
+      text-decoration: none;
+    }
+
+    .btn:hover { transform: translateY(-1px); }
+    .btn:active { transform: translateY(0); }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--orange), #E85D2A);
+      color: white;
+      box-shadow: 0 4px 16px rgba(255,107,53,0.3);
+    }
+    .btn-primary:hover { box-shadow: 0 6px 24px rgba(255,107,53,0.45); }
+
+    .btn-secondary {
+      background: var(--navy-mid);
+      color: var(--gray-200);
+      border: 1px solid var(--glass-border);
+    }
+    .btn-secondary:hover { background: var(--navy-light); border-color: var(--orange); }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--gray-400);
+      padding: 8px 14px;
+    }
+    .btn-ghost:hover { color: var(--orange); }
+
+    .btn-sm { padding: 7px 14px; font-size: 12px; }
+
+    .btn-icon {
+      width: 38px; height: 38px; padding: 0;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--glass-border);
+      background: var(--glass-bg);
+      color: var(--gray-300);
+      cursor: pointer; font-size: 16px;
+      transition: all 0.2s;
+    }
+    .btn-icon:hover { border-color: var(--orange); color: var(--orange); background: var(--navy-mid); }
+
+    /* Cards */
+    .card {
+      background: var(--glass-bg);
+      backdrop-filter: blur(16px);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius);
+      padding: 24px;
+      box-shadow: var(--shadow);
+      transition: border-color 0.3s;
+    }
+    .card:hover { border-color: rgba(255,107,53,0.3); }
+
+    .card-title {
+      font-size: 14px; font-weight: 600; color: var(--gray-300);
+      text-transform: uppercase; letter-spacing: 0.05em;
+      margin-bottom: 18px;
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    .card-title .icon { font-size: 18px; }
+
+    /* Grid */
+    .grid { display: grid; gap: 20px; }
+    .grid-2 { grid-template-columns: 1fr 1fr; }
+    .grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+
+    @media (max-width: 768px) {
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+      .header { flex-direction: column; align-items: flex-start; }
+    }
+
+    /* Stats */
+    .stat-value {
+      font-size: 32px; font-weight: 800;
+      background: linear-gradient(135deg, #fff, var(--gray-300));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+      line-height: 1.1;
+    }
+    .stat-label { font-size: 12px; color: var(--gray-500); margin-top: 4px; }
+
+    /* Status badge */
+    .badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 4px 10px; border-radius: 20px;
+      font-size: 11px; font-weight: 600;
+    }
+    .badge-success { background: rgba(16,185,129,0.15); color: var(--green); }
+    .badge-error { background: rgba(239,68,68,0.15); color: var(--red); }
+    .badge-warning { background: rgba(245,158,11,0.15); color: var(--yellow); }
+    .badge-running { background: rgba(59,130,246,0.15); color: var(--blue-light); }
+    .badge-neutral { background: rgba(107,114,128,0.15); color: var(--gray-400); }
+
+    .badge-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: currentColor;
+      display: inline-block;
+    }
+
+    .badge-running .badge-dot {
+      animation: pulse-dot 1.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* Setup Screen */
+    .setup-screen {
+      display: flex; align-items: center; justify-content: center;
+      min-height: 80vh;
+    }
+
+    .setup-card {
+      max-width: 460px; width: 100%;
+      text-align: center;
+    }
+
+    .setup-card .logo {
+      width: 64px; height: 64px; font-size: 28px;
+      margin: 0 auto 24px;
+    }
+
+    .setup-card h2 {
+      font-size: 24px; font-weight: 700; margin-bottom: 8px;
+    }
+
+    .setup-card p {
+      color: var(--gray-400); font-size: 14px; margin-bottom: 28px; line-height: 1.6;
+    }
+
+    .input-group {
+      display: flex; flex-direction: column; gap: 8px;
+      text-align: left; margin-bottom: 20px;
+    }
+
+    .input-group label {
+      font-size: 12px; font-weight: 600; color: var(--gray-400);
+      text-transform: uppercase; letter-spacing: 0.05em;
+    }
+
+    input[type="text"], input[type="password"], select {
+      width: 100%;
+      padding: 12px 16px;
+      background: var(--navy-mid);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      color: var(--gray-100);
+      font-family: inherit; font-size: 14px;
+      transition: border-color 0.2s;
+      outline: none;
+    }
+
+    input:focus, select:focus {
+      border-color: var(--orange);
+      box-shadow: 0 0 0 3px rgba(255,107,53,0.1);
+    }
+
+    input::placeholder { color: var(--gray-600); }
+
+    .help-text { font-size: 11px; color: var(--gray-500); margin-top: 4px; }
+
+    /* Schedule */
+    .schedule-grid {
+      display: flex; flex-direction: column; gap: 14px;
+    }
+
+    .schedule-item {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 16px;
+      background: var(--navy-mid);
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(255,255,255,0.04);
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .schedule-item-left { display: flex; align-items: center; gap: 12px; flex: 1; min-width: 200px; }
+
+    .schedule-icon {
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .schedule-icon.post { background: rgba(255,107,53,0.12); }
+    .schedule-icon.story { background: rgba(37,99,235,0.12); }
+
+    .schedule-name { font-size: 14px; font-weight: 600; }
+    .schedule-cron { font-size: 12px; color: var(--gray-500); font-family: 'SF Mono', monospace; margin-top: 2px; }
+
+    .schedule-item-right { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+    .cron-inputs { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+    .cron-inputs select {
+      width: auto; padding: 6px 10px; font-size: 12px;
+      min-width: 80px;
+    }
+
+    .cron-inputs .cron-time { width: 70px; text-align: center; }
+
+    /* Run History */
+    .run-list { display: flex; flex-direction: column; gap: 8px; }
+
+    .run-item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px;
+      background: var(--navy-mid);
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(255,255,255,0.03);
+      transition: background 0.2s;
+    }
+    .run-item:hover { background: var(--navy-light); }
+
+    .run-item .run-info { flex: 1; min-width: 0; }
+    .run-item .run-name { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .run-item .run-meta { font-size: 11px; color: var(--gray-500); margin-top: 2px; }
+    .run-item .run-duration { font-size: 11px; color: var(--gray-500); white-space: nowrap; }
+
+    .run-item a { color: var(--gray-400); text-decoration: none; font-size: 13px; }
+    .run-item a:hover { color: var(--orange); }
+
+    /* Trigger Panel */
+    .trigger-grid { display: flex; gap: 12px; flex-wrap: wrap; }
+
+    .trigger-card {
+      flex: 1; min-width: 140px;
+      padding: 18px;
+      background: var(--navy-mid);
+      border-radius: var(--radius-sm);
+      border: 1px solid rgba(255,255,255,0.04);
+      cursor: pointer;
+      transition: all 0.25s;
+      text-align: center;
+    }
+    .trigger-card:hover { border-color: var(--orange); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+    .trigger-card .trigger-icon { font-size: 28px; margin-bottom: 8px; }
+    .trigger-card .trigger-label { font-size: 13px; font-weight: 600; }
+    .trigger-card .trigger-sub { font-size: 11px; color: var(--gray-500); margin-top: 4px; }
+
+    /* Token Status */
+    .token-info { display: flex; flex-direction: column; gap: 12px; }
+
+    .token-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+    .token-row:last-child { border-bottom: none; }
+
+    .token-key { font-size: 12px; color: var(--gray-500); font-weight: 500; }
+    .token-value { font-size: 13px; font-weight: 600; }
+
+    /* Toast */
+    .toast-container {
+      position: fixed; top: 20px; right: 20px; z-index: 1000;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+
+    .toast {
+      padding: 14px 20px;
+      background: var(--navy-light);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius-sm);
+      font-size: 13px; font-weight: 500;
+      box-shadow: 0 12px 40px rgba(0,0,0,0.4);
+      animation: toast-in 0.3s ease;
+      display: flex; align-items: center; gap: 10px;
+      max-width: 400px;
+    }
+
+    .toast-success { border-color: var(--green); }
+    .toast-error { border-color: var(--red); }
+
+    @keyframes toast-in {
+      from { opacity: 0; transform: translateX(20px); }
+      to { opacity: 1; transform: translateX(0); }
+    }
+
+    /* Loading */
+    .loading-spinner {
+      width: 20px; height: 20px;
+      border: 2px solid var(--navy-mid);
+      border-top-color: var(--orange);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      display: inline-block;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loading-overlay {
+      display: flex; align-items: center; justify-content: center;
+      padding: 40px; color: var(--gray-500);
+      gap: 12px; font-size: 13px;
+    }
+
+    /* Sections */
+    .section { margin-bottom: 24px; }
+    .section-title {
+      font-size: 13px; font-weight: 600; color: var(--gray-500);
+      text-transform: uppercase; letter-spacing: 0.06em;
+      margin-bottom: 14px;
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    /* Modal */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6);
+      backdrop-filter: blur(4px);
+      display: none; align-items: center; justify-content: center;
+      z-index: 100;
+    }
+    .modal-overlay.active { display: flex; }
+
+    .modal {
+      background: var(--navy-light);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--radius);
+      padding: 32px;
+      max-width: 480px; width: 90%;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.5);
+      animation: modal-in 0.3s ease;
+    }
+
+    @keyframes modal-in {
+      from { opacity: 0; transform: scale(0.95) translateY(10px); }
+      to { opacity: 1; transform: scale(1) translateY(0); }
+    }
+
+    .modal h3 { font-size: 18px; font-weight: 700; margin-bottom: 16px; }
+    .modal-actions { display: flex; gap: 10px; margin-top: 24px; justify-content: flex-end; }
+
+    /* Divider */
+    .divider { height: 1px; background: rgba(255,255,255,0.06); margin: 20px 0; }
+
+    /* Fade In Animations */
+    .fade-in { animation: fadeIn 0.4s ease; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+    .stagger-1 { animation-delay: 0.05s; }
+    .stagger-2 { animation-delay: 0.1s; }
+    .stagger-3 { animation-delay: 0.15s; }
+    .stagger-4 { animation-delay: 0.2s; }
+  </style>
+</head>
+<body>
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- Setup Screen -->
+  <div id="setup-screen" class="setup-screen" style="display:none">
+    <div class="setup-card card fade-in">
+      <div class="logo">J</div>
+      <h2>Instagram Yönetim Paneli</h2>
+      <p>GitHub Actions workflow'larını yönetmek için bir GitHub Personal Access Token (PAT) girin.<br/>
+        <strong>repo</strong> ve <strong>workflow</strong> scope'ları gereklidir.</p>
+      <div class="input-group">
+        <label>GitHub Personal Access Token</label>
+        <input type="password" id="setup-token" placeholder="ghp_xxxxxxxxxxxxxxxxxxxx" />
+        <span class="help-text">Settings → Developer Settings → Personal Access Tokens → Tokens (classic)</span>
+      </div>
+      <div class="input-group">
+        <label>Repository (owner/repo)</label>
+        <input type="text" id="setup-repo" value="dogankapikiran/jobreel" />
+      </div>
+      <button class="btn btn-primary" onclick="saveSetup()" style="width:100%;justify-content:center;margin-top:8px">
+        🚀 Bağlan
+      </button>
+    </div>
+  </div>
+
+  <!-- Main Dashboard -->
+  <div id="dashboard" class="app" style="display:none">
+    <!-- Header -->
+    <header class="header fade-in">
+      <div class="header-left">
+        <div class="logo">J</div>
+        <h1>Instagram Panel <span>JobReel Automation</span></h1>
+      </div>
+      <div class="header-actions">
+        <button class="btn-icon" onclick="refreshAll()" title="Yenile" id="refresh-btn">↻</button>
+        <button class="btn-icon" onclick="showSettings()" title="Ayarlar">⚙</button>
+        <button class="btn btn-primary btn-sm" onclick="showTriggerModal()">▶ Şimdi Post At</button>
+      </div>
+    </header>
+
+    <!-- Stats Row -->
+    <div class="grid grid-3 section fade-in stagger-1" id="stats-row">
+      <div class="card">
+        <div class="card-title"><span class="icon">📊</span> Son 30 Gün</div>
+        <div class="stat-value" id="stat-total">—</div>
+        <div class="stat-label">toplam çalıştırma</div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="icon">✅</span> Başarı Oranı</div>
+        <div class="stat-value" id="stat-success">—</div>
+        <div class="stat-label">başarılı / toplam</div>
+      </div>
+      <div class="card">
+        <div class="card-title"><span class="icon">🔑</span> Token Durumu</div>
+        <div id="token-badge" style="margin-top:4px">
+          <span class="badge badge-neutral"><span class="badge-dot"></span> Kontrol ediliyor...</span>
+        </div>
+        <div class="stat-label" id="token-detail">—</div>
+      </div>
+    </div>
+
+    <!-- Schedule + Quick Actions -->
+    <div class="grid grid-2 section fade-in stagger-2">
+      <!-- Schedule -->
+      <div class="card">
+        <div class="card-title"><span class="icon">🗓️</span> Post Takvimi</div>
+        <div class="schedule-grid" id="schedule-list">
+          <div class="loading-overlay"><span class="loading-spinner"></span> Yükleniyor...</div>
+        </div>
+      </div>
+
+      <!-- Quick Trigger -->
+      <div class="card">
+        <div class="card-title"><span class="icon">⚡</span> Hızlı Eylemler</div>
+        <div class="trigger-grid">
+          <div class="trigger-card" onclick="triggerWorkflow('instagram-post.yml','image')">
+            <div class="trigger-icon">🖼️</div>
+            <div class="trigger-label">Görsel Post</div>
+            <div class="trigger-sub">Statik / Carousel</div>
+          </div>
+          <div class="trigger-card" onclick="triggerWorkflow('instagram-post.yml','reels')">
+            <div class="trigger-icon">🎬</div>
+            <div class="trigger-label">Reels</div>
+            <div class="trigger-sub">Video içerik</div>
+          </div>
+          <div class="trigger-card" onclick="triggerWorkflow('instagram-story.yml','story')">
+            <div class="trigger-icon">📱</div>
+            <div class="trigger-label">Story</div>
+            <div class="trigger-sub">Günlük Story</div>
+          </div>
+          <div class="trigger-card" onclick="triggerWorkflow('instagram-post.yml','image',true)">
+            <div class="trigger-icon">🧪</div>
+            <div class="trigger-label">Dry Run</div>
+            <div class="trigger-sub">Test (yayınlamaz)</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Run History -->
+    <div class="card section fade-in stagger-3">
+      <div class="card-title" style="justify-content:space-between">
+        <span style="display:flex;align-items:center;gap:8px"><span class="icon">📋</span> Son Çalıştırmalar</span>
+        <button class="btn btn-ghost btn-sm" onclick="loadRuns()">↻ Yenile</button>
+      </div>
+      <div class="run-list" id="run-list">
+        <div class="loading-overlay"><span class="loading-spinner"></span> Yükleniyor...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Trigger Modal -->
+  <div class="modal-overlay" id="trigger-modal">
+    <div class="modal">
+      <h3>⚡ Manuel Post Tetikle</h3>
+      <div class="input-group">
+        <label>Workflow</label>
+        <select id="modal-workflow">
+          <option value="instagram-post.yml">Instagram Post (Görsel/Reels)</option>
+          <option value="instagram-story.yml">Instagram Story</option>
+        </select>
+      </div>
+      <div class="input-group">
+        <label>Post Tipi</label>
+        <select id="modal-post-type">
+          <option value="auto">Otomatik (güne göre)</option>
+          <option value="image">Görsel Post</option>
+          <option value="reels">Reels</option>
+        </select>
+      </div>
+      <div class="input-group" style="flex-direction:row;align-items:center;gap:10px">
+        <input type="checkbox" id="modal-dry-run" style="width:auto" />
+        <label style="text-transform:none;font-size:13px;color:var(--gray-200)">Dry Run (test, yayınlama)</label>
+      </div>
+      <div class="input-group" style="flex-direction:row;align-items:center;gap:10px">
+        <input type="checkbox" id="modal-auto-approve" style="width:auto" />
+        <label style="text-transform:none;font-size:13px;color:var(--gray-200)">Telegram onayını atla</label>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeTriggerModal()">İptal</button>
+        <button class="btn btn-primary" onclick="executeTrigger()">🚀 Başlat</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay" id="settings-modal">
+    <div class="modal">
+      <h3>⚙ Ayarlar</h3>
+      <div class="input-group">
+        <label>GitHub Token</label>
+        <input type="password" id="settings-token" />
+      </div>
+      <div class="input-group">
+        <label>Repository</label>
+        <input type="text" id="settings-repo" />
+      </div>
+      <div class="divider"></div>
+      <button class="btn btn-secondary btn-sm" onclick="logout()" style="color:var(--red)">🚪 Çıkış Yap (Token'ı Sil)</button>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeSettings()">İptal</button>
+        <button class="btn btn-primary" onclick="saveSettings()">Kaydet</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ══════════════════════════════════════════
+    // State & Config
+    // ══════════════════════════════════════════
+    const GITHUB_API = 'https://api.github.com';
+    let config = {
+      token: localStorage.getItem('jreel_gh_token') || '',
+      repo: localStorage.getItem('jreel_gh_repo') || 'dogankapikiran/jobreel',
+    };
+
+    // Schedule descriptions (human readable)
+    const WORKFLOW_INFO = {
+      'instagram-post.yml': {
+        name: 'Instagram Post',
+        icon: '🖼️',
+        iconClass: 'post',
+        description: 'Salı & Cuma 10:00 İstanbul',
+      },
+      'instagram-story.yml': {
+        name: 'Instagram Story',
+        icon: '📱',
+        iconClass: 'story',
+        description: 'Her gün 09:00 İstanbul',
+      },
+    };
+
+    // Days of week
+    const DAYS = {
+      '*': 'Her gün',
+      '1': 'Pazartesi',
+      '2': 'Salı',
+      '3': 'Çarşamba',
+      '4': 'Perşembe',
+      '5': 'Cuma',
+      '6': 'Cumartesi',
+      '0': 'Pazar',
+      '1,3,5': 'Pzt-Çar-Cum',
+      '2,5': 'Sal-Cum',
+      '1-5': 'Hafta içi',
+    };
+
+    // ══════════════════════════════════════════
+    // Init
+    // ══════════════════════════════════════════
+    function init() {
+      if (config.token) {
+        showDashboard();
+      } else {
+        document.getElementById('setup-screen').style.display = 'flex';
+      }
+    }
+
+    function showDashboard() {
+      document.getElementById('setup-screen').style.display = 'none';
+      document.getElementById('dashboard').style.display = 'block';
+      refreshAll();
+    }
+
+    function saveSetup() {
+      const token = document.getElementById('setup-token').value.trim();
+      const repo = document.getElementById('setup-repo').value.trim();
+      if (!token) { toast('Token gerekli', 'error'); return; }
+      if (!repo.includes('/')) { toast('Format: owner/repo', 'error'); return; }
+      config.token = token;
+      config.repo = repo;
+      localStorage.setItem('jreel_gh_token', token);
+      localStorage.setItem('jreel_gh_repo', repo);
+      showDashboard();
+      toast('✅ Bağlantı başarılı!', 'success');
+    }
+
+    // ══════════════════════════════════════════
+    // GitHub API
+    // ══════════════════════════════════════════
+    async function ghFetch(path, options = {}) {
+      const url = path.startsWith('http') ? path : `${GITHUB_API}/repos/${config.repo}${path}`;
+      const res = await fetch(url, {
+        ...options,
+        headers: {
+          'Authorization': `Bearer ${config.token}`,
+          'Accept': 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28',
+          ...options.headers,
+        },
+      });
+
+      if (res.status === 401) {
+        toast('GitHub token geçersiz! Ayarlardan güncelleyin.', 'error');
+        throw new Error('Unauthorized');
+      }
+
+      if (res.status === 204) return null;
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || `HTTP ${res.status}`);
+      return data;
+    }
+
+    // ══════════════════════════════════════════
+    // Refresh All
+    // ══════════════════════════════════════════
+    async function refreshAll() {
+      const btn = document.getElementById('refresh-btn');
+      btn.style.animation = 'spin 0.8s linear infinite';
+      try {
+        await Promise.all([loadSchedules(), loadRuns(), checkToken()]);
+      } finally {
+        setTimeout(() => { btn.style.animation = ''; }, 800);
+      }
+    }
+
+    // ══════════════════════════════════════════
+    // Schedules
+    // ══════════════════════════════════════════
+    async function loadSchedules() {
+      const container = document.getElementById('schedule-list');
+      container.innerHTML = '<div class="loading-overlay"><span class="loading-spinner"></span> Yükleniyor...</div>';
+
+      try {
+        const workflows = ['instagram-post.yml', 'instagram-story.yml'];
+        const items = [];
+
+        for (const wf of workflows) {
+          try {
+            const data = await ghFetch(`/contents/.github/workflows/${wf}`);
+            const content = atob(data.content.replace(/\n/g, ''));
+            const cronMatches = [...content.matchAll(/cron:\s*'([^']+)'/g)];
+            const info = WORKFLOW_INFO[wf];
+
+            items.push({
+              workflow: wf,
+              name: info.name,
+              icon: info.icon,
+              iconClass: info.iconClass,
+              crons: cronMatches.map(m => m[1]),
+              sha: data.sha,
+              rawContent: content,
+            });
+          } catch (err) {
+            console.warn(`Workflow ${wf} yüklenemedi:`, err);
+          }
+        }
+
+        if (items.length === 0) {
+          container.innerHTML = '<div style="color:var(--gray-500);font-size:13px;padding:20px;text-align:center">Workflow dosyası bulunamadı</div>';
+          return;
+        }
+
+        container.innerHTML = items.map(item => `
+          <div class="schedule-item">
+            <div class="schedule-item-left">
+              <div class="schedule-icon ${item.iconClass}">${item.icon}</div>
+              <div>
+                <div class="schedule-name">${item.name}</div>
+                <div class="schedule-cron">${item.crons.map(c => cronToHuman(c)).join(' / ')}</div>
+              </div>
+            </div>
+            <div class="schedule-item-right">
+              <button class="btn btn-secondary btn-sm" onclick="editSchedule('${item.workflow}')">✏ Düzenle</button>
+              <button class="btn btn-primary btn-sm" onclick="triggerWorkflow('${item.workflow}')">▶ Çalıştır</button>
+            </div>
+          </div>
+        `).join('');
+
+        // Store for editing
+        window._scheduleData = items;
+      } catch (err) {
+        container.innerHTML = `<div style="color:var(--red);font-size:13px;padding:20px">${err.message}</div>`;
+      }
+    }
+
+    function cronToHuman(cron) {
+      const parts = cron.split(' ');
+      if (parts.length < 5) return cron;
+      const [min, hour, , , dow] = parts;
+      const utcHour = parseInt(hour);
+      const trHour = (utcHour + 3) % 24;
+      const dayName = DAYS[dow] || `Gün ${dow}`;
+      return `${dayName} ${String(trHour).padStart(2, '0')}:${String(min).padStart(2, '0')} İstanbul`;
+    }
+
+    // ══════════════════════════════════════════
+    // Edit Schedule
+    // ══════════════════════════════════════════
+    function editSchedule(workflow) {
+      const item = (window._scheduleData || []).find(i => i.workflow === workflow);
+      if (!item) { toast('Schedule verisi bulunamadı', 'error'); return; }
+
+      const modal = document.getElementById('trigger-modal');
+      const modalContent = modal.querySelector('.modal');
+
+      // Parse current crons
+      const cronInputs = item.crons.map((cron, idx) => {
+        const parts = cron.split(' ');
+        const utcHour = parseInt(parts[1]);
+        const trHour = (utcHour + 3) % 24;
+        return `
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px">
+            <span style="font-size:12px;color:var(--gray-400);min-width:50px">Cron ${idx + 1}:</span>
+            <select id="edit-day-${idx}" style="width:auto;padding:6px 10px;font-size:12px;min-width:100px">
+              ${Object.entries(DAYS).map(([val, label]) =>
+                `<option value="${val}" ${parts[4] === val ? 'selected' : ''}>${label}</option>`
+              ).join('')}
+            </select>
+            <input type="text" id="edit-hour-${idx}" value="${String(trHour).padStart(2, '0')}" style="width:55px;text-align:center;padding:6px 8px;font-size:12px" placeholder="SS" />
+            <span style="color:var(--gray-500)">:</span>
+            <input type="text" id="edit-min-${idx}" value="${String(parts[0]).padStart(2, '0')}" style="width:55px;text-align:center;padding:6px 8px;font-size:12px" placeholder="DD" />
+            <span style="font-size:11px;color:var(--gray-500)">(İstanbul)</span>
+          </div>
+        `;
+      }).join('');
+
+      modalContent.innerHTML = `
+        <h3>🗓️ ${item.name} — Zamanlamayı Düzenle</h3>
+        <div style="margin-bottom:16px">${cronInputs}</div>
+        <div class="help-text" style="margin-bottom:20px">
+          ⏰ Saatler İstanbul (UTC+3) olarak girilir, otomatik UTC'ye çevrilir.
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" onclick="closeTriggerModal();loadSchedules();">İptal</button>
+          <button class="btn btn-primary" onclick="saveSchedule('${workflow}')">💾 Kaydet & Push</button>
+        </div>
+      `;
+
+      modal.classList.add('active');
+    }
+
+    async function saveSchedule(workflow) {
+      const item = (window._scheduleData || []).find(i => i.workflow === workflow);
+      if (!item) return;
+
+      let newContent = item.rawContent;
+      const oldCrons = item.crons;
+
+      for (let i = 0; i < oldCrons.length; i++) {
+        const dayEl = document.getElementById(`edit-day-${i}`);
+        const hourEl = document.getElementById(`edit-hour-${i}`);
+        const minEl = document.getElementById(`edit-min-${i}`);
+        if (!dayEl || !hourEl || !minEl) continue;
+
+        const day = dayEl.value;
+        const trHour = parseInt(hourEl.value) || 0;
+        const min = parseInt(minEl.value) || 0;
+        const utcHour = ((trHour - 3) + 24) % 24;
+        const newCron = `${min} ${utcHour} * * ${day}`;
+
+        newContent = newContent.replace(oldCrons[i], newCron);
+      }
+
+      try {
+        toast('⏳ Schedule güncelleniyor...', 'success');
+        await ghFetch(`/contents/.github/workflows/${workflow}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            message: `[bot] Schedule güncellendi: ${workflow}`,
+            content: btoa(unescape(encodeURIComponent(newContent))),
+            sha: item.sha,
+          }),
+        });
+        toast('✅ Schedule güncellendi ve push edildi!', 'success');
+        closeTriggerModal();
+        await loadSchedules();
+      } catch (err) {
+        toast(`❌ Hata: ${err.message}`, 'error');
+      }
+    }
+
+    // ══════════════════════════════════════════
+    // Workflow Runs
+    // ══════════════════════════════════════════
+    async function loadRuns() {
+      const container = document.getElementById('run-list');
+      container.innerHTML = '<div class="loading-overlay"><span class="loading-spinner"></span> Yükleniyor...</div>';
+
+      try {
+        const data = await ghFetch('/actions/runs?per_page=20');
+        const runs = (data.workflow_runs || []).filter(r =>
+          r.name.includes('Instagram')
+        );
+
+        // Stats
+        const total = runs.length;
+        const success = runs.filter(r => r.conclusion === 'success').length;
+        document.getElementById('stat-total').textContent = total;
+        document.getElementById('stat-success').textContent = total > 0 ? `${Math.round(success / total * 100)}%` : '—';
+
+        if (runs.length === 0) {
+          container.innerHTML = '<div style="color:var(--gray-500);font-size:13px;padding:20px;text-align:center">Henüz çalıştırma yok</div>';
+          return;
+        }
+
+        container.innerHTML = runs.map(run => {
+          const badge = getStatusBadge(run.status, run.conclusion);
+          const date = new Date(run.created_at);
+          const duration = run.updated_at ? getDuration(new Date(run.created_at), new Date(run.updated_at)) : '';
+          const trigger = run.event === 'schedule' ? '⏰' : run.event === 'workflow_dispatch' ? '👤' : '🔄';
+
+          return `
+            <div class="run-item">
+              <span style="font-size:16px">${trigger}</span>
+              ${badge}
+              <div class="run-info">
+                <div class="run-name">${run.name}</div>
+                <div class="run-meta">${date.toLocaleDateString('tr-TR')} ${date.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })} · #${run.run_number}</div>
+              </div>
+              <div class="run-duration">${duration}</div>
+              <a href="${run.html_url}" target="_blank" title="GitHub'da aç">↗</a>
+            </div>
+          `;
+        }).join('');
+
+      } catch (err) {
+        container.innerHTML = `<div style="color:var(--red);font-size:13px;padding:20px">${err.message}</div>`;
+      }
+    }
+
+    function getStatusBadge(status, conclusion) {
+      if (status === 'in_progress' || status === 'queued') {
+        return '<span class="badge badge-running"><span class="badge-dot"></span> Çalışıyor</span>';
+      }
+      if (conclusion === 'success') return '<span class="badge badge-success"><span class="badge-dot"></span> Başarılı</span>';
+      if (conclusion === 'failure') return '<span class="badge badge-error"><span class="badge-dot"></span> Hata</span>';
+      if (conclusion === 'cancelled') return '<span class="badge badge-warning"><span class="badge-dot"></span> İptal</span>';
+      return '<span class="badge badge-neutral"><span class="badge-dot"></span> Bilinmiyor</span>';
+    }
+
+    function getDuration(start, end) {
+      const ms = end - start;
+      const sec = Math.floor(ms / 1000);
+      if (sec < 60) return `${sec}s`;
+      const min = Math.floor(sec / 60);
+      const remainSec = sec % 60;
+      return `${min}dk ${remainSec}s`;
+    }
+
+    // ══════════════════════════════════════════
+    // Trigger Workflow
+    // ══════════════════════════════════════════
+    function showTriggerModal() {
+      const modal = document.getElementById('trigger-modal');
+      // Reset modal content to default trigger form
+      modal.querySelector('.modal').innerHTML = `
+        <h3>⚡ Manuel Post Tetikle</h3>
+        <div class="input-group">
+          <label>Workflow</label>
+          <select id="modal-workflow">
+            <option value="instagram-post.yml">Instagram Post (Görsel/Reels)</option>
+            <option value="instagram-story.yml">Instagram Story</option>
+          </select>
+        </div>
+        <div class="input-group">
+          <label>Post Tipi</label>
+          <select id="modal-post-type">
+            <option value="auto">Otomatik (güne göre)</option>
+            <option value="image">Görsel Post</option>
+            <option value="reels">Reels</option>
+          </select>
+        </div>
+        <div class="input-group" style="flex-direction:row;align-items:center;gap:10px">
+          <input type="checkbox" id="modal-dry-run" style="width:auto" />
+          <label style="text-transform:none;font-size:13px;color:var(--gray-200)">Dry Run (test, yayınlama)</label>
+        </div>
+        <div class="input-group" style="flex-direction:row;align-items:center;gap:10px">
+          <input type="checkbox" id="modal-auto-approve" style="width:auto" />
+          <label style="text-transform:none;font-size:13px;color:var(--gray-200)">Telegram onayını atla</label>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" onclick="closeTriggerModal()">İptal</button>
+          <button class="btn btn-primary" onclick="executeTrigger()">🚀 Başlat</button>
+        </div>
+      `;
+      modal.classList.add('active');
+    }
+
+    function closeTriggerModal() {
+      document.getElementById('trigger-modal').classList.remove('active');
+    }
+
+    async function triggerWorkflow(workflow, postType = 'auto', dryRun = false) {
+      try {
+        const inputs = {};
+        if (workflow === 'instagram-post.yml') {
+          inputs.post_type = postType || 'auto';
+        }
+        inputs.dry_run = dryRun ? 'true' : 'false';
+
+        await ghFetch(`/actions/workflows/${workflow}/dispatches`, {
+          method: 'POST',
+          body: JSON.stringify({
+            ref: 'main',
+            inputs,
+          }),
+        });
+
+        toast(`✅ ${workflow.replace('.yml', '')} tetiklendi!${dryRun ? ' (Dry Run)' : ''}`, 'success');
+        closeTriggerModal();
+
+        // 3sn sonra run listesini yenile
+        setTimeout(() => loadRuns(), 3000);
+      } catch (err) {
+        toast(`❌ Tetikleme hatası: ${err.message}`, 'error');
+      }
+    }
+
+    async function executeTrigger() {
+      const workflow = document.getElementById('modal-workflow').value;
+      const postType = document.getElementById('modal-post-type').value;
+      const dryRun = document.getElementById('modal-dry-run').checked;
+      const autoApprove = document.getElementById('modal-auto-approve')?.checked || false;
+
+      try {
+        const inputs = {};
+        if (workflow === 'instagram-post.yml') {
+          inputs.post_type = postType;
+          inputs.auto_approve = autoApprove ? 'true' : 'false';
+        }
+        inputs.dry_run = dryRun ? 'true' : 'false';
+        if (workflow === 'instagram-story.yml') {
+          inputs.auto_approve = autoApprove ? 'true' : 'false';
+        }
+
+        await ghFetch(`/actions/workflows/${workflow}/dispatches`, {
+          method: 'POST',
+          body: JSON.stringify({ ref: 'main', inputs }),
+        });
+
+        toast(`✅ Workflow tetiklendi! ${dryRun ? '(Dry Run)' : ''}`, 'success');
+        closeTriggerModal();
+        setTimeout(() => loadRuns(), 3000);
+      } catch (err) {
+        toast(`❌ Hata: ${err.message}`, 'error');
+      }
+    }
+
+    // ══════════════════════════════════════════
+    // Token Check
+    // ══════════════════════════════════════════
+    async function checkToken() {
+      const badgeEl = document.getElementById('token-badge');
+      const detailEl = document.getElementById('token-detail');
+
+      try {
+        let hasToken = true;
+        let hasAccountId = true;
+        let secretsPermError = false;
+
+        try {
+          // Get secrets list to verify INSTAGRAM_ACCESS_TOKEN exists
+          const secrets = await ghFetch('/actions/secrets');
+          hasToken = (secrets.secrets || []).some(s => s.name === 'INSTAGRAM_ACCESS_TOKEN');
+          hasAccountId = (secrets.secrets || []).some(s => s.name === 'INSTAGRAM_ACCOUNT_ID');
+        } catch (secErr) {
+          console.warn('Secrets check skipped (insufficient PAT permissions):', secErr);
+          secretsPermError = true;
+        }
+
+        if (!secretsPermError && !hasToken) {
+          badgeEl.innerHTML = '<span class="badge badge-error"><span class="badge-dot"></span> Token Eksik</span>';
+          detailEl.textContent = 'INSTAGRAM_ACCESS_TOKEN secret bulunamadı';
+          return;
+        }
+
+        if (!secretsPermError && !hasAccountId) {
+          badgeEl.innerHTML = '<span class="badge badge-warning"><span class="badge-dot"></span> Account ID Eksik</span>';
+          detailEl.textContent = 'INSTAGRAM_ACCOUNT_ID secret bulunamadı';
+          return;
+        }
+
+        // Check last run for token-related errors
+        const runsData = await ghFetch('/actions/runs?per_page=5');
+        const igRuns = (runsData.workflow_runs || []).filter(r => r.name.includes('Instagram'));
+        const lastRun = igRuns[0];
+
+        if (lastRun) {
+          if (lastRun.conclusion === 'failure') {
+            badgeEl.innerHTML = '<span class="badge badge-warning"><span class="badge-dot"></span> Kontrol Gerekli</span>';
+            detailEl.textContent = `Son çalıştırma başarısız (${new Date(lastRun.created_at).toLocaleDateString('tr-TR')})${secretsPermError ? ' [PAT Sınırlı]' : ''}`;
+          } else if (lastRun.conclusion === 'success') {
+            badgeEl.innerHTML = '<span class="badge badge-success"><span class="badge-dot"></span> Aktif</span>';
+            detailEl.textContent = `Son başarılı: ${new Date(lastRun.created_at).toLocaleDateString('tr-TR')}${secretsPermError ? ' [PAT Sınırlı]' : ''}`;
+          } else {
+            badgeEl.innerHTML = '<span class="badge badge-running"><span class="badge-dot"></span> Çalışıyor</span>';
+            detailEl.textContent = 'Workflow devam ediyor...';
+          }
+        } else {
+          badgeEl.innerHTML = '<span class="badge badge-success"><span class="badge-dot"></span> Aktif</span>';
+          detailEl.textContent = secretsPermError ? 'Secret\'lar okunamadı ama repo bağlantısı aktif.' : 'Secret\'lar mevcut, henüz çalıştırılmadı';
+        }
+      } catch (err) {
+        badgeEl.innerHTML = '<span class="badge badge-error"><span class="badge-dot"></span> Hata</span>';
+        detailEl.textContent = err.message;
+      }
+    }
+
+    // ══════════════════════════════════════════
+    // Settings
+    // ══════════════════════════════════════════
+    function showSettings() {
+      document.getElementById('settings-token').value = config.token;
+      document.getElementById('settings-repo').value = config.repo;
+      document.getElementById('settings-modal').classList.add('active');
+    }
+
+    function closeSettings() {
+      document.getElementById('settings-modal').classList.remove('active');
+    }
+
+    function saveSettings() {
+      const token = document.getElementById('settings-token').value.trim();
+      const repo = document.getElementById('settings-repo').value.trim();
+      if (token) { config.token = token; localStorage.setItem('jreel_gh_token', token); }
+      if (repo) { config.repo = repo; localStorage.setItem('jreel_gh_repo', repo); }
+      closeSettings();
+      toast('✅ Ayarlar kaydedildi', 'success');
+      refreshAll();
+    }
+
+    function logout() {
+      localStorage.removeItem('jreel_gh_token');
+      localStorage.removeItem('jreel_gh_repo');
+      config.token = '';
+      closeSettings();
+      document.getElementById('dashboard').style.display = 'none';
+      document.getElementById('setup-screen').style.display = 'flex';
+      toast('Çıkış yapıldı', 'success');
+    }
+
+    // ══════════════════════════════════════════
+    // Toast Notifications
+    // ══════════════════════════════════════════
+    function toast(message, type = 'success') {
+      const container = document.getElementById('toast-container');
+      const el = document.createElement('div');
+      el.className = `toast toast-${type}`;
+      el.innerHTML = `${type === 'success' ? '✅' : '❌'} ${message}`;
+      container.appendChild(el);
+      setTimeout(() => {
+        el.style.opacity = '0';
+        el.style.transform = 'translateX(20px)';
+        el.style.transition = 'all 0.3s ease';
+        setTimeout(() => el.remove(), 300);
+      }, 4000);
+    }
+
+    // ══════════════════════════════════════════
+    // Keyboard shortcuts
+    // ══════════════════════════════════════════
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        closeTriggerModal();
+        closeSettings();
+      }
+      if (e.key === 'r' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        refreshAll();
+      }
+    });
+
+    // Close modals on overlay click
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+      overlay.addEventListener('click', (e) => {
+        if (e.target === overlay) {
+          overlay.classList.remove('active');
+        }
+      });
+    });
+
+    // Init
+    init();
+  </script>
+</body>
+</html>

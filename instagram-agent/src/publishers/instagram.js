@@ -1,7 +1,8 @@
 // src/publishers/instagram.js
 // Meta Instagram Graph API ile post yayınlar
+// NOT: graph.instagram.com deprecate edildi, tüm istekler graph.facebook.com üzerinden yapılmalı
 
-const IG_API_BASE = 'https://graph.instagram.com/v21.0';
+const IG_API_BASE = 'https://graph.facebook.com/v21.0';
 
 async function igRequest(endpoint, method = 'GET', body = null) {
   const url = endpoint.startsWith('http') ? endpoint : `${IG_API_BASE}${endpoint}`;
@@ -17,7 +18,13 @@ async function igRequest(endpoint, method = 'GET', body = null) {
   const data = await response.json();
 
   if (data.error) {
-    throw new Error(`Instagram API Error ${data.error.code}: ${data.error.message}`);
+    console.error(`[Instagram] API Hata Detayı:`, JSON.stringify(data.error, null, 2));
+    const subcode = data.error.error_subcode ? ` (subcode: ${data.error.error_subcode})` : '';
+    throw new Error(`Instagram API Error ${data.error.code}${subcode}: ${data.error.message}`);
+  }
+
+  if (!response.ok) {
+    throw new Error(`Instagram HTTP ${response.status}: Beklenmeyen yanıt`);
   }
 
   return data;
@@ -204,45 +211,67 @@ function formatCaption(content) {
 // Token geçerliliğini kontrol et + otomatik yenile
 export async function checkTokenValidity() {
   const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN;
+  const accountId = process.env.INSTAGRAM_ACCOUNT_ID;
 
   if (!accessToken) {
     return { valid: false, error: 'INSTAGRAM_ACCESS_TOKEN env değişkeni eksik' };
   }
 
+  if (!accountId) {
+    return { valid: false, error: 'INSTAGRAM_ACCOUNT_ID env değişkeni eksik' };
+  }
+
   try {
-    // debug_token yerine doğrudan /me endpoint'ini kullan
+    // graph.facebook.com üzerinden token'ı doğrula
     const info = await igRequest(
-      `https://graph.instagram.com/v21.0/me?fields=id,username&access_token=${accessToken}`
+      `${IG_API_BASE}/${accountId}?fields=id,username,name,profile_picture_url&access_token=${accessToken}`
     );
 
-    console.log(`[Instagram] Token geçerli. Kullanıcı: @${info.username}`);
+    console.log(`[Instagram] ✅ Token geçerli. Kullanıcı: @${info.username || info.name || info.id}`);
 
-    // Token'ı yenilemeyi dene (60 gün içindeyse yenilenir)
+    // Token'ın kalan süresini kontrol et
     try {
-      const refreshed = await igRequest(
-        `https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=${accessToken}`
+      const debugInfo = await igRequest(
+        `${IG_API_BASE}/debug_token?input_token=${accessToken}&access_token=${accessToken}`
       );
-
-      if (refreshed.access_token) {
-        process.env.INSTAGRAM_ACCESS_TOKEN = refreshed.access_token;
-
-        const expiresInDays = Math.floor(refreshed.expires_in / 86400);
-        console.log(`[Instagram] ✅ Token yenilendi! ${expiresInDays} gün daha geçerli.`);
-
-        if (refreshed.access_token !== accessToken) {
-          console.warn('[Instagram] ⚠️ Yeni token aşağıda — GitHub Secret\'ı güncelle:');
-          console.warn(`NEW_TOKEN=${refreshed.access_token}`);
+      if (debugInfo.data?.expires_at) {
+        const expiresAt = new Date(debugInfo.data.expires_at * 1000);
+        const daysLeft = Math.floor((expiresAt - Date.now()) / 86400000);
+        console.log(`[Instagram] Token geçerlilik: ${expiresAt.toISOString()} (${daysLeft} gün kaldı)`);
+        if (daysLeft < 14) {
+          console.warn(`[Instagram] ⚠️ Token ${daysLeft} gün içinde expire olacak! Yenilemeyi dene.`);
         }
       }
+    } catch (_debugErr) {
+      // debug_token başarısız olabilir, kritik değil
+    }
+
+    // Token'ı yenilemeyi dene (Facebook long-lived token exchange)
+    try {
+      const refreshed = await igRequest(
+        `${IG_API_BASE}/oauth/access_token?grant_type=fb_exchange_token&client_id=${process.env.META_APP_ID || ''}&client_secret=${process.env.META_APP_SECRET || ''}&fb_exchange_token=${accessToken}`
+      );
+
+      if (refreshed.access_token && refreshed.access_token !== accessToken) {
+        process.env.INSTAGRAM_ACCESS_TOKEN = refreshed.access_token;
+        const expiresInDays = Math.floor((refreshed.expires_in || 0) / 86400);
+        console.log(`[Instagram] ✅ Token yenilendi! ${expiresInDays} gün daha geçerli.`);
+        console.warn('[Instagram] ⚠️ Yeni token aşağıda — GitHub Secret\'ı güncelle:');
+        console.warn(`NEW_TOKEN=${refreshed.access_token}`);
+      }
     } catch (refreshErr) {
-      // Refresh başarısız olsa da token hâlâ geçerliyse devam et
-      console.warn(`[Instagram] Token yenilenemedi (önemli değil): ${refreshErr.message}`);
+      // META_APP_ID/SECRET yoksa veya refresh başarısız olsa da token hâlâ geçerliyse devam et
+      if (process.env.META_APP_ID && process.env.META_APP_SECRET) {
+        console.warn(`[Instagram] Token yenilenemedi: ${refreshErr.message}`);
+      }
     }
 
     return { valid: true };
 
   } catch (err) {
     console.error('[Instagram] ❌ Token geçersiz:', err.message);
+    console.error('[Instagram] 💡 Çözüm: https://developers.facebook.com/tools/explorer/ adresinden yeni token al');
+    console.error('[Instagram] 💡 Gerekli izinler: instagram_basic, instagram_content_publish, pages_read_engagement');
     return { valid: false, error: err.message };
   }
 }
