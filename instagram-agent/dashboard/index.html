@@ -517,6 +517,7 @@
           <span class="badge badge-neutral"><span class="badge-dot"></span> Kontrol ediliyor...</span>
         </div>
         <div class="stat-label" id="token-detail">—</div>
+        <button class="btn btn-secondary btn-sm" onclick="showTokenModal()" style="margin-top:12px;width:100%;justify-content:center">🔑 Token Güncelle</button>
       </div>
     </div>
 
@@ -621,6 +622,34 @@
       <div class="modal-actions">
         <button class="btn btn-secondary" onclick="closeSettings()">İptal</button>
         <button class="btn btn-primary" onclick="saveSettings()">Kaydet</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Token Update Modal -->
+  <div class="modal-overlay" id="token-modal">
+    <div class="modal">
+      <h3>🔑 Instagram Token Güncelle</h3>
+      <div style="background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:14px;margin-bottom:20px;font-size:13px;line-height:1.7">
+        Token geçersiz veya süresi dolmuş olabilir. Aşağıdaki adımlarla yeni bir <strong>long-lived</strong> token oluşturup GitHub Secret'ı direkt güncelleyebilirsin.
+      </div>
+      <div class="section-title">Nasıl Yeni Token Alınır?</div>
+      <ol style="font-size:12px;color:var(--gray-300);line-height:2.2;padding-left:20px;margin-bottom:20px">
+        <li><a href="https://developers.facebook.com/tools/explorer/" target="_blank" style="color:var(--orange)">Graph API Explorer</a>'ı aç</li>
+        <li>Uygulamanı seç (JobReel / jobreel)</li>
+        <li>İzinleri ekle: <code style="background:var(--navy-mid);padding:2px 6px;border-radius:4px;font-size:11px">instagram_basic</code> <code style="background:var(--navy-mid);padding:2px 6px;border-radius:4px;font-size:11px">instagram_content_publish</code> <code style="background:var(--navy-mid);padding:2px 6px;border-radius:4px;font-size:11px">pages_read_engagement</code></li>
+        <li>"Generate Access Token" butonuna tıkla</li>
+        <li>Oluşan token'ı kopyala ve aşağıya yapıştır</li>
+      </ol>
+      <div class="input-group">
+        <label>Yeni Instagram Access Token</label>
+        <input type="password" id="new-token-input" placeholder="EAA..." autocomplete="off" />
+        <span class="help-text">Token, libsodium ile şifrelenerek GitHub Secret olarak kaydedilir — düz metin olarak iletilmez.</span>
+      </div>
+      <div id="token-update-status" style="display:none;font-size:12px;margin-top:8px;padding:12px;border-radius:8px;line-height:1.5"></div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeTokenModal()">İptal</button>
+        <button class="btn btn-primary" id="token-update-btn" onclick="updateInstagramToken()">🔒 GitHub Secret'ı Güncelle</button>
       </div>
     </div>
   </div>
@@ -1100,8 +1129,8 @@
 
         if (lastRun) {
           if (lastRun.conclusion === 'failure') {
-            badgeEl.innerHTML = '<span class="badge badge-warning"><span class="badge-dot"></span> Kontrol Gerekli</span>';
-            detailEl.textContent = `Son çalıştırma başarısız (${new Date(lastRun.created_at).toLocaleDateString('tr-TR')})${secretsPermError ? ' [PAT Sınırlı]' : ''}`;
+            badgeEl.innerHTML = '<span class="badge badge-error"><span class="badge-dot"></span> Hata — Token Kontrol Et</span>';
+            detailEl.textContent = `Son çalıştırma başarısız (${new Date(lastRun.created_at).toLocaleDateString('tr-TR')}) — Token süresi dolmuş olabilir${secretsPermError ? ' [PAT Sınırlı]' : ''}`;
           } else if (lastRun.conclusion === 'success') {
             badgeEl.innerHTML = '<span class="badge badge-success"><span class="badge-dot"></span> Aktif</span>';
             detailEl.textContent = `Son başarılı: ${new Date(lastRun.created_at).toLocaleDateString('tr-TR')}${secretsPermError ? ' [PAT Sınırlı]' : ''}`;
@@ -1176,6 +1205,7 @@
       if (e.key === 'Escape') {
         closeTriggerModal();
         closeSettings();
+        closeTokenModal();
       }
       if (e.key === 'r' && (e.metaKey || e.ctrlKey)) {
         e.preventDefault();
@@ -1191,6 +1221,176 @@
         }
       });
     });
+
+    // ══════════════════════════════════════════
+    // Token Update
+    // ══════════════════════════════════════════
+    function showTokenModal() {
+      document.getElementById('new-token-input').value = '';
+      document.getElementById('token-update-status').style.display = 'none';
+      const btn = document.getElementById('token-update-btn');
+      btn.disabled = false;
+      btn.innerHTML = '🔒 GitHub Secret\'ı Güncelle';
+      document.getElementById('token-modal').classList.add('active');
+    }
+
+    function closeTokenModal() {
+      document.getElementById('token-modal').classList.remove('active');
+    }
+
+    // ── BLAKE2b inline (RFC 7693 / blakejs mantığı, CDN bağımlılığı yok) ────
+    var _B2BIV=new Uint32Array([
+      0xF3BCC908,0x6A09E667,0x84CAA73B,0xBB67AE85,
+      0xFE94F82B,0x3C6EF372,0x5F1D36F1,0xA54FF53A,
+      0xADE682D1,0x510E527F,0x2B3E6C1F,0x9B05688C,
+      0xFB41BD6B,0x1F83D9AB,0x137E2179,0x5BE0CD19]);
+    var _SIG=new Uint8Array([
+      0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,
+      28,20,8,16,18,30,26,12,2,24,0,4,22,14,10,6,
+      22,16,24,0,10,4,30,26,20,28,6,12,14,2,18,8,
+      14,18,6,2,26,24,22,28,4,12,10,20,8,0,30,16,
+      18,0,10,14,4,8,20,30,28,2,22,24,12,16,6,26,
+      4,24,12,20,0,22,16,6,8,26,14,10,30,28,2,18,
+      24,10,2,30,28,26,8,20,0,14,12,6,18,4,16,22,
+      26,22,14,28,24,2,6,18,10,0,30,8,16,12,4,20,
+      12,30,28,18,22,6,0,16,24,4,26,14,2,8,20,10,
+      20,4,16,8,14,12,2,10,30,22,18,28,6,24,26,0,
+      0,2,4,6,8,10,12,14,16,18,20,22,24,26,28,30,
+      28,20,8,16,18,30,26,12,2,24,0,4,22,14,10,6]);
+    var _bv=new Uint32Array(32),_bm=new Uint32Array(32);
+    function _aa(v,a,b){var o0=v[a]+v[b],o1=v[a+1]+v[b+1];if(o0>=0x100000000)o1++;v[a]=o0;v[a+1]=o1;}
+    function _ac(v,a,x,y){var o0=v[a]+x,o1=v[a+1]+y;if(o0>=0x100000000)o1++;v[a]=o0;v[a+1]=o1;}
+    function _g32(b,i){return b[i]^(b[i+1]<<8)^(b[i+2]<<16)^(b[i+3]<<24);}
+    function _G(a,b,c,d,ix,iy){
+      _aa(_bv,a,b);_ac(_bv,a,_bm[ix],_bm[ix+1]);
+      var x=_bv[d]^_bv[a],y=_bv[d+1]^_bv[a+1];_bv[d]=y;_bv[d+1]=x;
+      _aa(_bv,c,d);
+      x=_bv[b]^_bv[c];y=_bv[b+1]^_bv[c+1];
+      _bv[b]=(x>>>24)^(y<<8);_bv[b+1]=(y>>>24)^(x<<8);
+      _aa(_bv,a,b);_ac(_bv,a,_bm[iy],_bm[iy+1]);
+      x=_bv[d]^_bv[a];y=_bv[d+1]^_bv[a+1];
+      _bv[d]=(x>>>16)^(y<<16);_bv[d+1]=(y>>>16)^(x<<16);
+      _aa(_bv,c,d);
+      x=_bv[b]^_bv[c];y=_bv[b+1]^_bv[c+1];
+      _bv[b]=(y>>>31)^(x<<1);_bv[b+1]=(x>>>31)^(y<<1);
+    }
+    function _compress(ctx,last){
+      var i;
+      for(i=0;i<16;i++){_bv[i]=ctx.h[i];_bv[i+16]=_B2BIV[i];}
+      _bv[24]^=ctx.t[0];_bv[25]^=ctx.t[1];
+      if(last){_bv[28]=~_bv[28];_bv[29]=~_bv[29];}
+      for(i=0;i<32;i++)_bm[i]=_g32(ctx.b,4*i);
+      for(i=0;i<12;i++){
+        var s=i*16;
+        _G(0,8,16,24,_SIG[s],_SIG[s+1]);_G(2,10,18,26,_SIG[s+2],_SIG[s+3]);
+        _G(4,12,20,28,_SIG[s+4],_SIG[s+5]);_G(6,14,22,30,_SIG[s+6],_SIG[s+7]);
+        _G(0,10,20,30,_SIG[s+8],_SIG[s+9]);_G(2,12,22,24,_SIG[s+10],_SIG[s+11]);
+        _G(4,14,16,26,_SIG[s+12],_SIG[s+13]);_G(6,8,18,28,_SIG[s+14],_SIG[s+15]);
+      }
+      for(i=0;i<16;i++)ctx.h[i]^=_bv[i]^_bv[i+16];
+    }
+    function blake2b(input,outlen){
+      outlen=outlen||64;
+      var ctx={b:new Uint8Array(128),h:_B2BIV.slice(),t:new Uint32Array(2),c:0};
+      ctx.h[0]^=0x01010000^outlen;
+      for(var i=0;i<input.length;i++){
+        if(ctx.c===128){
+          ctx.t[0]+=128;if(ctx.t[0]>=0x100000000){ctx.t[0]-=0x100000000;ctx.t[1]++;}
+          _compress(ctx,false);ctx.c=0;
+        }
+        ctx.b[ctx.c++]=input[i];
+      }
+      ctx.t[0]+=ctx.c;if(ctx.t[0]>=0x100000000){ctx.t[0]-=0x100000000;ctx.t[1]++;}
+      while(ctx.c<128)ctx.b[ctx.c++]=0;
+      _compress(ctx,true);
+      var out=new Uint8Array(outlen);
+      for(var j=0;j<outlen;j++)out[j]=(ctx.h[j>>2]>>>(8*(j&3)))&0xFF;
+      return out;
+    }
+    // ── End BLAKE2b ──────────────────────────────────────────────────────────
+
+    // tweetnacl: X25519 + XSalsa20-Poly1305 (blake2b artık inline)
+    let _cryptoReady = false;
+    async function loadCrypto() {
+      if (_cryptoReady) return;
+      if (!window.nacl) {
+        await new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = 'https://cdn.jsdelivr.net/npm/tweetnacl@1.0.3/nacl-fast.min.js';
+          s.onload = resolve;
+          s.onerror = () => {
+            const s2 = document.createElement('script');
+            s2.src = 'https://unpkg.com/tweetnacl@1.0.3/nacl-fast.min.js';
+            s2.onload = resolve;
+            s2.onerror = () => reject(new Error('tweetnacl CDN\'den yüklenemedi'));
+            document.head.appendChild(s2);
+          };
+          document.head.appendChild(s);
+        });
+      }
+      if (!window.nacl) throw new Error('tweetnacl yüklenemedi (window.nacl yok)');
+      _cryptoReady = true;
+    }
+
+    // NaCl sealed box: ephemeral_pk || secretbox(msg, blake2b(epk||rpk,24), X25519(esk,rpk))
+    function sealBox(messageBytes, recipientPublicKey) {
+      const ephemeral = nacl.box.keyPair();
+      const nonceInput = new Uint8Array(64);
+      nonceInput.set(ephemeral.publicKey, 0);
+      nonceInput.set(recipientPublicKey, 32);
+      const nonce = blake2b(nonceInput, 24);
+      const sharedKey = nacl.box.before(recipientPublicKey, ephemeral.secretKey);
+      const ciphertext = nacl.secretbox(messageBytes, nonce, sharedKey);
+      const sealed = new Uint8Array(32 + ciphertext.length);
+      sealed.set(ephemeral.publicKey, 0);
+      sealed.set(ciphertext, 32);
+      return sealed;
+    }
+
+    async function updateInstagramToken() {
+      const newToken = document.getElementById('new-token-input').value.trim();
+      const statusEl = document.getElementById('token-update-status');
+      const btn = document.getElementById('token-update-btn');
+
+      if (!newToken) { toast('Token gerekli', 'error'); return; }
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="loading-spinner"></span> Güncelleniyor...';
+      statusEl.style.display = 'none';
+
+      try {
+        // 1. Repo public key al
+        const keyData = await ghFetch('/actions/secrets/public-key');
+
+        // 2. Crypto kütüphanelerini yükle ve sealed box ile şifrele
+        await loadCrypto();
+        const publicKeyBytes = Uint8Array.from(atob(keyData.key), c => c.charCodeAt(0));
+        const messageBytes = new TextEncoder().encode(newToken);
+        const sealed = sealBox(messageBytes, publicKeyBytes);
+        const encryptedB64 = btoa(String.fromCharCode(...sealed));
+
+        // 3. GitHub Secret'ı güncelle
+        await ghFetch('/actions/secrets/INSTAGRAM_ACCESS_TOKEN', {
+          method: 'PUT',
+          body: JSON.stringify({ encrypted_value: encryptedB64, key_id: keyData.key_id }),
+        });
+
+        statusEl.style.cssText = 'display:block;background:rgba(16,185,129,0.1);border:1px solid rgba(16,185,129,0.3);border-radius:8px;color:var(--green);font-size:12px;padding:12px;margin-top:8px';
+        statusEl.textContent = '✅ INSTAGRAM_ACCESS_TOKEN güncellendi! Sonraki pipeline çalıştırmasında geçerli olacak.';
+        toast('✅ Instagram token güncellendi!', 'success');
+        setTimeout(() => { closeTokenModal(); checkToken(); }, 2500);
+
+      } catch (err) {
+        statusEl.style.cssText = 'display:block;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:8px;color:var(--red);font-size:12px;padding:12px;margin-top:8px;white-space:pre-wrap';
+        statusEl.textContent = `❌ ${err.message}`;
+        if (err.message.includes('404') || err.message.includes('Not Found')) {
+          statusEl.textContent += '\n\n⚠️ GitHub PAT\'ında secrets yazma izni yok.\nToken "repo" + "workflow" scope\'larını gerektiriyor.';
+        }
+        toast(`❌ Token güncellenemedi: ${err.message}`, 'error');
+        btn.disabled = false;
+        btn.innerHTML = '🔒 GitHub Secret\'ı Güncelle';
+      }
+    }
 
     // Init
     init();

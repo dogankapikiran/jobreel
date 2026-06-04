@@ -377,8 +377,10 @@ export default function FeedScreen() {
         <TouchableOpacity
           activeOpacity={0.7}
           onPress={() => listRef.current?.scrollToOffset({ offset: 0, animated: true })}
+          style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
         >
           <Text style={styles.logo}>JobReel</Text>
+          <Text style={{ fontSize: 16, lineHeight: 20 }}>🇹🇷</Text>
         </TouchableOpacity>
         <View style={styles.headerRight}>
           <TouchableOpacity

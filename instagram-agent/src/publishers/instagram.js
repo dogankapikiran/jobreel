@@ -4,6 +4,27 @@
 
 const IG_API_BASE = 'https://graph.facebook.com/v21.0';
 
+function getCredentials() {
+  const rawAccountId = process.env.INSTAGRAM_ACCOUNT_ID;
+  const rawAccessToken = process.env.INSTAGRAM_ACCESS_TOKEN;
+
+  const sanitize = (val, prefixes = []) => {
+    if (!val) return '';
+    let cleaned = val.trim();
+    for (const prefix of prefixes) {
+      if (cleaned.toLowerCase().startsWith(prefix.toLowerCase())) {
+        cleaned = cleaned.substring(prefix.length).trim();
+      }
+    }
+    return cleaned.replace(/^["']|["']$/g, '').trim();
+  };
+
+  return {
+    accountId: sanitize(rawAccountId, ['INSTAGRAM_ACCOUNT_ID=', 'account_id=']),
+    accessToken: sanitize(rawAccessToken, ['INSTAGRAM_ACCESS_TOKEN=', 'access_token=', 'NEW_TOKEN=']),
+  };
+}
+
 async function igRequest(endpoint, method = 'GET', body = null) {
   const url = endpoint.startsWith('http') ? endpoint : `${IG_API_BASE}${endpoint}`;
 
@@ -32,8 +53,7 @@ async function igRequest(endpoint, method = 'GET', body = null) {
 
 // Statik görsel post
 export async function publishImagePost(content, imageUrl) {
-  const accountId = process.env.INSTAGRAM_ACCOUNT_ID;
-  const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN;
+  const { accountId, accessToken } = getCredentials();
 
   if (!accountId || !accessToken) {
     throw new Error('INSTAGRAM_ACCOUNT_ID veya INSTAGRAM_ACCESS_TOKEN eksik');
@@ -44,7 +64,7 @@ export async function publishImagePost(content, imageUrl) {
   console.log(`[Instagram] Görsel URL: ${imageUrl.slice(0, 80)}...`);
 
   // Step 1: Media container oluştur
-  const container = await igRequest(`/${accountId}/media?access_token=${accessToken}`, 'POST', {
+  const container = await igRequest(`/${accountId}/media?access_token=${encodeURIComponent(accessToken)}`, 'POST', {
     image_url: imageUrl,
     caption: caption,
   });
@@ -56,7 +76,7 @@ export async function publishImagePost(content, imageUrl) {
   await waitForContainer(container.id, accessToken);
 
   // Step 3: Yayınla
-  const publish = await igRequest(`/${accountId}/media_publish?access_token=${accessToken}`, 'POST', {
+  const publish = await igRequest(`/${accountId}/media_publish?access_token=${encodeURIComponent(accessToken)}`, 'POST', {
     creation_id: container.id,
   });
 
@@ -70,8 +90,7 @@ export async function publishImagePost(content, imageUrl) {
 
 // Story post
 export async function publishStory(content, imageUrl) {
-  const accountId = process.env.INSTAGRAM_ACCOUNT_ID;
-  const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN;
+  const { accountId, accessToken } = getCredentials();
 
   if (!accountId || !accessToken) {
     throw new Error('INSTAGRAM_ACCOUNT_ID veya INSTAGRAM_ACCESS_TOKEN eksik');
@@ -79,7 +98,7 @@ export async function publishStory(content, imageUrl) {
 
   console.log('[Instagram] Story container oluşturuluyor...');
 
-  const container = await igRequest(`/${accountId}/media?access_token=${accessToken}`, 'POST', {
+  const container = await igRequest(`/${accountId}/media?access_token=${encodeURIComponent(accessToken)}`, 'POST', {
     image_url: imageUrl,
     media_type: 'STORIES',
   });
@@ -89,7 +108,7 @@ export async function publishStory(content, imageUrl) {
 
   await waitForContainer(container.id, accessToken);
 
-  const publish = await igRequest(`/${accountId}/media_publish?access_token=${accessToken}`, 'POST', {
+  const publish = await igRequest(`/${accountId}/media_publish?access_token=${encodeURIComponent(accessToken)}`, 'POST', {
     creation_id: container.id,
   });
 
@@ -103,8 +122,7 @@ export async function publishStory(content, imageUrl) {
 
 // Carousel post (birden fazla görsel)
 export async function publishCarouselPost(content, imageUrls) {
-  const accountId = process.env.INSTAGRAM_ACCOUNT_ID;
-  const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN;
+  const { accountId, accessToken } = getCredentials();
   const caption = formatCaption(content);
 
   console.log(`[Instagram] ${imageUrls.length} slide'lı carousel oluşturuluyor...`);
@@ -112,7 +130,7 @@ export async function publishCarouselPost(content, imageUrls) {
   // Her slide için container oluştur
   const childContainers = await Promise.all(
     imageUrls.map(async (url, i) => {
-      const child = await igRequest(`/${accountId}/media?access_token=${accessToken}`, 'POST', {
+      const child = await igRequest(`/${accountId}/media?access_token=${encodeURIComponent(accessToken)}`, 'POST', {
         image_url: url,
         is_carousel_item: true,
       });
@@ -122,7 +140,7 @@ export async function publishCarouselPost(content, imageUrls) {
   );
 
   // Carousel container
-  const carousel = await igRequest(`/${accountId}/media?access_token=${accessToken}`, 'POST', {
+  const carousel = await igRequest(`/${accountId}/media?access_token=${encodeURIComponent(accessToken)}`, 'POST', {
     media_type: 'CAROUSEL',
     caption: caption,
     children: childContainers.join(','),
@@ -130,7 +148,7 @@ export async function publishCarouselPost(content, imageUrls) {
 
   await waitForContainer(carousel.id, accessToken);
 
-  const publish = await igRequest(`/${accountId}/media_publish?access_token=${accessToken}`, 'POST', {
+  const publish = await igRequest(`/${accountId}/media_publish?access_token=${encodeURIComponent(accessToken)}`, 'POST', {
     creation_id: carousel.id,
   });
 
@@ -144,13 +162,12 @@ export async function publishCarouselPost(content, imageUrls) {
 
 // Reels post
 export async function publishReels(content, videoUrl, coverUrl) {
-  const accountId = process.env.INSTAGRAM_ACCOUNT_ID;
-  const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN;
+  const { accountId, accessToken } = getCredentials();
   const caption = formatCaption(content);
 
   console.log('[Instagram] Reels container oluşturuluyor...');
 
-  const container = await igRequest(`/${accountId}/media?access_token=${accessToken}`, 'POST', {
+  const container = await igRequest(`/${accountId}/media?access_token=${encodeURIComponent(accessToken)}`, 'POST', {
     media_type: 'REELS',
     video_url: videoUrl,
     cover_url: coverUrl,
@@ -163,7 +180,7 @@ export async function publishReels(content, videoUrl, coverUrl) {
   // Video işleme daha uzun sürer
   await waitForContainer(container.id, accessToken, 20, 10000);
 
-  const publish = await igRequest(`/${accountId}/media_publish?access_token=${accessToken}`, 'POST', {
+  const publish = await igRequest(`/${accountId}/media_publish?access_token=${encodeURIComponent(accessToken)}`, 'POST', {
     creation_id: container.id,
   });
 
@@ -179,7 +196,7 @@ export async function publishReels(content, videoUrl, coverUrl) {
 async function waitForContainer(containerId, accessToken, maxRetries = 10, interval = 3000) {
   for (let i = 0; i < maxRetries; i++) {
     const status = await igRequest(
-      `/${containerId}?fields=status_code,status&access_token=${accessToken}`
+      `/${containerId}?fields=status_code,status&access_token=${encodeURIComponent(accessToken)}`
     );
 
     if (status.status_code === 'FINISHED') {
@@ -210,8 +227,7 @@ function formatCaption(content) {
 
 // Token geçerliliğini kontrol et + otomatik yenile
 export async function checkTokenValidity() {
-  const accessToken = process.env.INSTAGRAM_ACCESS_TOKEN;
-  const accountId = process.env.INSTAGRAM_ACCOUNT_ID;
+  const { accountId, accessToken } = getCredentials();
 
   if (!accessToken) {
     return { valid: false, error: 'INSTAGRAM_ACCESS_TOKEN env değişkeni eksik' };
@@ -224,7 +240,7 @@ export async function checkTokenValidity() {
   try {
     // graph.facebook.com üzerinden token'ı doğrula
     const info = await igRequest(
-      `${IG_API_BASE}/${accountId}?fields=id,username,name,profile_picture_url&access_token=${accessToken}`
+      `${IG_API_BASE}/${accountId}?fields=id,username,name,profile_picture_url&access_token=${encodeURIComponent(accessToken)}`
     );
 
     console.log(`[Instagram] ✅ Token geçerli. Kullanıcı: @${info.username || info.name || info.id}`);
@@ -232,7 +248,7 @@ export async function checkTokenValidity() {
     // Token'ın kalan süresini kontrol et
     try {
       const debugInfo = await igRequest(
-        `${IG_API_BASE}/debug_token?input_token=${accessToken}&access_token=${accessToken}`
+        `${IG_API_BASE}/debug_token?input_token=${encodeURIComponent(accessToken)}&access_token=${encodeURIComponent(accessToken)}`
       );
       if (debugInfo.data?.expires_at) {
         const expiresAt = new Date(debugInfo.data.expires_at * 1000);
@@ -246,11 +262,21 @@ export async function checkTokenValidity() {
       // debug_token başarısız olabilir, kritik değil
     }
 
-    // Token'ı yenilemeyi dene (Facebook long-lived token exchange)
+    // Token yenilemeyi dene — IGAAV tokenlar için Instagram endpoint, EAA için Facebook
+    const isIGToken = accessToken.startsWith('IGAA') || accessToken.startsWith('IGQV');
     try {
-      const refreshed = await igRequest(
-        `${IG_API_BASE}/oauth/access_token?grant_type=fb_exchange_token&client_id=${process.env.META_APP_ID || ''}&client_secret=${process.env.META_APP_SECRET || ''}&fb_exchange_token=${accessToken}`
-      );
+      let refreshed;
+      if (isIGToken) {
+        // IGAAV long-lived token → refresh (app credentials gerekmez)
+        refreshed = await igRequest(
+          `https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=${encodeURIComponent(accessToken)}`
+        );
+      } else {
+        // EAA token → Facebook fb_exchange_token
+        refreshed = await igRequest(
+          `${IG_API_BASE}/oauth/access_token?grant_type=fb_exchange_token&client_id=${encodeURIComponent(process.env.META_APP_ID || '')}&client_secret=${encodeURIComponent(process.env.META_APP_SECRET || '')}&fb_exchange_token=${encodeURIComponent(accessToken)}`
+        );
+      }
 
       if (refreshed.access_token && refreshed.access_token !== accessToken) {
         process.env.INSTAGRAM_ACCESS_TOKEN = refreshed.access_token;
@@ -260,8 +286,22 @@ export async function checkTokenValidity() {
         console.warn(`NEW_TOKEN=${refreshed.access_token}`);
       }
     } catch (refreshErr) {
-      // META_APP_ID/SECRET yoksa veya refresh başarısız olsa da token hâlâ geçerliyse devam et
-      if (process.env.META_APP_ID && process.env.META_APP_SECRET) {
+      // Short-lived IGAAV token ise exchange gerekir (app credentials ile)
+      if (isIGToken && process.env.META_APP_ID && process.env.META_APP_SECRET) {
+        try {
+          const exchanged = await igRequest(
+            `https://graph.instagram.com/access_token?grant_type=ig_exchange_token&client_id=${encodeURIComponent(process.env.META_APP_ID)}&client_secret=${encodeURIComponent(process.env.META_APP_SECRET)}&access_token=${encodeURIComponent(accessToken)}`
+          );
+          if (exchanged.access_token) {
+            process.env.INSTAGRAM_ACCESS_TOKEN = exchanged.access_token;
+            const expiresInDays = Math.floor((exchanged.expires_in || 0) / 86400);
+            console.log(`[Instagram] ✅ IGAAV token long-lived'e çevrildi! ${expiresInDays} gün geçerli.`);
+            console.warn(`NEW_TOKEN=${exchanged.access_token}`);
+          }
+        } catch (_) {
+          console.warn(`[Instagram] Token exchange başarısız: ${refreshErr.message}`);
+        }
+      } else if (!isIGToken && process.env.META_APP_ID) {
         console.warn(`[Instagram] Token yenilenemedi: ${refreshErr.message}`);
       }
     }
