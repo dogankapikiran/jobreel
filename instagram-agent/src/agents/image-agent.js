@@ -1,7 +1,7 @@
 // src/agents/image-agent.js
 // Pollinations.ai ile ücretsiz görsel üretir (API key gerektirmez)
 
-const POLLINATIONS_BASE = 'https://image.pollinations.ai/prompt';
+const POLLINATIONS_BASE = 'https://gen.pollinations.ai/image';
 
 // Instagram boyutları
 const DIMENSIONS = {
@@ -36,7 +36,12 @@ export async function generateImage(content, options = {}) {
   console.log(`[ImageAgent] URL: ${url.slice(0, 100)}...`);
 
   // Görseli tam olarak indir — Instagram fetch ettiğinde cache'de hazır olsun
-  const response = await fetch(url);
+  const headers = {};
+  if (process.env.POLLINATIONS_API_KEY) {
+    console.log('[ImageAgent] API Key ile istek yapılıyor');
+    headers['Authorization'] = `Bearer ${process.env.POLLINATIONS_API_KEY}`;
+  }
+  const response = await fetch(url, { headers });
   if (!response.ok) throw new Error(`Pollinations error ${response.status}`);
   const contentType = response.headers.get('content-type') || '';
   if (!contentType.includes('image')) throw new Error(`Pollinations beklenmedik içerik: ${contentType}`);
