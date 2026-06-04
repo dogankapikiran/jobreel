@@ -42,7 +42,11 @@ export async function generateImage(content, options = {}) {
     headers['Authorization'] = `Bearer ${process.env.POLLINATIONS_API_KEY}`;
   }
   const response = await fetch(url, { headers });
-  if (!response.ok) throw new Error(`Pollinations error ${response.status}`);
+  if (!response.ok) {
+    let errText = '';
+    try { errText = await response.text(); } catch (_) {}
+    throw new Error(`Pollinations error ${response.status}: ${errText}`);
+  }
   const contentType = response.headers.get('content-type') || '';
   if (!contentType.includes('image')) throw new Error(`Pollinations beklenmedik içerik: ${contentType}`);
 
