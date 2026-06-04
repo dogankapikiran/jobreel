@@ -53,6 +53,14 @@ jobs:
             echo "type=reels" >> $GITHUB_OUTPUT
           fi
 
+      - name: Debug secret lengths
+        run: |
+          echo "FAL_API_KEY length: ${#FAL_API_KEY}"
+          echo "POLLINATIONS_API_KEY length: ${#POLLINATIONS_API_KEY}"
+        env:
+          FAL_API_KEY: ${{ secrets.FAL_API_KEY }}
+          POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
+
       - name: Run content pipeline
         working-directory: instagram-agent
         env:
