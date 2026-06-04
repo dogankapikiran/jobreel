@@ -44,6 +44,7 @@ jobs:
           INSTAGRAM_ACCESS_TOKEN: ${{ secrets.INSTAGRAM_ACCESS_TOKEN }}
           INSTAGRAM_ACCOUNT_ID: ${{ secrets.INSTAGRAM_ACCOUNT_ID }}
           POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
+          FAL_API_KEY: ${{ secrets.FAL_API_KEY }}
           POST_TYPE: story
           DRY_RUN: ${{ github.event.inputs.dry_run || 'false' }}
           AUTO_APPROVE: ${{ github.event.inputs.auto_approve || 'false' }}

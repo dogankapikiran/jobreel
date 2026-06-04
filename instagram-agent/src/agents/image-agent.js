@@ -1,5 +1,5 @@
 // src/agents/image-agent.js
-// Pollinations.ai ile ücretsiz görsel üretir (API key gerektirmez)
+// Fal.ai veya Pollinations.ai ile görsel üretir
 
 const POLLINATIONS_BASE = 'https://gen.pollinations.ai/image';
 
@@ -9,6 +9,35 @@ const DIMENSIONS = {
   portrait: { width: 1080, height: 1350 },
   story: { width: 1080, height: 1920 },
 };
+
+async function generateImageWithFal(prompt, width, height) {
+  const url = 'https://fal.run/fal-ai/flux/schnell';
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Key ${process.env.FAL_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      prompt: prompt,
+      image_size: { width, height },
+      num_images: 1,
+      enable_safety_checker: true,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Fal.ai API error ${response.status}: ${errorText}`);
+  }
+
+  const data = await response.json();
+  if (!data.images || data.images.length === 0) {
+    throw new Error('Fal.ai did not return any images');
+  }
+
+  return data.images[0].url;
+}
 
 export async function generateImage(content, options = {}) {
   const { format = 'portrait', dryRun = false, style = 'editorial' } = options;
@@ -30,12 +59,31 @@ export async function generateImage(content, options = {}) {
     };
   }
 
+  if (process.env.FAL_API_KEY) {
+    console.log('[ImageAgent] Fal.ai API kullanılıyor...');
+    try {
+      const url = await generateImageWithFal(fullPrompt, dims.width, dims.height);
+      console.log(`[ImageAgent] ✅ Görsel hazır (Fal.ai)`);
+      return {
+        url,
+        width: dims.width,
+        height: dims.height,
+        model: 'fal-flux-schnell',
+        prompt: fullPrompt,
+      };
+    } catch (err) {
+      console.error('[ImageAgent] ❌ Fal.ai Hatası:', err.message);
+      console.log('[ImageAgent] Pollinations.ai fallback deneniyor...');
+    }
+  }
+
+  // Fallback to Pollinations
+  console.log('[ImageAgent] Pollinations.ai kullanılıyor...');
   const seed = Date.now() % 1000000;
   const url = `${POLLINATIONS_BASE}/${encodeURIComponent(fullPrompt)}?width=${dims.width}&height=${dims.height}&seed=${seed}&model=flux&nologo=true`;
 
   console.log(`[ImageAgent] URL: ${url.slice(0, 100)}...`);
 
-  // Görseli tam olarak indir — Instagram fetch ettiğinde cache'de hazır olsun
   const headers = {};
   if (process.env.POLLINATIONS_API_KEY) {
     console.log('[ImageAgent] API Key ile istek yapılıyor');
