@@ -229,6 +229,13 @@ function formatCaption(content) {
 export async function checkTokenValidity() {
   const { accountId, accessToken } = getCredentials();
 
+  console.log(`[Instagram] Debug: Token Length=${accessToken?.length}, AccountID=${accountId}`);
+  if (accessToken) {
+    console.log(`[Instagram] Debug: Token starts with: "${accessToken.substring(0, 10)}...", ends with: "...${accessToken.substring(accessToken.length - 10)}"`);
+    console.log(`[Instagram] Debug: Token first 5 charCodes:`, [...accessToken.substring(0, 5)].map(c => c.charCodeAt(0)));
+    console.log(`[Instagram] Debug: Token last 5 charCodes:`, [...accessToken.substring(accessToken.length - 5)].map(c => c.charCodeAt(0)));
+  }
+
   if (!accessToken) {
     return { valid: false, error: 'INSTAGRAM_ACCESS_TOKEN env değişkeni eksik' };
   }
