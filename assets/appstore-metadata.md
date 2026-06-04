@@ -45,7 +45,7 @@ iş ilanı,kariyer,iş bul,cv,özgeçmiş,işe alım,remote,hibrit,staj,junior,s
 ## Support URL
 
 ```
-https://dogankapikiran.github.io/jobreel-legal/privacy.html
+https://jobreel.app/iletisim
 ```
 
 ---

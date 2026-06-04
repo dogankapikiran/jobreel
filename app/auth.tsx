@@ -375,6 +375,16 @@ export default function AuthScreen() {
             )}
           </TouchableOpacity>
         )}
+
+        <View style={styles.termsFooter}>
+          <Text style={styles.termsFooterText}>
+            Giriş yaparak veya kayıt olarak{' '}
+            <Text style={styles.termsLink} onPress={() => router.push('/terms' as any)}>Kullanım Koşullarını</Text>
+            {' ve '}
+            <Text style={styles.termsLink} onPress={() => router.push('/privacy' as any)}>Gizlilik Politikasını</Text>
+            {' kabul etmiş olursunuz.'}
+          </Text>
+        </View>
       </View>
     </KeyboardAvoidingView>
   );
@@ -561,6 +571,21 @@ function makeStyles(c: ThemeColors) {
     alreadyRegisteredLink: {
       color: c.text,
       fontSize: FONT_SIZES.sm,
+      fontWeight: '700',
+      textDecorationLine: 'underline',
+    },
+    termsFooter: {
+      marginTop: SPACING.xs,
+      paddingHorizontal: SPACING.sm,
+    },
+    termsFooterText: {
+      color: c.textMuted,
+      fontSize: FONT_SIZES.xs - 1,
+      textAlign: 'center',
+      lineHeight: 16,
+    },
+    termsLink: {
+      color: c.text,
       fontWeight: '700',
       textDecorationLine: 'underline',
     },

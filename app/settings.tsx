@@ -293,14 +293,14 @@ export default function SettingsScreen() {
           <ArrowRow
             icon="document-text-outline"
             label="Gizlilik Politikası"
-            onPress={() => Linking.openURL('https://jobreel.app/gizlilik')}
+            onPress={() => router.push('/privacy')}
             colors={colors}
           />
           <Divider colors={colors} />
           <ArrowRow
             icon="reader-outline"
             label="Kullanım Koşulları"
-            onPress={() => Linking.openURL('https://jobreel.app/sartlar')}
+            onPress={() => router.push('/terms')}
             colors={colors}
           />
           <Divider colors={colors} />

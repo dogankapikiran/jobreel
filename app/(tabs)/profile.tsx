@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -76,8 +76,6 @@ export default function ProfileScreen() {
   const { savedJobs, appliedJobs } = useFeedStore();
 
   const signOut = useAuthStore((s) => s.signOut);
-
-  const avatarButtonRef = useRef<View>(null);
 
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -248,6 +246,9 @@ export default function ProfileScreen() {
     try {
       const raw = require('expo-image-picker');
       ImagePicker = raw?.default ?? raw;
+      if (!ImagePicker || typeof ImagePicker.requestMediaLibraryPermissionsAsync !== 'function') {
+        throw new Error('Native module ExponentImagePicker is not installed or linked');
+      }
     } catch {
       Alert.alert('Hata', 'Profil fotoğrafı değiştirmek için App Store\'dan güncel versiyonu kullanın.');
       return;
@@ -258,25 +259,13 @@ export default function ProfileScreen() {
       return;
     }
 
+    const isPad = Platform.OS === 'ios' && Platform.isPad;
     const pickerOptions: Parameters<typeof ImagePicker.launchImageLibraryAsync>[0] = {
       mediaTypes: ['images'] as any,
-      allowsEditing: true,
+      allowsEditing: !isPad,
       aspect: [1, 1],
       quality: 0.7,
     };
-
-    if (Platform.OS === 'ios' && Platform.isPad) {
-      const rect = await new Promise<{ x: number; y: number; width: number; height: number }>(
-        (resolve) => {
-          avatarButtonRef.current?.measure((_x, _y, w, h, pageX, pageY) => {
-            resolve({ x: pageX, y: pageY, width: w, height: h });
-          });
-        }
-      );
-      (pickerOptions as any).presentationStyle =
-        ImagePicker.UIImagePickerPresentationStyle.POPOVER;
-      (pickerOptions as any).sourceRect = rect;
-    }
 
     let result: Awaited<ReturnType<typeof ImagePicker.launchImageLibraryAsync>>;
     try {
@@ -444,7 +433,6 @@ export default function ProfileScreen() {
           )}
           {/* Avatar */}
           <View style={styles.hero}>
-            <View ref={avatarButtonRef}>
             <TouchableOpacity onPress={handlePickAvatar} activeOpacity={0.8} style={styles.avatarWrap}>
               {profile.avatarUrl ? (
                 <Image source={{ uri: profile.avatarUrl }} style={styles.avatarImg} />
@@ -463,7 +451,6 @@ export default function ProfileScreen() {
                 </View>
               )}
             </TouchableOpacity>
-            </View>
 
             {editing ? (
               <View style={styles.editFields}>
