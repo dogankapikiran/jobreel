@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from 'react';
 import { Animated, ImageBackground, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/store/authStore';
+import { useGuestStore } from '@/store/guestStore';
+import { useRecoveryStore } from '@/store/recoveryStore';
 import { useUserStore } from '@/store/userStore';
+import { useOnboardingStore } from '@/store/onboardingStore';
 import { useFeedStore } from '@/store/feedStore';
 import { api } from '@/services/api';
 import { WorkType, Seniority } from '@/types';
@@ -31,10 +34,12 @@ function normalizeApiLocation(loc: string): string {
 const SPLASH_BG = '#0d0d14';
 
 export default function Index() {
-  const { session, isLoading, isRecoveryMode } = useAuthStore();
-  const hasCompletedOnboarding = useUserStore((s) => s.hasCompletedOnboarding);
-  const completedOnboardingUserIds = useUserStore((s) => s.completedOnboardingUserIds);
-  const markOnboardingComplete = useUserStore((s) => s.markOnboardingComplete);
+  const { session, isLoading } = useAuthStore();
+  const isRecoveryMode = useRecoveryStore((s) => s.isRecoveryMode);
+  const isGuest = useGuestStore((s) => s.isGuest);
+  const hasCompletedOnboarding = useOnboardingStore((s) => s.hasCompletedOnboarding);
+  const completedOnboardingUserIds = useOnboardingStore((s) => s.completedOnboardingUserIds);
+  const markOnboardingComplete = useOnboardingStore((s) => s.markOnboardingComplete);
   const setProfile = useUserStore((s) => s.setProfile);
   const setPreferences = useUserStore((s) => s.setPreferences);
   const profile = useUserStore((s) => s.profile);
@@ -42,6 +47,9 @@ export default function Index() {
 
   const [userHydrated, setUserHydrated] = useState(
     () => useUserStore.persist.hasHydrated()
+  );
+  const [onboardingHydrated, setOnboardingHydrated] = useState(
+    () => useOnboardingStore.persist.hasHydrated()
   );
   const [showLoadingSplash, setShowLoadingSplash] = useState(false);
   const progress = useRef(new Animated.Value(0)).current;
@@ -54,6 +62,11 @@ export default function Index() {
     return useUserStore.persist.onFinishHydration(() => setUserHydrated(true));
   }, []);
 
+  useEffect(() => {
+    if (onboardingHydrated) return;
+    return useOnboardingStore.persist.onFinishHydration(() => setOnboardingHydrated(true));
+  }, []);
+
   // Migration: mevcut kullanıcıları per-user listesine ekle
   useEffect(() => {
     if (session?.user.id && hasCompletedOnboarding) {
@@ -62,7 +75,7 @@ export default function Index() {
   }, [session?.user.id, hasCompletedOnboarding]);
 
   useEffect(() => {
-    if (isLoading || !userHydrated) return;
+    if (isLoading || !userHydrated || !onboardingHydrated) return;
 
     if (isRecoveryMode) {
       fetchStarted.current = false;
@@ -71,6 +84,57 @@ export default function Index() {
     }
 
     if (!session) {
+      if (isGuest) {
+        if (fetchStarted.current) return;
+        fetchStarted.current = true;
+
+        setShowLoadingSplash(true);
+
+        Animated.timing(progress, {
+          toValue: 0.65,
+          duration: 1800,
+          useNativeDriver: false,
+        }).start();
+
+        setLoading(true);
+
+        api.feed({
+          page: 1,
+          location: 'Istanbul, Turkey',
+          sectors: '',
+          work_type: 'any',
+          seniority: '',
+        })
+          .then(({ jobs }) => {
+            setJobs(jobs);
+          })
+          .catch(() => {})
+          .finally(() => {
+            setLoading(false);
+            const navigate = () => router.replace('/(tabs)');
+            try {
+              Animated.timing(progress, {
+                toValue: 1,
+                duration: 300,
+                useNativeDriver: false,
+              }).start(() => {
+                try {
+                  Animated.timing(opacity, {
+                    toValue: 0,
+                    duration: 250,
+                    useNativeDriver: true,
+                  }).start(() => navigate());
+                } catch {
+                  navigate();
+                }
+              });
+            } catch {
+              navigate();
+            }
+          });
+        return;
+      }
+
       router.replace('/auth');
       return;
     }
@@ -107,14 +171,14 @@ export default function Index() {
           if (data.avatar_url) setProfile({ avatarUrl: data.avatar_url as string });
           const p = data.preferences as Record<string, unknown> | undefined;
           if (p) {
-            const rawWorkType = (p.work_type as string) || 'any';
+            const rawWorkType = typeof p.work_type === 'string' ? p.work_type : 'any';
             setPreferences({
-              sectors: (p.sectors as string[]) || [],
-              seniority: (p.seniority as Seniority[]) || [],
+              sectors: Array.isArray(p.sectors) ? (p.sectors as string[]) : [],
+              seniority: Array.isArray(p.seniority) ? (p.seniority as Seniority[]) : [],
               workType: rawWorkType as WorkType,
-              location: (p.location as string) || '',
-              cities: (p.cities as string[]) || [],
-              skills: (p.skills as string[]) || [],
+              location: typeof p.location === 'string' ? p.location : '',
+              cities: Array.isArray(p.cities) ? (p.cities as string[]) : [],
+              skills: Array.isArray(p.skills) ? (p.skills as string[]) : [],
             });
           }
         }
@@ -161,7 +225,7 @@ export default function Index() {
           navigate();
         }
       });
-  }, [session, isLoading, hasCompletedOnboarding, completedOnboardingUserIds, userHydrated, isRecoveryMode]);
+  }, [session, isLoading, hasCompletedOnboarding, completedOnboardingUserIds, userHydrated, onboardingHydrated, isRecoveryMode, isGuest]);
 
   if (showLoadingSplash) {
     return (

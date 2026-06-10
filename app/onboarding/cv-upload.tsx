@@ -83,7 +83,8 @@ export default function CvUploadScreen() {
       setParsedSkillCount(parsed.skills?.length ?? 0);
       setUploaded(true);
       track('CV Uploaded', { skill_count: parsed.skills?.length ?? 0 });
-    } catch (e: any) {
+    } catch (err) {
+      const e = err as Error;
       if (e?.name === 'AbortError' || e?.message?.includes('abort')) {
         Alert.alert('Zaman Aşımı', 'CV yükleme çok uzun sürdü. İnternet bağlantınızı kontrol edip tekrar deneyin.');
       } else if (e?.message?.includes('Upload HTTP')) {

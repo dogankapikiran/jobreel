@@ -13,6 +13,7 @@ import {
 import { router } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useUserStore } from '@/store/userStore';
+import { useOnboardingStore } from '@/store/onboardingStore';
 import { useAuthStore } from '@/store/authStore';
 import { api } from '@/services/api';
 import { track } from '@/services/analytics';
@@ -30,7 +31,8 @@ export default function CvScreen() {
   const insets = useSafeAreaInsets();
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  const { profile, setProfile, setPreferences, completeOnboarding, markOnboardingComplete } = useUserStore();
+  const { profile, setProfile, setPreferences } = useUserStore();
+  const { completeOnboarding, markOnboardingComplete } = useOnboardingStore();
   const session = useAuthStore((s) => s.session);
 
   const [name, setName] = useState(profile.name);

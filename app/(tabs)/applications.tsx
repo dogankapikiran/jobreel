@@ -13,12 +13,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Job } from '@/types';
-import { useFeedStore } from '@/store/feedStore';
+import { useApplicationStore } from '@/store/applicationStore';
 import { timeAgo } from '@/services/api';
 import { BOTTOM_NAV_HEIGHT, FONT_SIZES, RADII, SPACING, ThemeColors } from '@/constants/theme';
 import { brandColors } from '@/services/logoService';
 import CompanyLogo from '@/components/CompanyLogo';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useAuthStore } from '@/store/authStore';
+import AuthGate from '@/components/AuthGate';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -129,11 +131,22 @@ function DateGroupHeader({ title }: { title: string }) {
 export default function ApplicationsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { appliedJobs, appliedTimestamps } = useFeedStore();
+  const session = useAuthStore((s) => s.session);
+  const { appliedJobs, appliedTimestamps } = useApplicationStore();
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 
   const [activeFilter, setActiveFilter] = useState<FilterKey>('Tümü');
+
+  if (!session) {
+    return (
+      <AuthGate
+        icon="briefcase-outline"
+        title="Başvurularım"
+        description="Başvurduğunuz iş ilanlarını takip etmek ve başvuru geçmişinizi görüntülemek için giriş yapın."
+      />
+    );
+  }
 
   const validJobs = useMemo(
     () => appliedJobs.filter(

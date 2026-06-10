@@ -4,7 +4,6 @@ import {
   Alert,
   Image,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   ScrollView,
   StyleSheet,
@@ -16,64 +15,36 @@ import {
 import * as WebBrowser from 'expo-web-browser';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { Href, router } from 'expo-router';
 import { useAuthStore } from '@/store/authStore';
 import { useUserStore } from '@/store/userStore';
-import { useFeedStore } from '@/store/feedStore';
+import { useSavedStore } from '@/store/savedStore';
+import { useApplicationStore } from '@/store/applicationStore';
 import { api, CvParsed } from '@/services/api';
-import { LinearGradient } from 'expo-linear-gradient';
-import { ACCENT_GRADIENT, BOTTOM_NAV_HEIGHT, FONT_SIZES, RADII, SPACING, ThemeColors } from '@/constants/theme';
+import { BOTTOM_NAV_HEIGHT, FONT_SIZES, RADII, SPACING } from '@/constants/theme';
+import type { ThemeColors } from '@/constants/theme';
 import { Seniority, WorkType } from '@/types';
 import { useTheme } from '@/contexts/ThemeContext';
+import AuthGate from '@/components/AuthGate';
 
-const SUGGESTED_SKILLS = [
-  // Yazılım
-  'JavaScript', 'TypeScript', 'React', 'React Native', 'Node.js',
-  'Python', 'Java', 'Swift', 'Kotlin', 'Go',
-  'PostgreSQL', 'MongoDB', 'Redis', 'Docker', 'Kubernetes', 'AWS',
-  // Tasarım & Ürün
-  'Figma', 'UI/UX Design', 'Sketch', 'Prototyping',
-  'Product Management', 'Agile', 'Scrum', 'Jira',
-  // Veri & AI
-  'Data Science', 'Machine Learning', 'SQL', 'Tableau', 'Power BI', 'Excel',
-  // Pazarlama & İçerik
-  'Digital Marketing', 'SEO', 'Google Analytics', 'Content Writing',
-  'Social Media Marketing', 'HubSpot', 'Salesforce',
-  // İK & Finans
-  'Human Resources', 'Recruitment', 'Financial Modeling', 'Accounting',
-  'Business Analysis', 'Project Management',
-];
+// Extracted Constants
+import { SUGGESTED_SKILLS, SECTOR_SKILLS } from '@/constants/skills';
 
-const SECTOR_SKILLS: Record<string, string[]> = {
-  'Yazılım & Teknoloji': ['JavaScript', 'TypeScript', 'React', 'React Native', 'Node.js', 'Python', 'Java', 'Swift', 'Kotlin', 'Go', 'PostgreSQL', 'MongoDB', 'Redis', 'Docker', 'Kubernetes', 'AWS'],
-  'Yapay Zeka & ML': ['Python', 'Machine Learning', 'Data Science', 'SQL', 'Tableau', 'Power BI', 'Docker', 'AWS'],
-  'Veri & Analitik': ['SQL', 'Python', 'Data Science', 'Tableau', 'Power BI', 'Excel', 'Machine Learning', 'PostgreSQL'],
-  'Fintech & Bankacılık': ['Financial Modeling', 'Accounting', 'SQL', 'Python', 'Business Analysis', 'Excel', 'PostgreSQL'],
-  'E-ticaret': ['Digital Marketing', 'SEO', 'Google Analytics', 'Product Management', 'Agile', 'JavaScript', 'React'],
-  'SaaS & B2B': ['Salesforce', 'HubSpot', 'Product Management', 'Agile', 'Business Analysis', 'JavaScript', 'React'],
-  'Reklam & Pazarlama': ['Digital Marketing', 'SEO', 'Google Analytics', 'Content Writing', 'Social Media Marketing', 'HubSpot', 'Salesforce'],
-  'İnsan Kaynakları & HR Tech': ['Human Resources', 'Recruitment', 'Project Management', 'Business Analysis', 'Excel'],
-  'Muhasebe & Finans': ['Financial Modeling', 'Accounting', 'Excel', 'SQL', 'Power BI', 'Business Analysis'],
-  'Eğitim & EdTech': ['Content Writing', 'Product Management', 'Agile', 'JavaScript', 'React', 'Python'],
-  'Sağlık & Biyoteknoloji': ['Python', 'Data Science', 'SQL', 'Machine Learning', 'Business Analysis', 'Excel'],
-  'Gaming & Oyun': ['JavaScript', 'TypeScript', 'Python', 'Java', 'Kotlin', 'Swift', 'Go', 'React', 'Node.js'],
-};
-
-function StatCard({ value, label, colors }: { value: string | number; label: string; colors: ThemeColors }) {
-  return (
-    <View style={{ flex: 1, alignItems: 'center', gap: SPACING.xs }}>
-      <Text style={{ color: colors.text, fontSize: FONT_SIZES.xl, fontWeight: '800' }}>{value}</Text>
-      <Text style={{ color: colors.textMuted, fontSize: FONT_SIZES.xs }}>{label}</Text>
-    </View>
-  );
-}
+// Extracted Subcomponents
+import StatCard from '@/components/profile/StatCard';
+import ProfileCompletion from '@/components/profile/ProfileCompletion';
+import ProfilePreferences from '@/components/profile/ProfilePreferences';
+import SkillsEditorModal from '@/components/profile/SkillsEditorModal';
+import CvSection from '@/components/profile/CvSection';
 
 export default function ProfileScreen() {
+  const session = useAuthStore((s) => s.session);
   const insets = useSafeAreaInsets();
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { profile, setProfile, setPreferences } = useUserStore();
-  const { savedJobs, appliedJobs } = useFeedStore();
+  const { savedJobs } = useSavedStore();
+  const { appliedJobs } = useApplicationStore();
 
   const signOut = useAuthStore((s) => s.signOut);
 
@@ -83,44 +54,42 @@ export default function ProfileScreen() {
   const [cvParsed, setCvParsed] = useState<CvParsed | null>(null);
   const [cvLoading, setCvLoading] = useState(false);
   const [showSkillsEditor, setShowSkillsEditor] = useState(false);
-  const [draftSkills, setDraftSkills] = useState<string[]>([]);
-  const [customSkillInput, setCustomSkillInput] = useState('');
-  const [skillsSaving, setSkillsSaving] = useState(false);
 
   const [draftName, setDraftName] = useState('');
   const [draftTitle, setDraftTitle] = useState('');
   const [draftLocation, setDraftLocation] = useState('');
 
-  const skills = profile.skills ?? [];
-  const prefs = profile.preferences ?? { sectors: [], seniority: [], workType: 'any' as WorkType, location: '', salaryMin: 0, skills: [] };
-
-  const [profileLoadError, setProfileLoadError] = useState(false);
+  const skills = Array.isArray(profile.skills) ? profile.skills : [];
+  const prefs = profile.preferences ?? { sectors: [], seniority: [], workType: 'any' as WorkType, location: 'İstanbul', salaryMin: 0, skills: [] };
 
   useEffect(() => {
-    setProfileLoadError(false);
+    if (!session) return;
     api.getProfile().then((data) => {
+      if (!data) return;
       if (data.display_name) setProfile({ name: data.display_name as string });
       if (data.title) setProfile({ title: data.title as string });
       if (data.avatar_url) setProfile({ avatarUrl: data.avatar_url as string });
-      const prefs = data.preferences as Record<string, unknown> | undefined;
-      if (prefs) {
-        const rawWorkType = (prefs.work_type as string) || 'any';
+      const prefsData = data.preferences as Record<string, unknown> | undefined;
+      if (prefsData) {
+        const rawWorkType = typeof prefsData.work_type === 'string' ? prefsData.work_type : 'any';
         const parsedWorkTypes =
           rawWorkType !== 'any'
             ? (rawWorkType.split(',').map((s) => s.trim()).filter(Boolean) as WorkType[])
             : [];
         setPreferences({
-          sectors: (prefs.sectors as string[]) || [],
-          seniority: (prefs.seniority as Seniority[]) || [],
+          sectors: Array.isArray(prefsData.sectors) ? (prefsData.sectors as string[]) : [],
+          seniority: Array.isArray(prefsData.seniority) ? (prefsData.seniority as Seniority[]) : [],
           workType: rawWorkType as WorkType,
           workTypes: parsedWorkTypes.length > 0 && parsedWorkTypes.length < 3 ? parsedWorkTypes : undefined,
-          location: (prefs.location as string) || 'İstanbul',
-          salaryMin: (prefs.salary_min as number) || 0,
-          skills: (prefs.skills as string[]) || [],
+          location: typeof prefsData.location === 'string' ? prefsData.location : 'İstanbul',
+          salaryMin: typeof prefsData.salary_min === 'number' ? prefsData.salary_min : 0,
+          skills: Array.isArray(prefsData.skills) ? (prefsData.skills as string[]) : [],
         });
       }
       if (data.cv_parsed) setCvParsed(data.cv_parsed as CvParsed);
-    }).catch(() => { setProfileLoadError(true); });
+    }).catch((err) => {
+      console.warn('[Profile] Failed to fetch profile from API:', err);
+    });
   }, []);
 
   function startEdit() {
@@ -214,7 +183,7 @@ export default function ProfileScreen() {
       const { parsed } = await api.parseCv();
       setCvParsed(parsed);
 
-      if (parsed.skills && parsed.skills.length > 0) {
+      if (parsed.skills && Array.isArray(parsed.skills) && parsed.skills.length > 0) {
         const merged = Array.from(new Set([...skills, ...parsed.skills]));
         setProfile({ skills: merged });
         api.updateProfile({ skills: merged }).catch(() => {});
@@ -222,7 +191,7 @@ export default function ProfileScreen() {
 
       Alert.alert(
         'CV Yüklendi',
-        `${parsed.skills?.length || 0} yetenek çıkarıldı. Feed eşleşme skorunuz güncellendi.`,
+        `${parsed.skills?.length || 0} yetenek çıkarıldı. Feed eşleşme skorunuz güncellenedi.`,
       );
     } catch {
       Alert.alert('Hata', 'CV yüklenemedi. Tekrar deneyin.');
@@ -241,7 +210,6 @@ export default function ProfileScreen() {
   }
 
   async function handlePickAvatar() {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     let ImagePicker: typeof import('expo-image-picker');
     try {
       const raw = require('expo-image-picker');
@@ -261,7 +229,7 @@ export default function ProfileScreen() {
 
     const isPad = Platform.OS === 'ios' && Platform.isPad;
     const pickerOptions: Parameters<typeof ImagePicker.launchImageLibraryAsync>[0] = {
-      mediaTypes: ['images'] as any,
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: !isPad,
       aspect: [1, 1],
       quality: 0.7,
@@ -297,54 +265,33 @@ export default function ProfileScreen() {
     }
   }
 
-  function openSkillsEditor() {
-    setDraftSkills([...(profile.skills ?? [])]);
-    setCustomSkillInput('');
-    setShowSkillsEditor(true);
-  }
-
-  function toggleDraftSkill(s: string) {
-    setDraftSkills((prev) => prev.includes(s) ? prev.filter((x) => x !== s) : [...prev, s]);
-  }
-
-  function addCustomDraftSkill() {
-    const trimmed = customSkillInput.trim();
-    if (trimmed && !draftSkills.includes(trimmed)) {
-      setDraftSkills((prev) => [...prev, trimmed]);
-    }
-    setCustomSkillInput('');
-  }
-
-  async function saveSkills() {
-    setSkillsSaving(true);
-    const newSkills = draftSkills;
+  async function saveSkills(newSkills: string[]) {
     const prevSkills = profile.skills ?? [];
     const prevPrefSkills = prefs.skills ?? [];
     setProfile({ skills: newSkills });
     setPreferences({ skills: newSkills });
-    api.updateProfile({
-      skills: newSkills,
-      preferences: {
-        sectors: prefs.sectors,
-        work_type: prefs.workType,
-        seniority: prefs.seniority,
-        location: prefs.location,
-        salary_min: prefs.salaryMin,
+    try {
+      await api.updateProfile({
         skills: newSkills,
-      },
-    }).then(() => {
+        preferences: {
+          sectors: prefs.sectors,
+          work_type: prefs.workType,
+          seniority: prefs.seniority,
+          location: prefs.location,
+          salary_min: prefs.salaryMin,
+          skills: newSkills,
+        },
+      });
       setShowSkillsEditor(false);
-    }).catch(() => {
+    } catch {
       setProfile({ skills: prevSkills });
       setPreferences({ skills: prevPrefSkills });
       Alert.alert('Bağlantı Hatası', 'Yetenekler kaydedilemedi. Tekrar deneyin.');
-    }).finally(() => {
-      setSkillsSaving(false);
-    });
+    }
   }
 
   const suggestedSkills = useMemo(() => {
-    const userSectors = prefs.sectors ?? [];
+    const userSectors = Array.isArray(prefs.sectors) ? prefs.sectors : [];
     if (userSectors.length === 0) return SUGGESTED_SKILLS;
     const sectorSkills = Array.from(new Set(userSectors.flatMap((s) => SECTOR_SKILLS[s] ?? [])));
     const prioritized = sectorSkills.filter((s) => SUGGESTED_SKILLS.includes(s));
@@ -352,33 +299,18 @@ export default function ProfileScreen() {
     return [...prioritized, ...rest];
   }, [prefs.sectors]);
 
-  const completionItems = [
-    { label: 'Ad Soyad', points: 20, done: !!profile.name },
-    { label: 'Ünvan', points: 10, done: !!profile.title },
-    { label: 'Yetenek (en az 3)', points: 25, done: skills.length >= 3 },
-    { label: 'Sektör tercihleri', points: 20, done: (prefs.sectors ?? []).length > 0 },
-    { label: 'Fotoğraf', points: 10, done: !!profile.avatarUrl },
-    { label: 'CV Yükle', points: 10, done: !!cvParsed },
-    { label: 'Konum', points: 5, done: !!prefs.location },
-  ];
-  const completionScore = completionItems.filter((i) => i.done).reduce((sum, i) => sum + i.points, 0);
-  const missingItems = completionItems.filter((i) => !i.done);
-
   const displayName = profile.name || 'Anonim';
   const initial = displayName.charAt(0).toUpperCase();
 
-  const WT_LABEL: Record<string, string> = { any: 'Farketmez', remote: 'Remote', hybrid: 'Hibrit', office: 'Ofis' };
-  const workTypeDisplay = (() => {
-    if (prefs.workType === 'any' || !prefs.workType) return 'Farketmez';
-    if (prefs.workType.includes(',')) {
-      return prefs.workType.split(',').map((v) => WT_LABEL[v.trim()] ?? v).join(', ');
-    }
-    return WT_LABEL[prefs.workType] ?? 'Belirtilmemiş';
-  })();
-
-  const seniorityLabelMap: Record<string, string> = { junior: 'Junior', mid: 'Mid-Level', senior: 'Senior', lead: 'Lead' };
-  const seniorityLabel = (Array.isArray(prefs.seniority) ? prefs.seniority : [])
-    .map(s => seniorityLabelMap[s] ?? s).join(', ') || 'Belirtilmemiş';
+  if (!session) {
+    return (
+      <AuthGate
+        icon="person-outline"
+        title="Profil"
+        description="Profil bilgilerinizi düzenlemek, özgeçmişinizi yüklemek ve yetenek analizinizi yapmak için giriş yapın."
+      />
+    );
+  }
 
   return (
     <KeyboardAvoidingView
@@ -426,11 +358,6 @@ export default function ProfileScreen() {
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.content, { paddingBottom: BOTTOM_NAV_HEIGHT + insets.bottom + SPACING.md }]} keyboardShouldPersistTaps="handled">
-          {profileLoadError && (
-            <View style={styles.errorBanner}>
-              <Text style={styles.errorBannerText}>Profil yüklenemedi. Önbellek verileri gösteriliyor.</Text>
-            </View>
-          )}
           {/* Avatar */}
           <View style={styles.hero}>
             <TouchableOpacity onPress={handlePickAvatar} activeOpacity={0.8} style={styles.avatarWrap}>
@@ -455,7 +382,7 @@ export default function ProfileScreen() {
             {editing ? (
               <View style={styles.editFields}>
                 <TextInput
-                  style={styles.editInput}
+                  style={[styles.editInput, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder, color: colors.text }]}
                   value={draftName}
                   onChangeText={setDraftName}
                   placeholder="Ad Soyad"
@@ -463,14 +390,14 @@ export default function ProfileScreen() {
                   autoCapitalize="words"
                 />
                 <TextInput
-                  style={styles.editInput}
+                  style={[styles.editInput, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder, color: colors.text }]}
                   value={draftTitle}
                   onChangeText={setDraftTitle}
                   placeholder="Ünvan (örn. Senior Developer)"
                   placeholderTextColor={colors.textDim}
                 />
                 <TextInput
-                  style={styles.editInput}
+                  style={[styles.editInput, { backgroundColor: colors.cardBg, borderColor: colors.cardBorder, color: colors.text }]}
                   value={draftLocation}
                   onChangeText={setDraftLocation}
                   placeholder="Şehir (örn. İstanbul)"
@@ -479,193 +406,80 @@ export default function ProfileScreen() {
               </View>
             ) : (
               <>
-                <Text style={styles.name}>{displayName}</Text>
-                {profile.title ? <Text style={styles.jobTitle}>{profile.title}</Text> : null}
+                <Text style={[styles.name, { color: colors.text }]}>{displayName}</Text>
+                {profile.title ? <Text style={[styles.jobTitle, { color: colors.textMuted }]}>{profile.title}</Text> : null}
                 {prefs.location ? (
-                  <Text style={styles.location}>📍 {prefs.location}</Text>
+                  <Text style={[styles.location, { color: colors.textMuted }]}>📍 {prefs.location}</Text>
                 ) : null}
               </>
             )}
           </View>
 
           {/* Profil Tamamlanma */}
-          {completionScore >= 100 ? (
-            <View style={styles.completionComplete}>
-              <Ionicons name="checkmark-circle" size={18} color="#2ecc71" />
-              <Text style={styles.completionCompleteText}>Profil %100 tamamlandı</Text>
-            </View>
-          ) : (
-            <View style={styles.completionCard}>
-              <View style={styles.completionHeader}>
-                <Text style={styles.completionTitle}>Profil Tamamlanma</Text>
-                <Text style={styles.completionScore}>{completionScore}%</Text>
-              </View>
-              <View style={styles.completionBar}>
-                <LinearGradient
-                  colors={ACCENT_GRADIENT}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={[styles.completionFill, { width: `${completionScore}%` }]}
-                />
-              </View>
-              {missingItems.slice(0, 3).map((item) => (
-                <Text key={item.label} style={styles.completionHint}>
-                  {item.label} ekle → +{item.points} puan
-                </Text>
-              ))}
-              {missingItems.length > 3 && (
-                <Text style={styles.completionHint}>+{missingItems.length - 3} madde daha...</Text>
-              )}
-            </View>
-          )}
+          <ProfileCompletion
+            profile={profile}
+            prefs={prefs}
+            cvParsed={cvParsed}
+            colors={colors}
+          />
 
           {/* Stats */}
-          <View style={styles.statsRow}>
+          <View style={[styles.statsRow, { backgroundColor: colors.bgDeep, borderColor: colors.cardBorder }]}>
             <StatCard value={savedJobs.length} label="Kaydedilen" colors={colors} />
-            <View style={styles.statDivider} />
+            <View style={[styles.statDivider, { backgroundColor: colors.cardBorder }]} />
             <StatCard value={appliedJobs.length} label="Başvurulan" colors={colors} />
-            <View style={styles.statDivider} />
+            <View style={[styles.statDivider, { backgroundColor: colors.cardBorder }]} />
             <StatCard value={skills.length} label="Yetenek" colors={colors} />
           </View>
 
           {/* Preferences summary */}
-          <View style={styles.section}>
-            <View style={styles.sectionRow}>
-              <Text style={styles.sectionTitle}>Tercihler</Text>
-              <TouchableOpacity
-                onPress={() => router.push('/onboarding/preferences?edit=1')}
-                activeOpacity={0.7}
-                style={styles.sectionEditBtn}
-              >
-                <Text style={styles.sectionEditText}>Düzenle</Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.card}>
-              <View style={styles.infoRow}>
-                <Text style={styles.infoIcon}>🏷️</Text>
-                <View style={styles.infoContent}>
-                  <Text style={styles.infoLabel}>Sektörler</Text>
-                  {(prefs.sectors ?? []).length > 0 ? (
-                    <Text style={styles.infoValue}>{(prefs.sectors ?? []).join(', ')}</Text>
-                  ) : (
-                    <Text style={[styles.infoValue, { color: colors.textDim }]}>Belirtilmemiş</Text>
-                  )}
-                </View>
-              </View>
-              <View style={styles.cardDivider} />
-              <View style={styles.infoRow}>
-                <Text style={styles.infoIcon}>🏢</Text>
-                <View style={styles.infoContent}>
-                  <Text style={styles.infoLabel}>Çalışma Tipi</Text>
-                  <Text style={styles.infoValue}>{workTypeDisplay}</Text>
-                </View>
-              </View>
-              <View style={styles.cardDivider} />
-              <View style={styles.infoRow}>
-                <Text style={styles.infoIcon}>📊</Text>
-                <View style={styles.infoContent}>
-                  <Text style={styles.infoLabel}>Kıdem</Text>
-                  <Text style={styles.infoValue}>{seniorityLabel}</Text>
-                </View>
-              </View>
-              <View style={styles.cardDivider} />
-              <View style={styles.infoRow}>
-                <Text style={styles.infoIcon}>🏙️</Text>
-                <View style={styles.infoContent}>
-                  <Text style={styles.infoLabel}>Şehir</Text>
-                  <Text style={styles.infoValue}>{prefs.location || 'Belirtilmemiş'}</Text>
-                </View>
-              </View>
-            </View>
-          </View>
+          <ProfilePreferences prefs={prefs} colors={colors} />
 
           {/* Skills */}
           <View style={styles.section}>
             <View style={styles.sectionRow}>
               <Text style={styles.sectionTitle}>Yetenekler</Text>
-              <TouchableOpacity onPress={openSkillsEditor} activeOpacity={0.7} style={styles.sectionEditBtn}>
-                <Text style={styles.sectionEditText}>Düzenle</Text>
+              <TouchableOpacity onPress={() => setShowSkillsEditor(true)} activeOpacity={0.7} style={styles.sectionEditBtn}>
+                <Text style={[styles.sectionEditText, { color: colors.isDark ? colors.textMuted : colors.accent }]}>Düzenle</Text>
               </TouchableOpacity>
             </View>
             {skills.length > 0 ? (
               <View style={styles.skillsWrap}>
                 {skills.map((skill) => (
-                  <View key={skill} style={styles.skillChip}>
-                    <Text style={styles.skillText}>{skill}</Text>
+                  <View key={skill} style={[styles.skillChip, { backgroundColor: colors.bgDeep, borderColor: colors.cardBorder }]}>
+                    <Text style={[styles.skillText, { color: colors.text }]}>{skill}</Text>
                   </View>
                 ))}
               </View>
             ) : (
-              <Text style={styles.sectionEmpty}>Henüz yetenek eklenmedi.</Text>
+              <Text style={[styles.sectionEmpty, { color: colors.textDim }]}>Henüz yetenek eklenmedi.</Text>
             )}
           </View>
 
           {/* CV */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>CV / Özgeçmiş</Text>
-            {cvParsed ? (
-              <View style={styles.card}>
-                <View style={styles.infoRow}>
-                  <Text style={styles.infoIcon}>📄</Text>
-                  <View style={styles.infoContent}>
-                    <Text style={styles.infoValue}>{cvParsed.title || 'CV yüklendi'}</Text>
-                    <Text style={styles.infoLabel}>
-                      {cvParsed.skills?.length || 0} yetenek · {cvParsed.experience?.length || 0} deneyim
-                    </Text>
-                  </View>
-                  {cvLoading ? (
-                    <ActivityIndicator size="small" color={colors.textMuted} />
-                  ) : (
-                    <View style={{ flexDirection: 'row', gap: SPACING.md }}>
-                      <TouchableOpacity onPress={handleViewCv} hitSlop={8} activeOpacity={0.7}>
-                        <Text style={styles.cvActionLink}>Görüntüle</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity onPress={handlePickCv} hitSlop={8} activeOpacity={0.7}>
-                        <Text style={styles.cvActionLink}>Güncelle</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </View>
-              </View>
-            ) : (
-              <TouchableOpacity
-                style={styles.cvUploadBtn}
-                onPress={handlePickCv}
-                activeOpacity={0.8}
-                disabled={cvLoading}
-                accessibilityRole="button"
-                accessibilityLabel="CV yükle, PDF dosyası seç"
-              >
-                {cvLoading ? (
-                  <ActivityIndicator color={colors.text} />
-                ) : (
-                  <>
-                    <Text style={styles.cvUploadIcon}>📄</Text>
-                    <View>
-                      <Text style={styles.cvUploadText}>CV Yükle (PDF)</Text>
-                      <Text style={styles.cvUploadSub}>İlan eşleşme skorunuzu artırın</Text>
-                    </View>
-                  </>
-                )}
-              </TouchableOpacity>
-            )}
-          </View>
+          <CvSection
+            cvParsed={cvParsed}
+            cvLoading={cvLoading}
+            colors={colors}
+            onPickCv={handlePickCv}
+            onViewCv={handleViewCv}
+          />
 
           <TouchableOpacity
-            style={styles.settingsBtn}
+            style={[styles.settingsBtn, { backgroundColor: colors.bgDeep, borderColor: colors.cardBorder }]}
             onPress={() => router.push('/job-alerts')}
             activeOpacity={0.8}
           >
-            <Text style={styles.settingsBtnText}>İş İlanı Uyarısı</Text>
+            <Text style={[styles.settingsBtnText, { color: colors.text }]}>İş İlanı Uyarısı</Text>
             <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.settingsBtn}
+            style={[styles.settingsBtn, { backgroundColor: colors.bgDeep, borderColor: colors.cardBorder }]}
             onPress={() => router.push('/settings')}
             activeOpacity={0.8}
           >
-            <Text style={styles.settingsBtnText}>Ayarlar</Text>
+            <Text style={[styles.settingsBtnText, { color: colors.text }]}>Ayarlar</Text>
             <Ionicons name="chevron-forward" size={16} color={colors.textMuted} />
           </TouchableOpacity>
 
@@ -688,89 +502,15 @@ export default function ProfileScreen() {
         </ScrollView>
 
         {/* Yetenekler Editor Bottom Sheet */}
-        <Modal
+        <SkillsEditorModal
           visible={showSkillsEditor}
-          transparent
-          animationType="slide"
-          onRequestClose={() => setShowSkillsEditor(false)}
-        >
-          <TouchableOpacity
-            style={styles.sheetBackdrop}
-            activeOpacity={1}
-            onPress={() => setShowSkillsEditor(false)}
-          />
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.sheetKeyboard}
-          >
-            <View style={[styles.sheet, styles.skillsSheet, { paddingBottom: insets.bottom + SPACING.lg }]}>
-              <View style={styles.sheetHandle} />
-              <View style={styles.sheetHeader}>
-                <Text style={styles.sheetTitle}>Yetenekler</Text>
-                <TouchableOpacity onPress={() => setShowSkillsEditor(false)} style={styles.sheetCloseBtn}>
-                  <Ionicons name="close" size={16} color={colors.textMuted} />
-                </TouchableOpacity>
-              </View>
-
-              <View style={styles.skillInputRow}>
-                <TextInput
-                  style={styles.skillInputField}
-                  value={customSkillInput}
-                  onChangeText={setCustomSkillInput}
-                  placeholder="Yetenek ekle..."
-                  placeholderTextColor={colors.textDim}
-                  onSubmitEditing={addCustomDraftSkill}
-                  returnKeyType="done"
-                />
-                <TouchableOpacity style={styles.skillAddBtn} onPress={addCustomDraftSkill} activeOpacity={0.8}>
-                  <Text style={styles.skillAddBtnText}>+</Text>
-                </TouchableOpacity>
-              </View>
-
-              <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                <View style={styles.skillChipsWrap}>
-                  {suggestedSkills.map((s) => {
-                    const active = draftSkills.includes(s);
-                    return (
-                      <TouchableOpacity
-                        key={s}
-                        style={[styles.skillEditorChip, active && styles.skillEditorChipActive]}
-                        onPress={() => toggleDraftSkill(s)}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={[styles.skillEditorChipText, active && styles.skillEditorChipTextActive]}>{s}</Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                  {draftSkills
-                    .filter((s) => !suggestedSkills.includes(s))
-                    .map((s) => (
-                      <TouchableOpacity
-                        key={s}
-                        style={[styles.skillEditorChip, styles.skillEditorChipActive, { flexDirection: 'row', alignItems: 'center', gap: 4 }]}
-                        onPress={() => toggleDraftSkill(s)}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={[styles.skillEditorChipText, styles.skillEditorChipTextActive]}>{s}</Text>
-                        <Ionicons name="close" size={10} color={colors.isDark ? colors.text : '#ffffff'} />
-                      </TouchableOpacity>
-                    ))}
-                </View>
-              </ScrollView>
-
-              <TouchableOpacity
-                style={styles.skillsSaveBtn}
-                onPress={saveSkills}
-                activeOpacity={0.85}
-                disabled={skillsSaving}
-              >
-                {skillsSaving
-                  ? <ActivityIndicator color="#fff" size="small" />
-                  : <Text style={styles.skillsSaveBtnText}>Kaydet ({draftSkills.length} yetenek)</Text>}
-              </TouchableOpacity>
-            </View>
-          </KeyboardAvoidingView>
-        </Modal>
+          colors={colors}
+          insets={insets}
+          initialSkills={skills}
+          suggestedSkills={suggestedSkills}
+          onSave={saveSkills}
+          onClose={() => setShowSkillsEditor(false)}
+        />
 
       </View>
     </KeyboardAvoidingView>
@@ -868,30 +608,25 @@ function makeStyles(c: ThemeColors) {
       shadowRadius: 4,
       elevation: 2,
     },
-    avatarEditIcon: { fontSize: 15 },
     avatarText: { color: '#ffffff', fontSize: 32, fontWeight: '800' },
     editFields: { width: '100%', gap: SPACING.sm, marginTop: SPACING.sm },
     editInput: {
-      backgroundColor: c.cardBg,
       borderWidth: 1,
-      borderColor: c.cardBorder,
       borderRadius: RADII.md,
       paddingHorizontal: SPACING.md,
       paddingVertical: SPACING.sm + 2,
-      color: c.text,
       fontSize: FONT_SIZES.md,
       textAlign: 'left',
     },
     name: {
-      color: c.text, fontSize: FONT_SIZES.xl,
+      fontSize: FONT_SIZES.xl,
       fontWeight: '800', letterSpacing: -0.5,
     },
-    jobTitle: { color: c.textMuted, fontSize: FONT_SIZES.md, marginTop: SPACING.xs },
-    location: { color: c.textMuted, fontSize: FONT_SIZES.sm, marginTop: SPACING.xs },
+    jobTitle: { fontSize: FONT_SIZES.md, marginTop: SPACING.xs },
+    location: { fontSize: FONT_SIZES.sm, marginTop: SPACING.xs },
     statsRow: {
       flexDirection: 'row',
-      backgroundColor: c.bgDeep,
-      borderWidth: 1, borderColor: c.cardBorder,
+      borderWidth: 1,
       borderRadius: RADII.lg, padding: SPACING.md,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 3 },
@@ -899,7 +634,7 @@ function makeStyles(c: ThemeColors) {
       shadowRadius: 8,
       elevation: 2,
     },
-    statDivider: { width: 1, backgroundColor: c.cardBorder },
+    statDivider: { width: 1 },
     section: { gap: SPACING.sm },
     sectionRow: {
       flexDirection: 'row',
@@ -919,37 +654,15 @@ function makeStyles(c: ThemeColors) {
       borderColor: c.cardBorder,
     },
     sectionEditText: {
-      color: c.isDark ? c.textMuted : c.accent,
       fontSize: FONT_SIZES.xs,
       fontWeight: '600',
     },
     sectionEmpty: {
-      color: c.textDim,
       fontSize: FONT_SIZES.sm,
     },
-    card: {
-      backgroundColor: c.bgDeep, borderWidth: 1,
-      borderColor: c.cardBorder, borderRadius: RADII.lg, overflow: 'hidden',
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 3 },
-      shadowOpacity: c.isDark ? 0.2 : 0.06,
-      shadowRadius: 8,
-      elevation: 2,
-    },
-    cardDivider: { height: 1, backgroundColor: c.cardBorder },
-    infoRow: {
-      flexDirection: 'row', alignItems: 'center',
-      gap: SPACING.sm + 4, padding: SPACING.md,
-    },
-    infoIcon: { fontSize: 18, width: 24, textAlign: 'center' },
-    infoContent: { flex: 1 },
-    infoLabel: { color: c.textMuted, fontSize: FONT_SIZES.xs, marginBottom: 2 },
-    infoValue: { color: c.text, fontSize: FONT_SIZES.sm, fontWeight: '500' },
     skillsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
     skillChip: {
-      backgroundColor: c.bgDeep,
       borderWidth: 1,
-      borderColor: c.cardBorder,
       borderRadius: RADII.full,
       paddingHorizontal: SPACING.sm + 4, paddingVertical: SPACING.xs + 2,
       shadowColor: '#051650',
@@ -958,10 +671,10 @@ function makeStyles(c: ThemeColors) {
       shadowRadius: 3,
       elevation: c.isDark ? 0 : 1,
     },
-    skillText: { color: c.text, fontSize: FONT_SIZES.xs, fontWeight: '500' },
+    skillText: { fontSize: FONT_SIZES.xs, fontWeight: '500' },
     settingsBtn: {
-      backgroundColor: c.bgDeep, borderWidth: 1,
-      borderColor: c.cardBorder, borderRadius: RADII.full,
+      borderWidth: 1,
+      borderRadius: RADII.full,
       paddingVertical: SPACING.sm + 4,
       paddingHorizontal: SPACING.lg,
       flexDirection: 'row',
@@ -973,223 +686,12 @@ function makeStyles(c: ThemeColors) {
       shadowRadius: 6,
       elevation: c.isDark ? 0 : 1,
     },
-    settingsBtnText: { flex: 1, textAlign: 'center', color: c.text, fontSize: FONT_SIZES.sm, fontWeight: '600' },
+    settingsBtnText: { flex: 1, textAlign: 'center', fontSize: FONT_SIZES.sm, fontWeight: '600' },
     signOutBtn: {
       backgroundColor: 'rgba(255,59,48,0.07)', borderWidth: 1,
       borderColor: 'rgba(255,59,48,0.2)', borderRadius: RADII.full,
       paddingVertical: SPACING.sm + 4, alignItems: 'center',
     },
     signOutText: { color: '#ef4444', fontSize: FONT_SIZES.sm, fontWeight: '600' },
-    errorBanner: {
-      backgroundColor: 'rgba(239,68,68,0.08)',
-      borderWidth: 1,
-      borderColor: 'rgba(239,68,68,0.2)',
-      borderRadius: RADII.md,
-      paddingHorizontal: SPACING.md,
-      paddingVertical: SPACING.sm,
-    },
-    errorBannerText: {
-      color: '#ef4444',
-      fontSize: FONT_SIZES.xs,
-      textAlign: 'center',
-    },
-    sheetBackdrop: {
-      flex: 1,
-      backgroundColor: c.isDark ? 'rgba(0,5,20,0.65)' : 'rgba(5,22,80,0.30)',
-    },
-    sheet: {
-      backgroundColor: c.cardBg,
-      borderTopLeftRadius: 28,
-      borderTopRightRadius: 28,
-      paddingHorizontal: SPACING.lg,
-      paddingTop: SPACING.sm,
-      maxHeight: '70%',
-      borderTopWidth: 1,
-      borderColor: c.cardBorder,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: -6 },
-      shadowOpacity: c.isDark ? 0.4 : 0.08,
-      shadowRadius: 20,
-      elevation: 10,
-    },
-    sheetHandle: {
-      width: 36, height: 4,
-      backgroundColor: c.cardBorder,
-      borderRadius: 2,
-      alignSelf: 'center',
-      marginBottom: SPACING.md,
-    },
-    sheetHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: SPACING.md,
-      paddingBottom: SPACING.md,
-      borderBottomWidth: 1,
-      borderBottomColor: c.cardBorder,
-    },
-    sheetTitle: {
-      color: c.text,
-      fontSize: FONT_SIZES.lg,
-      fontWeight: '700',
-    },
-    sheetCloseBtn: {
-      width: 30, height: 30,
-      backgroundColor: c.bgDeep,
-      borderRadius: 15,
-      alignItems: 'center', justifyContent: 'center',
-    },
-    cvUploadBtn: {
-      backgroundColor: c.bgDeep,
-      borderWidth: 1.5,
-      borderColor: c.cardBorder,
-      borderRadius: RADII.lg,
-      borderStyle: 'dashed',
-      padding: SPACING.md,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: SPACING.md,
-      justifyContent: 'center',
-    },
-    cvUploadIcon: { fontSize: 24 },
-    cvUploadText: { color: c.text, fontSize: FONT_SIZES.md, fontWeight: '700' },
-    cvUploadSub: { color: c.textMuted, fontSize: FONT_SIZES.xs, marginTop: 2 },
-    cvActionLink: {
-      color: c.isDark ? c.textMuted : c.accent,
-      fontSize: FONT_SIZES.xs,
-      fontWeight: '600',
-    },
-    completionCard: {
-      backgroundColor: c.bgDeep,
-      borderWidth: 1,
-      borderColor: c.cardBorder,
-      borderRadius: RADII.lg,
-      padding: SPACING.md,
-      gap: SPACING.sm,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 3 },
-      shadowOpacity: c.isDark ? 0.2 : 0.06,
-      shadowRadius: 8,
-      elevation: 2,
-    },
-    completionHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-    },
-    completionTitle: {
-      color: c.textMuted,
-      fontSize: FONT_SIZES.xs,
-      fontWeight: '600',
-      textTransform: 'uppercase',
-      letterSpacing: 1,
-    },
-    completionScore: {
-      color: c.text,
-      fontSize: FONT_SIZES.md,
-      fontWeight: '800',
-    },
-    completionBar: {
-      height: 6,
-      backgroundColor: c.cardBorder,
-      borderRadius: RADII.full,
-      overflow: 'hidden',
-    },
-    completionFill: {
-      height: '100%',
-      borderRadius: RADII.full,
-    },
-    completionHint: {
-      color: c.textMuted,
-      fontSize: FONT_SIZES.xs,
-    },
-    completionComplete: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: SPACING.xs,
-      backgroundColor: 'rgba(46,204,113,0.08)',
-      borderWidth: 1,
-      borderColor: 'rgba(46,204,113,0.25)',
-      borderRadius: RADII.lg,
-      padding: SPACING.md,
-    },
-    completionCompleteText: {
-      color: '#2ecc71',
-      fontSize: FONT_SIZES.sm,
-      fontWeight: '600',
-    },
-    sheetKeyboard: {
-      position: 'absolute',
-      bottom: 0, left: 0, right: 0,
-    },
-    skillsSheet: {
-      maxHeight: '80%',
-    },
-    skillInputRow: {
-      flexDirection: 'row',
-      gap: SPACING.sm,
-      marginBottom: SPACING.md,
-    },
-    skillInputField: {
-      flex: 1,
-      backgroundColor: c.bgDeep,
-      borderWidth: 1,
-      borderColor: c.cardBorder,
-      borderRadius: RADII.md,
-      paddingHorizontal: SPACING.md,
-      paddingVertical: SPACING.sm,
-      color: c.text,
-      fontSize: FONT_SIZES.md,
-    },
-    skillAddBtn: {
-      width: 48,
-      backgroundColor: c.isDark ? c.bgDeep : c.accent,
-      borderWidth: c.isDark ? 1 : 0,
-      borderColor: c.cardBorder,
-      borderRadius: RADII.md,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    skillAddBtnText: { color: '#ffffff', fontSize: 24, fontWeight: '300' },
-    skillChipsWrap: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: SPACING.sm,
-      paddingBottom: SPACING.md,
-    },
-    skillEditorChip: {
-      paddingHorizontal: SPACING.sm + 4,
-      paddingVertical: SPACING.xs + 4,
-      borderRadius: RADII.full,
-      backgroundColor: c.bgDeep,
-      borderWidth: 1,
-      borderColor: c.cardBorder,
-    },
-    skillEditorChipActive: {
-      backgroundColor: c.isDark ? 'rgba(226,232,245,0.18)' : c.accent,
-      borderColor: c.isDark ? 'rgba(226,232,245,0.35)' : c.accent,
-    },
-    skillEditorChipText: {
-      color: c.textMuted,
-      fontSize: FONT_SIZES.sm,
-      fontWeight: '500',
-    },
-    skillEditorChipTextActive: { color: c.isDark ? c.text : '#ffffff' },
-    skillsSaveBtn: {
-      height: 52,
-      backgroundColor: c.isDark ? 'rgba(226,232,245,0.15)' : c.accent,
-      borderWidth: c.isDark ? 1 : 0,
-      borderColor: 'rgba(226,232,245,0.30)',
-      borderRadius: RADII.full,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginTop: SPACING.sm,
-      shadowColor: '#051650',
-      shadowOffset: { width: 0, height: 6 },
-      shadowOpacity: c.isDark ? 0 : 0.28,
-      shadowRadius: 14,
-      elevation: c.isDark ? 0 : 4,
-    },
-    skillsSaveBtnText: { color: '#ffffff', fontSize: FONT_SIZES.md, fontWeight: '700' },
   });
 }

@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { router } from 'expo-router';
 import { supabase } from '@/services/supabase';
-import { useAuthStore } from '@/store/authStore';
+import { useRecoveryStore } from '@/store/recoveryStore';
 import { FONT_SIZES, RADII, SPACING, ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 
@@ -22,7 +22,7 @@ export default function ResetPasswordScreen() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [focusedField, setFocusedField] = useState<string | null>(null);
-  const setRecoveryMode = useAuthStore((s) => s.setRecoveryMode);
+  const setRecoveryMode = useRecoveryStore((s) => s.setRecoveryMode);
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
 

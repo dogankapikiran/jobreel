@@ -1,12 +1,12 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, StyleSheet, View } from 'react-native';
+import { Animated, StyleProp, StyleSheet, View, ViewStyle, DimensionValue } from 'react-native';
 import { RADII, SPACING } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
 
 interface SkeletonBoxProps {
-  width: number | string;
-  height: number;
-  style?: object;
+  width: DimensionValue;
+  height: DimensionValue;
+  style?: StyleProp<ViewStyle>;
   shimmerLight: string;
   shimmerDark: string;
   anim: Animated.Value;
@@ -44,7 +44,7 @@ export default function SkeletonCard({ cardHeight }: Props) {
     ).start();
   }, []);
 
-  const box = (width: number | string, height: number, style?: object) => (
+  const box = (width: DimensionValue, height: DimensionValue, style?: StyleProp<ViewStyle>) => (
     <SkeletonBox
       width={width}
       height={height}
@@ -77,7 +77,7 @@ export default function SkeletonCard({ cardHeight }: Props) {
       </View>
 
       {box('100%', 60, { borderRadius: RADII.md, marginBottom: SPACING.md })}
-      {box('100%', 48, { borderRadius: RADII.full, marginTop: 'auto' as any })}
+      {box('100%', 48, { borderRadius: RADII.full, marginTop: 'auto' })}
     </View>
   );
 }

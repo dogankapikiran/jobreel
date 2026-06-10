@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Interaction, UserProfile } from '@/types';
+import { UserProfile } from '@/types';
 import { safeJSONStorage } from './safeStorage';
+import { registerStoreCleanup } from './cleanupRegistry';
 
 const DEFAULT_PREFERENCES: UserProfile['preferences'] = {
   sectors: [],
@@ -26,15 +26,9 @@ const DEFAULT_PROFILE: UserProfile = {
 
 interface UserState {
   profile: UserProfile;
-  interactions: Interaction[];
-  hasCompletedOnboarding: boolean;
-  completedOnboardingUserIds: string[];
 
   setProfile: (partial: Partial<UserProfile>) => void;
   setPreferences: (partial: Partial<UserProfile['preferences']>) => void;
-  addInteraction: (interaction: Interaction) => void;
-  completeOnboarding: () => void;
-  markOnboardingComplete: (userId: string) => void;
   reset: () => Promise<void>;
 }
 
@@ -42,9 +36,6 @@ export const useUserStore = create<UserState>()(
   persist(
     (set) => ({
       profile: DEFAULT_PROFILE,
-      interactions: [],
-      hasCompletedOnboarding: false,
-      completedOnboardingUserIds: [],
 
       setProfile: (partial) =>
         set((state) => ({ profile: { ...state.profile, ...partial } })),
@@ -57,34 +48,20 @@ export const useUserStore = create<UserState>()(
           },
         })),
 
-      addInteraction: (interaction) =>
-        set((state) => ({
-          interactions: [interaction, ...state.interactions].slice(0, 500),
-        })),
-
-      completeOnboarding: () => set({ hasCompletedOnboarding: true }),
-
-      markOnboardingComplete: (userId) =>
-        set((state) => ({
-          completedOnboardingUserIds: state.completedOnboardingUserIds.includes(userId)
-            ? state.completedOnboardingUserIds
-            : [...state.completedOnboardingUserIds, userId],
-        })),
-
       reset: async () => {
-        // completedOnboardingUserIds intentionally preserved so returning users skip onboarding
-        set({ profile: DEFAULT_PROFILE, interactions: [], hasCompletedOnboarding: false });
+        set({ profile: DEFAULT_PROFILE });
       },
     }),
     {
       name: 'jobreel-user',
       storage: safeJSONStorage,
       merge: (persisted: unknown, current: UserState): UserState => {
-        const p = persisted as Partial<UserState> | null;
+        const p = (persisted !== null && typeof persisted === 'object')
+          ? (persisted as Partial<UserState>)
+          : null;
         return {
           ...current,
           ...p,
-          completedOnboardingUserIds: p?.completedOnboardingUserIds ?? [],
           profile: {
             ...current.profile,
             ...(p?.profile ?? {}),
@@ -101,3 +78,5 @@ export const useUserStore = create<UserState>()(
     }
   )
 );
+
+registerStoreCleanup(() => useUserStore.getState().reset());

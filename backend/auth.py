@@ -3,11 +3,15 @@ import jwt
 from jwt import PyJWKClient
 from fastapi import HTTPException, Security
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 _security = HTTPBearer()
 _optional_security = HTTPBearer(auto_error=False)
 
-SUPABASE_URL = os.getenv("SUPABASE_URL", "")
+SUPABASE_URL = os.getenv("SUPABASE_URL", "") or os.getenv("EXPO_PUBLIC_SUPABASE_URL", "")
 _jwks_client = PyJWKClient(
     f"{SUPABASE_URL}/auth/v1/.well-known/jwks.json",
     cache_keys=True,

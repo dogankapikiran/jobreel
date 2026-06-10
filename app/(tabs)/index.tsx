@@ -15,6 +15,7 @@ import {
   TouchableOpacity,
   useWindowDimensions,
   View,
+  ViewToken,
 } from 'react-native';
 
 import { Ionicons } from '@expo/vector-icons';
@@ -35,7 +36,12 @@ import {
   HEADER_HEIGHT,
   RADII,
   SPACING,
+  ThemeColors,
 } from '@/constants/theme';
+
+// ─── Subcomponents ────────────────────────────────────────────────────────────
+import SearchBarGroup from '@/components/feed/SearchBarGroup';
+import SwipeHint from '@/components/feed/SwipeHint';
 
 export default function FeedScreen() {
   const insets = useSafeAreaInsets();
@@ -76,34 +82,45 @@ export default function FeedScreen() {
   const bgRefreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const bgRefreshRetries = useRef(0);
   const BG_MAX_RETRIES = 10;
-  // Refs for stale-closure-safe access inside onViewableItemsChanged
+
   const pageRef = useRef(1);
   const filtersRef = useRef(filters);
   const hasMoreRef = useRef(true);
-  // BUG-06: sectors için ref — buildParams stale closure'ı önler
   const sectorsRef = useRef(profile.preferences.sectors);
-  // BUG-13: arka plan→ön plan geçişinde feed refresh
   const lastForegroundAt = useRef<number>(Date.now());
-  // BUG-23: profile location ilk kez set edildiğinde filters'ı güncelle
   const locationInitializedRef = useRef(!!profile.preferences.location);
   const hintShownRef = useRef(false);
 
   const SEARCH_BAR_HEIGHT = showSearchBars ? 148 : 0;
-  const cardHeight = height - insets.top - HEADER_HEIGHT - SEARCH_BAR_HEIGHT - BOTTOM_NAV_HEIGHT - insets.bottom;
+  const cardHeight =
+    height - insets.top - HEADER_HEIGHT - SEARCH_BAR_HEIGHT - BOTTOM_NAV_HEIGHT - insets.bottom;
 
-  const styles = useMemo(() => makeStyles({ bg, text, textDim, textMuted, accent, headerBtnBg, cardBorder, bgDeep, isDark, bottomNavH: BOTTOM_NAV_HEIGHT }), [bg, text, textDim, textMuted, accent, headerBtnBg, cardBorder, bgDeep, isDark]);
+  const styles = useMemo(
+    () =>
+      makeStyles({
+        bg,
+        text,
+        textDim,
+        textMuted,
+        accent,
+        headerBtnBg,
+        cardBorder,
+        bgDeep,
+        isDark,
+        bottomNavH: BOTTOM_NAV_HEIGHT,
+      }),
+    [bg, text, textDim, textMuted, accent, headerBtnBg, cardBorder, bgDeep, isDark]
+  );
 
   useEffect(() => {
     if (jobs.length > 0) return;
     loadInitialFeed(filters, 1);
   }, []);
 
-  // BUG-06: sectorsRef'i profil güncellendiğinde senkronize et
   useEffect(() => {
     sectorsRef.current = profile.preferences.sectors;
   }, [profile.preferences.sectors]);
 
-  // BUG-23: Profil hydrate olduktan sonra filters.location'ı güncelle (kullanıcı manuel değiştirmediyse)
   useEffect(() => {
     const loc = profile.preferences.location;
     if (loc && !locationInitializedRef.current) {
@@ -118,7 +135,6 @@ export default function FeedScreen() {
     }
   }, [profile.preferences.location]);
 
-  // BUG-13: Uygulama arka plandan öne geldiğinde 5+ dakika geçtiyse feed'i yenile
   useEffect(() => {
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') {
@@ -134,7 +150,9 @@ export default function FeedScreen() {
     return () => sub.remove();
   }, []);
 
-  useEffect(() => { hintShownRef.current = false; }, [sessionUserId]);
+  useEffect(() => {
+    hintShownRef.current = false;
+  }, [sessionUserId]);
 
   useEffect(() => {
     if (hintShownRef.current || isLoading || jobs.length === 0) return;
@@ -151,10 +169,14 @@ export default function FeedScreen() {
     bounce.start();
     const t = setTimeout(() => {
       bounce.stop();
-      Animated.timing(hintFade, { toValue: 0, duration: 500, useNativeDriver: true })
-        .start(() => setShowHint(false));
+      Animated.timing(hintFade, { toValue: 0, duration: 500, useNativeDriver: true }).start(() =>
+        setShowHint(false)
+      );
     }, 2800);
-    return () => { clearTimeout(t); bounce.stop(); };
+    return () => {
+      clearTimeout(t);
+      bounce.stop();
+    };
   }, [isLoading]);
 
   function normalizeLocation(loc: string): string {
@@ -249,11 +271,18 @@ export default function FeedScreen() {
         if (partial) {
           bgRefreshTimer.current = setTimeout(
             () => refreshInBackground(filtersRef.current, nextPage),
-            2000,
+            2000
           );
         }
-      } else {
+      } else if (!partial) {
         hasMoreRef.current = false;
+      } else {
+        setTimeout(() => {
+          loadingMoreRef.current = false;
+          setLoadingMore(false);
+          loadMoreJobs();
+        }, 2000);
+        return;
       }
     } catch {
       // ağ hatası — hasMore'u sıfırlama, sonra tekrar denenebilir
@@ -312,12 +341,7 @@ export default function FeedScreen() {
   }
 
   const renderItem = useCallback(
-    ({ item }: ListRenderItemInfo<Job>) => (
-      <JobCard
-        job={item}
-        cardHeight={cardHeight}
-      />
-    ),
+    ({ item }: ListRenderItemInfo<Job>) => <JobCard job={item} cardHeight={cardHeight} />,
     [cardHeight]
   );
 
@@ -338,12 +362,14 @@ export default function FeedScreen() {
 
   const prevIndexRef = useRef(0);
   const jobsCountRef = useRef(jobs.length);
-  useEffect(() => { jobsCountRef.current = jobs.length; }, [jobs.length]);
+  useEffect(() => {
+    jobsCountRef.current = jobs.length;
+  }, [jobs.length]);
 
   const displayJobsCountRef = useRef(0);
 
   const onViewableItemsChanged = useCallback(
-    ({ viewableItems }: any) => {
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
       if (!viewableItems[0]) return;
       const idx: number = viewableItems[0].index ?? 0;
       setCurrentIndex(idx);
@@ -355,12 +381,15 @@ export default function FeedScreen() {
 
   const viewabilityConfig = useRef({ viewAreaCoveragePercentThreshold: 60 });
 
-  const displayJobs = filters.minScore > 0
-    ? jobs.filter((j) => (j.score ?? 0) >= filters.minScore)
-    : jobs;
+  const displayJobs =
+    filters.minScore > 0 ? jobs.filter((j) => (j.score ?? 0) >= filters.minScore) : jobs;
   displayJobsCountRef.current = displayJobs.length;
 
-  const isFilterActive = filters.workType !== 'any' || filters.seniority.length > 0 || !!filters.keyword || filters.minScore > 0;
+  const isFilterActive =
+    filters.workType !== 'any' ||
+    filters.seniority.length > 0 ||
+    !!filters.keyword ||
+    filters.minScore > 0;
 
   if (isLoading && jobs.length === 0) {
     return (
@@ -407,82 +436,22 @@ export default function FeedScreen() {
 
       {/* Arama çubukları */}
       {showSearchBars && (
-        <View>
-          <View style={styles.searchRow}>
-            <Ionicons name="search-outline" size={15} color={textDim} />
-            <TextInput
-              style={styles.searchInput}
-              value={searchText}
-              onChangeText={setSearchText}
-              onFocus={() => setShowRecent(recentSearches.length > 0)}
-              onBlur={() => setTimeout(() => setShowRecent(false), 150)}
-              onSubmitEditing={() => locationInputRef.current?.focus()}
-              placeholder="Pozisyon veya şirket ara..."
-              placeholderTextColor={textDim}
-              returnKeyType="next"
-              autoCorrect={false}
-              autoCapitalize="none"
-            />
-            {searchText.length > 0 && (
-              <TouchableOpacity onPress={handleSearchClear} style={styles.searchClearBtn} activeOpacity={0.7}>
-                <Ionicons name="close-outline" size={16} color={textDim} />
-              </TouchableOpacity>
-            )}
-          </View>
-
-          {showRecent && (
-            <View style={styles.recentDropdown}>
-              <View style={styles.recentHeader}>
-                <Text style={styles.recentTitle}>Son Aramalar</Text>
-                <TouchableOpacity onPress={() => { clearRecentSearches(); setShowRecent(false); }} activeOpacity={0.7}>
-                  <Text style={styles.recentClear}>Temizle</Text>
-                </TouchableOpacity>
-              </View>
-              {recentSearches.map((kw) => (
-                <TouchableOpacity key={kw} style={styles.recentItem} onPress={() => handleRecentSelect(kw)} activeOpacity={0.7}>
-                  <Ionicons name="time-outline" size={14} color={textDim} />
-                  <Text style={styles.recentItemText}>{kw}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-
-          <View style={styles.searchRow}>
-            <Ionicons name="location-outline" size={15} color={textDim} />
-            <TextInput
-              ref={locationInputRef}
-              style={styles.searchInput}
-              value={locationText}
-              onChangeText={setLocationText}
-              onSubmitEditing={() => applySearchAndLocation(searchText, locationText)}
-              placeholder="İstanbul, Ankara, Uzaktan..."
-              placeholderTextColor={textDim}
-              returnKeyType="search"
-              autoCorrect={false}
-              autoCapitalize="words"
-            />
-            {locationText !== defaultLocation && locationText.length > 0 && (
-              <TouchableOpacity
-                onPress={handleLocationClear}
-                style={styles.searchClearBtn}
-                activeOpacity={0.7}
-                accessibilityLabel="Konumu varsayılana sıfırla"
-              >
-                <Ionicons name="arrow-undo-outline" size={15} color={textDim} />
-              </TouchableOpacity>
-            )}
-          </View>
-          <TouchableOpacity
-            style={styles.searchSubmitBtn}
-            onPress={() => applySearchAndLocation(searchText, locationText)}
-            activeOpacity={0.8}
-            accessibilityRole="button"
-            accessibilityLabel="Aramayı uygula"
-          >
-            <Ionicons name="search" size={14} color="#ffffff" />
-            <Text style={styles.searchSubmitText}>Ara</Text>
-          </TouchableOpacity>
-        </View>
+        <SearchBarGroup
+          searchText={searchText}
+          setSearchText={setSearchText}
+          locationText={locationText}
+          setLocationText={setLocationText}
+          defaultLocation={defaultLocation}
+          onSearchSubmit={() => applySearchAndLocation(searchText, locationText)}
+          onSearchClear={handleSearchClear}
+          onLocationClear={handleLocationClear}
+          showRecent={showRecent}
+          setShowRecent={setShowRecent}
+          recentSearches={recentSearches}
+          onRecentSelect={handleRecentSelect}
+          onRecentClear={clearRecentSearches}
+          locationInputRef={locationInputRef}
+        />
       )}
 
       <FilterSheet
@@ -492,7 +461,7 @@ export default function FeedScreen() {
         onClose={() => setShowFilter(false)}
       />
 
-      {(isLoading && jobs.length > 0 || loadingMore) && (
+      {((isLoading && jobs.length > 0) || loadingMore) && (
         <View style={styles.filteringBanner}>
           <ActivityIndicator size="small" color={accent} />
           <Text style={styles.filteringText}>
@@ -501,18 +470,8 @@ export default function FeedScreen() {
         </View>
       )}
 
-      {showHint && (
-        <Animated.View style={[styles.swipeHintContainer, { opacity: hintFade }]} pointerEvents="none">
-          <View style={styles.swipeHint}>
-            <Ionicons name="chevron-up-outline" size={18} color="rgba(255,255,255,0.8)" />
-            <Animated.View style={{ transform: [{ translateY: hintBounce }] }}>
-              <Ionicons name="swap-vertical-outline" size={28} color="#ffffff" />
-            </Animated.View>
-            <Text style={styles.swipeHintText}>Kaydır</Text>
-            <Ionicons name="chevron-down-outline" size={18} color="rgba(255,255,255,0.8)" />
-          </View>
-        </Animated.View>
-      )}
+      <SwipeHint visible={showHint} fadeAnim={hintFade} bounceAnim={hintBounce} />
+
       {showLocationToast && (
         <Animated.View style={[styles.toast, { opacity: locationToastAnim }]} pointerEvents="none">
           <Text style={styles.toastText}>Konum varsayılana döndürüldü</Text>
@@ -559,11 +518,14 @@ export default function FeedScreen() {
               {loadError
                 ? 'İnternet bağlantınızı kontrol edin ve tekrar deneyin.'
                 : filters.minScore > 0
-                  ? `Eşleşme skoru filtresi (≥%${filters.minScore}) tüm ilanları gizliyor`
-                  : 'Filtre kriterlerini genişletmeyi dene'}
+                ? `Eşleşme skoru filtresi (≥%${filters.minScore}) tüm ilanları gizliyor`
+                : 'Filtre kriterlerini genişletmeyi dene'}
             </Text>
             {!loadError && filters.minScore > 0 ? (
-              <TouchableOpacity style={styles.retryBtn} onPress={() => handleApplyFilter({ ...filters, minScore: 0 })}>
+              <TouchableOpacity
+                style={styles.retryBtn}
+                onPress={() => handleApplyFilter({ ...filters, minScore: 0 })}
+              >
                 <Text style={styles.retryText}>Skor Filtresini Kaldır</Text>
               </TouchableOpacity>
             ) : (
@@ -591,7 +553,18 @@ interface StyleProps {
   bottomNavH: number;
 }
 
-function makeStyles({ bg, text, textDim, textMuted, accent, headerBtnBg, cardBorder, bgDeep, isDark, bottomNavH }: StyleProps) {
+function makeStyles({
+  bg,
+  text,
+  textDim,
+  textMuted,
+  accent,
+  headerBtnBg,
+  cardBorder,
+  bgDeep,
+  isDark,
+  bottomNavH,
+}: StyleProps) {
   return StyleSheet.create({
     screen: {
       flex: 1,
@@ -631,39 +604,12 @@ function makeStyles({ bg, text, textDim, textMuted, accent, headerBtnBg, cardBor
       justifyContent: 'center',
       shadowColor: isDark ? '#000000' : '#051650',
       shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: isDark ? 0.30 : 0.10,
+      shadowOpacity: isDark ? 0.3 : 0.1,
       shadowRadius: 6,
       elevation: 2,
     },
     headerIconBtnActive: {
       backgroundColor: accent,
-    },
-    searchRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginHorizontal: SPACING.lg,
-      marginBottom: SPACING.sm,
-      height: 44,
-      backgroundColor: bgDeep,
-      borderWidth: isDark ? 1 : 0,
-      borderColor: cardBorder,
-      borderRadius: 12,
-      paddingHorizontal: SPACING.md,
-      gap: SPACING.sm,
-      shadowColor: isDark ? '#000000' : '#051650',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: isDark ? 0.30 : 0.08,
-      shadowRadius: 6,
-      elevation: 2,
-    },
-    searchInput: {
-      flex: 1,
-      color: text,
-      fontSize: FONT_SIZES.sm,
-      height: '100%',
-    },
-    searchClearBtn: {
-      padding: 4,
     },
     emptyText: {
       color: text,
@@ -694,82 +640,12 @@ function makeStyles({ bg, text, textDim, textMuted, accent, headerBtnBg, cardBor
       paddingVertical: SPACING.sm,
       backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(5,22,80,0.06)',
       borderBottomWidth: 1,
-      borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(5,22,80,0.10)',
+      borderBottomColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(5,22,80,0.1)',
     },
     filteringText: {
       color: text,
       fontSize: FONT_SIZES.xs,
       fontWeight: '600',
-    },
-    recentDropdown: {
-      marginHorizontal: SPACING.lg,
-      marginTop: -SPACING.xs,
-      backgroundColor: bgDeep,
-      borderWidth: 1,
-      borderColor: cardBorder,
-      borderRadius: RADII.lg,
-      overflow: 'hidden',
-      zIndex: 100,
-      shadowColor: isDark ? '#000000' : '#051650',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: isDark ? 0.40 : 0.08,
-      shadowRadius: 12,
-      elevation: 3,
-    },
-    recentHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingHorizontal: SPACING.md,
-      paddingVertical: SPACING.sm,
-      borderBottomWidth: 1,
-      borderBottomColor: cardBorder,
-    },
-    recentTitle: {
-      color: textMuted,
-      fontSize: FONT_SIZES.xs,
-      fontWeight: '600',
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
-    },
-    recentClear: {
-      color: text,
-      fontSize: FONT_SIZES.xs,
-      fontWeight: '600',
-    },
-    recentItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: SPACING.sm,
-      paddingHorizontal: SPACING.md,
-      paddingVertical: SPACING.sm + 2,
-      borderBottomWidth: 1,
-      borderBottomColor: isDark ? 'rgba(255,255,255,0.04)' : '#f0f2f7',
-    },
-    recentItemText: {
-      color: text,
-      fontSize: FONT_SIZES.sm,
-    },
-    swipeHintContainer: {
-      position: 'absolute',
-      top: 0, left: 0, right: 0, bottom: 0,
-      alignItems: 'center',
-      justifyContent: 'center',
-      zIndex: 50,
-    },
-    swipeHint: {
-      alignItems: 'center',
-      gap: 4,
-      backgroundColor: 'rgba(0,0,0,0.45)',
-      borderRadius: 20,
-      paddingHorizontal: 20,
-      paddingVertical: 12,
-    },
-    swipeHintText: {
-      color: '#ffffff',
-      fontSize: FONT_SIZES.xs,
-      fontWeight: '700',
-      letterSpacing: 0.5,
     },
     toast: {
       position: 'absolute',
@@ -787,22 +663,6 @@ function makeStyles({ bg, text, textDim, textMuted, accent, headerBtnBg, cardBor
       color: '#ffffff',
       fontSize: FONT_SIZES.xs,
       fontWeight: '600',
-    },
-    searchSubmitBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      gap: SPACING.xs,
-      marginHorizontal: SPACING.lg,
-      marginBottom: SPACING.sm,
-      height: 38,
-      backgroundColor: accent,
-      borderRadius: RADII.full,
-    },
-    searchSubmitText: {
-      color: '#ffffff',
-      fontSize: FONT_SIZES.sm,
-      fontWeight: '700',
     },
   });
 }

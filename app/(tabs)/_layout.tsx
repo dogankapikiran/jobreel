@@ -5,6 +5,7 @@ import { Tabs, useRouter } from 'expo-router';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuthStore } from '@/store/authStore';
+import { useGuestStore } from '@/store/guestStore';
 import { useEffect } from 'react';
 import { track } from '@/services/analytics';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -93,11 +94,12 @@ function CustomTabBar({ state, navigation }: BottomTabBarProps) {
 
 export default function TabsLayout() {
   const session = useAuthStore((s) => s.session);
+  const isGuest = useGuestStore((s) => s.isGuest);
   const router = useRouter();
 
   useEffect(() => {
-    if (!session) router.replace('/auth');
-  }, [session]);
+    if (!session && !isGuest) router.replace('/auth');
+  }, [session, isGuest]);
 
   return (
     <Tabs

@@ -19,11 +19,14 @@ import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { useAuthStore } from '@/store/authStore';
+import { useGuestStore } from '@/store/guestStore';
+import { useRecoveryStore } from '@/store/recoveryStore';
 import { useCompanyStore } from '@/store/companyStore';
 import { useUserStore } from '@/store/userStore';
 import { api } from '@/services/api';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { initAnalytics, identify } from '@/services/analytics';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -40,11 +43,14 @@ export default function RootLayout() {
   const initialize = useAuthStore((s) => s.initialize);
   const isAuthLoading = useAuthStore((s) => s.isLoading);
   const session = useAuthStore((s) => s.session);
-  const setRecoveryMode = useAuthStore((s) => s.setRecoveryMode);
+  const setRecoveryMode = useRecoveryStore((s) => s.setRecoveryMode);
   const setFollowing = useCompanyStore((s) => s.setFollowing);
 
   const [userHydrated, setUserHydrated] = useState(
     () => useUserStore.persist.hasHydrated()
+  );
+  const [guestHydrated, setGuestHydrated] = useState(
+    () => useGuestStore.persist.hasHydrated()
   );
 
   useEffect(() => {
@@ -53,8 +59,36 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
+    if (guestHydrated) return;
+    return useGuestStore.persist.onFinishHydration(() => setGuestHydrated(true));
+  }, []);
+
+  useEffect(() => {
     initialize();
     initAnalytics();
+
+    // Set up global crash logger in production
+    if (!__DEV__) {
+      const rnGlobal = global as unknown as {
+        ErrorUtils?: {
+          getGlobalHandler: () => (error: Error, isFatal?: boolean) => void;
+          setGlobalHandler: (fn: (error: Error, isFatal?: boolean) => void) => void;
+        };
+      };
+      if (rnGlobal.ErrorUtils) {
+        const defaultHandler = rnGlobal.ErrorUtils.getGlobalHandler();
+        rnGlobal.ErrorUtils.setGlobalHandler(async (error, isFatal) => {
+          try {
+            await api.logError(
+              error.message || 'Global Error',
+              error.stack || '',
+              { isFatal, platform: 'native_global' }
+            );
+          } catch {}
+          defaultHandler(error, isFatal);
+        });
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -91,14 +125,16 @@ api.getFollowedCompanies().then(setFollowing).catch(() => {});
   }, [!!session]);
 
   useEffect(() => {
-    if ((fontsLoaded || fontsError) && !isAuthLoading && userHydrated) SplashScreen.hideAsync();
-  }, [fontsLoaded, fontsError, isAuthLoading, userHydrated]);
+    if ((fontsLoaded || fontsError) && !isAuthLoading && userHydrated && guestHydrated) SplashScreen.hideAsync();
+  }, [fontsLoaded, fontsError, isAuthLoading, userHydrated, guestHydrated]);
 
   if (!fontsLoaded && !fontsError) return null;
 
   return (
     <ThemeProvider>
-      <AppShell />
+      <ErrorBoundary>
+        <AppShell />
+      </ErrorBoundary>
     </ThemeProvider>
   );
 }

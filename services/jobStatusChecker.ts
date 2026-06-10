@@ -1,4 +1,5 @@
-import { useFeedStore } from '@/store/feedStore';
+import { useApplicationStore } from '@/store/applicationStore';
+import { Job } from '@/types';
 
 const CONCURRENCY = 3;
 const TIMEOUT_MS = 8000;
@@ -18,13 +19,13 @@ async function isUrlClosed(url: string): Promise<boolean> {
 }
 
 export async function checkClosedJobs(): Promise<void> {
-  const { appliedJobs, markJobClosed } = useFeedStore.getState();
-  const toCheck = appliedJobs.filter((j) => !j.isClosed && j.url);
+  const { appliedJobs, markJobClosed } = useApplicationStore.getState();
+  const toCheck = appliedJobs.filter((j: Job) => !j.isClosed && j.url);
 
   for (let i = 0; i < toCheck.length; i += CONCURRENCY) {
     const batch = toCheck.slice(i, i + CONCURRENCY);
     await Promise.allSettled(
-      batch.map(async (job) => {
+      batch.map(async (job: Job) => {
         const closed = await isUrlClosed(job.url);
         if (closed) markJobClosed(job.id);
       }),

@@ -13,12 +13,25 @@ import { useCompanyStore } from '@/store/companyStore';
 import { api } from '@/services/api';
 import { BOTTOM_NAV_HEIGHT, FONT_SIZES, RADII, SPACING, ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useAuthStore } from '@/store/authStore';
+import AuthGate from '@/components/AuthGate';
 
 export default function FollowingScreen() {
+  const session = useAuthStore((s) => s.session);
   const insets = useSafeAreaInsets();
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
   const { following, follow, unfollow } = useCompanyStore();
+
+  if (!session) {
+    return (
+      <AuthGate
+        icon="business-outline"
+        title="Takip Ettiklerim"
+        description="Şirketleri takip ederek yeni iş ilanlarından anında haberdar olmak için giriş yapın."
+      />
+    );
+  }
 
   const handleUnfollow = useCallback((company: string) => {
     Alert.alert(

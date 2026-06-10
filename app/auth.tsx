@@ -1,7 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   StyleSheet,
@@ -11,183 +10,46 @@ import {
   View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
-import * as AppleAuthentication from 'expo-apple-authentication';
 
 WebBrowser.maybeCompleteAuthSession();
 
-import { useAuthStore } from '@/store/authStore';
-import { useUserStore } from '@/store/userStore';
-import { supabase } from '@/services/supabase';
-import { FONT_SIZES, RADII, SPACING, ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
-import { track } from '@/services/analytics';
+import { useGuestStore } from '@/store/guestStore';
+import { FONT_SIZES, RADII, SPACING, ThemeColors } from '@/constants/theme';
+
+import { useAuthForm } from '@/hooks/useAuthForm';
+import AuthHeader from '@/components/auth/AuthHeader';
+import OAuthButtonGroup from '@/components/auth/OAuthButtonGroup';
+import TermsFooter from '@/components/auth/TermsFooter';
 
 export default function AuthScreen() {
-  const [mode, setMode] = useState<'signin' | 'signup' | 'forgot'>('signin');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [forgotSent, setForgotSent] = useState(false);
-  const [forgotError, setForgotError] = useState('');
-  const [signupSent, setSignupSent] = useState(false);
-  const [focusedField, setFocusedField] = useState<string | null>(null);
-  const [validationError, setValidationError] = useState('');
-
-  const { signIn, signUp, error, clearError, session } = useAuthStore();
-  const hasCompletedOnboarding = useUserStore((s) => s.hasCompletedOnboarding);
-  const completedOnboardingUserIds = useUserStore((s) => s.completedOnboardingUserIds);
-  const [userHydrated, setUserHydrated] = useState(
-    () => useUserStore.persist.hasHydrated()
-  );
-  const router = useRouter();
   const colors = useTheme();
   const styles = useMemo(() => makeStyles(colors), [colors]);
+  const router = useRouter();
 
-  useEffect(() => {
-    const unsub = useUserStore.persist.onFinishHydration(() => setUserHydrated(true));
-    return () => unsub?.();
-  }, []);
-
-  useEffect(() => {
-    if (!session || !userHydrated) return;
-    const hasOnboarded =
-      completedOnboardingUserIds.includes(session.user.id) || hasCompletedOnboarding;
-    router.replace(hasOnboarded ? '/' : '/onboarding/welcome');
-  }, [session, hasCompletedOnboarding, completedOnboardingUserIds, userHydrated]);
-
-  function switchMode(m: 'signin' | 'signup' | 'forgot') {
-    setMode(m);
-    clearError();
-    setValidationError('');
-    setForgotSent(false);
-    setForgotError('');
-    setSignupSent(false);
-    setConfirmPassword('');
-    setPassword('');
-  }
-
-  async function submit() {
-    if (!email || !password) return;
-    setValidationError('');
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email.trim())) {
-      setValidationError('Geçerli bir e-posta adresi girin.');
-      return;
-    }
-    if (mode === 'signup') {
-      if (password.length < 8) {
-        setValidationError('Şifre en az 8 karakter olmalıdır.');
-        return;
-      }
-      if (password !== confirmPassword) {
-        setValidationError('Şifreler eşleşmiyor.');
-        return;
-      }
-    }
-    setBusy(true);
-    clearError();
-    if (mode === 'signin') {
-      await signIn(email.trim(), password);
-    } else {
-      const ok = await signUp(email.trim(), password);
-      if (ok) {
-        track('User Signed Up', { method: 'email' });
-        setSignupSent(true);
-      }
-    }
-    setBusy(false);
-  }
-
-  async function handleAppleSignIn() {
-    try {
-      setBusy(true);
-      const credential = await AppleAuthentication.signInAsync({
-        requestedScopes: [
-          AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
-          AppleAuthentication.AppleAuthenticationScope.EMAIL,
-        ],
-      });
-      if (!credential.identityToken) throw new Error('Apple kimlik token alınamadı');
-      const { data, error } = await supabase.auth.signInWithIdToken({
-        provider: 'apple',
-        token: credential.identityToken,
-      });
-      if (error) throw error;
-      track('User Signed In', { method: 'apple' });
-      const user = data.session?.user;
-      if (user && credential.fullName) {
-        const name = [credential.fullName.givenName, credential.fullName.familyName]
-          .filter(Boolean).join(' ');
-        if (name) {
-          useUserStore.getState().setProfile({ name });
-          supabase.from('profiles').update({ display_name: name }).eq('user_id', user.id).then(() => {});
-        }
-      }
-    } catch (e: unknown) {
-      if ((e as any).code === 'ERR_REQUEST_CANCELED') return;
-      const msg = e instanceof Error ? e.message : 'Apple ile giriş başarısız oldu.';
-      Alert.alert('Hata', msg);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleGoogleSignIn() {
-    try {
-      setBusy(true);
-      const redirectTo = makeRedirectUri({ scheme: 'jobreel', path: 'auth-callback' });
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: { redirectTo, skipBrowserRedirect: true, queryParams: { prompt: 'select_account' } },
-      });
-      if (error || !data.url) throw new Error(error?.message ?? 'OAuth URL alınamadı');
-      const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-      if (result.type === 'success') {
-        const fragment = result.url.split('#')[1] ?? '';
-        const params = new URLSearchParams(fragment);
-        const access_token = params.get('access_token');
-        const refresh_token = params.get('refresh_token');
-        if (!access_token || !refresh_token) throw new Error('Oturum bilgisi alınamadı');
-        const { data: sessionData, error: sessionError } = await supabase.auth.setSession({ access_token, refresh_token });
-        if (sessionError) throw sessionError;
-        track('User Signed In', { method: 'google' });
-        const user = sessionData.session?.user;
-        if (user) {
-          const meta = user.user_metadata ?? {};
-          const fullName: string = meta.full_name ?? meta.name ?? '';
-          const avatarUrl: string = meta.avatar_url ?? meta.picture ?? '';
-          if (fullName || avatarUrl) {
-            useUserStore.getState().setProfile({
-              ...(fullName ? { name: fullName } : {}),
-              ...(avatarUrl ? { avatarUrl } : {}),
-            });
-          }
-          if (avatarUrl) {
-            supabase.from('profiles').update({ avatar_url: avatarUrl }).eq('user_id', user.id).then(() => {});
-          }
-        }
-      }
-    } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Google ile giriş başarısız oldu.';
-      Alert.alert('Hata', msg);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function sendForgot() {
-    if (!email) { setForgotError('E-posta adresinizi girin.'); return; }
-    setBusy(true);
-    setForgotError('');
-    const redirectTo = makeRedirectUri({ scheme: 'jobreel', path: 'reset-password' });
-    const { error: err } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
-    setBusy(false);
-    if (err) { setForgotError(err.message); }
-    else { setForgotSent(true); }
-  }
+  const {
+    mode,
+    email,
+    setEmail,
+    password,
+    setPassword,
+    confirmPassword,
+    setConfirmPassword,
+    busy,
+    forgotSent,
+    forgotError,
+    signupSent,
+    focusedField,
+    setFocusedField,
+    validationError,
+    error,
+    switchMode,
+    submit,
+    handleAppleSignIn,
+    handleGoogleSignIn,
+    sendForgot,
+  } = useAuthForm();
 
   if (mode === 'forgot') {
     return (
@@ -196,10 +58,7 @@ export default function AuthScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={styles.inner}>
-          <View style={styles.heroSection}>
-            <Text style={styles.logo}>JobReel</Text>
-            <Text style={styles.sub}>Şifre Sıfırlama</Text>
-          </View>
+          <AuthHeader colors={colors} subtitle="Şifre Sıfırlama" />
 
           {forgotSent ? (
             <View style={styles.successBox}>
@@ -225,8 +84,17 @@ export default function AuthScreen() {
                 autoCorrect={false}
               />
               {forgotError ? <Text style={styles.error}>{forgotError}</Text> : null}
-              <TouchableOpacity onPress={sendForgot} activeOpacity={0.8} disabled={busy} style={[styles.primaryBtn, busy && { opacity: 0.6 }]}>
-                {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryBtnText}>Bağlantı Gönder</Text>}
+              <TouchableOpacity
+                onPress={sendForgot}
+                activeOpacity={0.8}
+                disabled={busy}
+                style={[styles.primaryBtn, busy && { opacity: 0.6 }]}
+              >
+                {busy ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text style={styles.primaryBtnText}>Bağlantı Gönder</Text>
+                )}
               </TouchableOpacity>
             </>
           )}
@@ -245,33 +113,14 @@ export default function AuthScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <View style={styles.inner}>
-        <View style={styles.heroSection}>
-          <Text style={styles.logo}>JobReel</Text>
-          <Text style={styles.sub}>Kariyerini keşfet</Text>
-        </View>
+        <AuthHeader colors={colors} />
 
-        {Platform.OS === 'ios' && (
-          <AppleAuthentication.AppleAuthenticationButton
-            buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
-            buttonStyle={
-              colors.isDark
-                ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
-                : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
-            }
-            cornerRadius={RADII.full}
-            style={[styles.appleBtn, busy && { opacity: 0.5 }]}
-            onPress={busy ? () => {} : handleAppleSignIn}
-          />
-        )}
-
-        <TouchableOpacity
-          style={styles.googleBtn}
-          onPress={handleGoogleSignIn}
-          activeOpacity={0.8}
-          disabled={busy}
-        >
-          <Text style={styles.googleBtnText}>G  Google ile Devam Et</Text>
-        </TouchableOpacity>
+        <OAuthButtonGroup
+          busy={busy}
+          colors={colors}
+          onAppleSignIn={handleAppleSignIn}
+          onGoogleSignIn={handleGoogleSignIn}
+        />
 
         <View style={styles.dividerRow}>
           <View style={styles.dividerLine} />
@@ -285,13 +134,17 @@ export default function AuthScreen() {
             style={[styles.tab, mode === 'signin' && styles.tabActive]}
             onPress={() => switchMode('signin')}
           >
-            <Text style={[styles.tabText, mode === 'signin' && styles.tabTextActive]}>Giriş Yap</Text>
+            <Text style={[styles.tabText, mode === 'signin' && styles.tabTextActive]}>
+              Giriş Yap
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.tab, mode === 'signup' && styles.tabActive]}
             onPress={() => switchMode('signup')}
           >
-            <Text style={[styles.tabText, mode === 'signup' && styles.tabTextActive]}>Kayıt Ol</Text>
+            <Text style={[styles.tabText, mode === 'signup' && styles.tabTextActive]}>
+              Kayıt Ol
+            </Text>
           </TouchableOpacity>
         </View>
 
@@ -355,36 +208,44 @@ export default function AuthScreen() {
         {signupSent ? (
           <View style={styles.successBox}>
             <Text style={styles.successText}>
-              ✅ Doğrulama e-postası gönderildi{'\n'}{email}{'\n\n'}Gelen kutunuzu kontrol edin ve bağlantıya tıklayın.
+              ✅ Doğrulama e-postası gönderildi{'\n'}{email}{'\n\n'}Gelen kutunuzu kontrol edin ve
+              bağlantıya tıklayın.
             </Text>
             <TouchableOpacity onPress={() => switchMode('signin')} style={styles.backLink}>
               <Text style={styles.backLinkText}>← Giriş ekranına dön</Text>
             </TouchableOpacity>
           </View>
         ) : (
-          <TouchableOpacity
-            onPress={submit}
-            activeOpacity={0.8}
-            disabled={busy}
-            style={[styles.primaryBtn, busy && { opacity: 0.6 }]}
-          >
-            {busy ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={styles.primaryBtnText}>{mode === 'signin' ? 'Giriş Yap' : 'Kayıt Ol'}</Text>
-            )}
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity
+              onPress={submit}
+              activeOpacity={0.8}
+              disabled={busy}
+              style={[styles.primaryBtn, busy && { opacity: 0.6 }]}
+            >
+              {busy ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text style={styles.primaryBtnText}>
+                  {mode === 'signin' ? 'Giriş Yap' : 'Kayıt Ol'}
+                </Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => {
+                useGuestStore.getState().setGuest(true);
+                router.replace('/');
+              }}
+              activeOpacity={0.8}
+              style={styles.guestBtn}
+            >
+              <Text style={styles.guestBtnText}>Üye Olmadan Devam Et</Text>
+            </TouchableOpacity>
+          </>
         )}
 
-        <View style={styles.termsFooter}>
-          <Text style={styles.termsFooterText}>
-            Giriş yaparak veya kayıt olarak{' '}
-            <Text style={styles.termsLink} onPress={() => router.push('/terms' as any)}>Kullanım Koşullarını</Text>
-            {' ve '}
-            <Text style={styles.termsLink} onPress={() => router.push('/privacy' as any)}>Gizlilik Politikasını</Text>
-            {' kabul etmiş olursunuz.'}
-          </Text>
-        </View>
+        <TermsFooter colors={colors} />
       </View>
     </KeyboardAvoidingView>
   );
@@ -401,24 +262,6 @@ function makeStyles(c: ThemeColors) {
       justifyContent: 'center',
       paddingHorizontal: SPACING.lg + 8,
       gap: SPACING.md,
-    },
-    heroSection: {
-      alignItems: 'center',
-      marginBottom: SPACING.sm,
-      gap: SPACING.sm,
-    },
-    logo: {
-      color: c.isDark ? '#ffffff' : c.text,
-      fontSize: 40,
-      fontWeight: '800',
-      textAlign: 'center',
-      letterSpacing: -1,
-      marginBottom: SPACING.xs,
-    },
-    sub: {
-      color: c.isDark ? 'rgba(255,255,255,0.55)' : c.textMuted,
-      fontSize: FONT_SIZES.md,
-      textAlign: 'center',
     },
     tabs: {
       flexDirection: 'row',
@@ -506,6 +349,21 @@ function makeStyles(c: ThemeColors) {
       elevation: c.isDark ? 0 : 4,
     },
     primaryBtnText: { color: '#ffffff', fontWeight: '700', fontSize: FONT_SIZES.md },
+    guestBtn: {
+      backgroundColor: 'transparent',
+      borderWidth: 1,
+      borderColor: c.cardBorder,
+      borderRadius: RADII.full,
+      paddingVertical: SPACING.md,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: SPACING.xs,
+    },
+    guestBtnText: {
+      color: c.text,
+      fontWeight: '600',
+      fontSize: FONT_SIZES.md,
+    },
     backLink: {
       alignItems: 'center',
       marginTop: SPACING.sm,
@@ -531,28 +389,10 @@ function makeStyles(c: ThemeColors) {
       flexDirection: 'row',
       alignItems: 'center',
       gap: SPACING.sm,
+      marginVertical: SPACING.xs,
     },
     dividerLine: { flex: 1, height: 1, backgroundColor: c.cardBorder },
     dividerText: { color: c.textMuted, fontSize: FONT_SIZES.xs },
-    appleBtn: {
-      height: 50,
-      width: '100%',
-    },
-    googleBtn: {
-      backgroundColor: c.bgDeep,
-      borderRadius: RADII.full,
-      height: 50,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 1,
-      borderColor: c.cardBorder,
-      shadowColor: '#051650',
-      shadowOffset: { width: 0, height: 3 },
-      shadowOpacity: c.isDark ? 0 : 0.08,
-      shadowRadius: 8,
-      elevation: c.isDark ? 0 : 2,
-    },
-    googleBtnText: { color: c.text, fontWeight: '700', fontSize: FONT_SIZES.md },
     alreadyRegisteredBox: {
       backgroundColor: 'rgba(239,68,68,0.07)',
       borderWidth: 1,
@@ -571,21 +411,6 @@ function makeStyles(c: ThemeColors) {
     alreadyRegisteredLink: {
       color: c.text,
       fontSize: FONT_SIZES.sm,
-      fontWeight: '700',
-      textDecorationLine: 'underline',
-    },
-    termsFooter: {
-      marginTop: SPACING.xs,
-      paddingHorizontal: SPACING.sm,
-    },
-    termsFooterText: {
-      color: c.textMuted,
-      fontSize: FONT_SIZES.xs - 1,
-      textAlign: 'center',
-      lineHeight: 16,
-    },
-    termsLink: {
-      color: c.text,
       fontWeight: '700',
       textDecorationLine: 'underline',
     },

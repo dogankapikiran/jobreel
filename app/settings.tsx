@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { ComponentProps, useEffect, useState } from 'react';
 import {
   Alert,
   Linking,
@@ -204,7 +204,7 @@ export default function SettingsScreen() {
                   activeOpacity={0.7}
                 >
                   <Ionicons
-                    name={opt.icon as any}
+                    name={opt.icon as ComponentProps<typeof Ionicons>['name']}
                     size={18}
                     color={active ? (colors.isDark ? colors.text : '#ffffff') : colors.textMuted}
                   />
@@ -359,7 +359,7 @@ function ToggleRow({
   return (
     <View style={[s.row, sub && s.subRow, disabled && s.rowDisabled]}>
       <Ionicons
-        name={icon as any}
+        name={icon as ComponentProps<typeof Ionicons>['name']}
         size={18}
         color={
           disabled ? colors.textDim
@@ -403,7 +403,7 @@ function ArrowRow({
   const s = makeStyles(colors);
   return (
     <TouchableOpacity style={s.row} onPress={onPress} activeOpacity={0.7}>
-      <Ionicons name={icon as any} size={20} color={colors.textMuted} style={s.rowIcon} />
+      <Ionicons name={icon as ComponentProps<typeof Ionicons>['name']} size={20} color={colors.textMuted} style={s.rowIcon} />
       <View style={{ flex: 1 }}>
         <Text style={s.rowLabel}>{label}</Text>
         {sublabel ? <Text style={s.rowSublabel} numberOfLines={1}>{sublabel}</Text> : null}
