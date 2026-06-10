@@ -1,13 +1,13 @@
 // services/httpClient.ts
 
-import { supabase } from './supabase';
+import { authService } from './authService';
 import { useAuthStore } from '@/store/authStore';
 
 export const BASE_URL =
   process.env.EXPO_PUBLIC_API_URL?.replace(/\/$/, '') ?? 'https://api.jobreel.app/api';
 
 export async function getToken(): Promise<string | null> {
-  const { data } = await supabase.auth.getSession();
+  const { data } = await authService.getSession();
   return data.session?.access_token ?? null;
 }
 

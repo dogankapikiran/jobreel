@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from auth import get_current_user
-from api.dependencies import get_db_repository
+from api.dependencies import get_alert_service
 from api.limiter import limiter
-from core.database import DatabaseRepository
+from services.alert_service import AlertService
 from core.config import MAX_ALERTS_PER_USER
 from utils.validation import parse_comma_separated_list
 
@@ -12,9 +12,9 @@ router = APIRouter()
 @router.get("/api/alerts")
 async def get_alerts(
     user: dict = Depends(get_current_user),
-    db_repo: DatabaseRepository = Depends(get_db_repository)
+    alert_service: AlertService = Depends(get_alert_service)
 ):
-    return await db_repo.get_job_alerts(user["sub"])
+    return await alert_service.get_job_alerts(user["sub"])
 
 
 @router.post("/api/alerts")
@@ -23,12 +23,12 @@ async def create_alert(
     request: Request,
     body: dict,
     user: dict = Depends(get_current_user),
-    db_repo: DatabaseRepository = Depends(get_db_repository)
+    alert_service: AlertService = Depends(get_alert_service)
 ):
-    count = await db_repo.get_job_alerts_count(user["sub"])
+    count = await alert_service.get_job_alerts_count(user["sub"])
     if count >= MAX_ALERTS_PER_USER:
         raise HTTPException(status_code=429, detail=f"Maksimum {MAX_ALERTS_PER_USER} alarm oluşturabilirsiniz")
-    
+
     seniority = parse_comma_separated_list(body.get("seniority"))
     sectors = parse_comma_separated_list(body.get("sectors"))
 
@@ -36,7 +36,7 @@ async def create_alert(
     if not keyword_clean and not sectors:
         raise HTTPException(status_code=400, detail="Anahtar kelime veya sektör gerekli")
 
-    res = await db_repo.insert_job_alert({
+    res = await alert_service.insert_job_alert({
         "user_id": user["sub"],
         "label": body.get("label", "").strip(),
         "keyword": keyword_clean,
@@ -54,7 +54,7 @@ async def toggle_alert(
     alert_id: str,
     body: dict,
     user: dict = Depends(get_current_user),
-    db_repo: DatabaseRepository = Depends(get_db_repository)
+    alert_service: AlertService = Depends(get_alert_service)
 ):
     update_data: dict = {}
     if "enabled" in body:
@@ -71,7 +71,7 @@ async def toggle_alert(
         update_data["sectors"] = parse_comma_separated_list(body["sectors"])
     if not update_data:
         return {"success": True}
-    res = await db_repo.update_job_alert(alert_id, user["sub"], update_data)
+    res = await alert_service.update_job_alert(alert_id, user["sub"], update_data)
     if not res:
         raise HTTPException(status_code=404, detail="Alarm bulunamadı")
     return {"success": True}
@@ -81,9 +81,9 @@ async def toggle_alert(
 async def delete_alert(
     alert_id: str,
     user: dict = Depends(get_current_user),
-    db_repo: DatabaseRepository = Depends(get_db_repository)
+    alert_service: AlertService = Depends(get_alert_service)
 ):
-    res = await db_repo.delete_job_alert(alert_id, user["sub"])
+    res = await alert_service.delete_job_alert(alert_id, user["sub"])
     if not res:
         raise HTTPException(status_code=404, detail="Alarm bulunamadı")
     return {"success": True}

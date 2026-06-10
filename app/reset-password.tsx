@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native';
 import { router } from 'expo-router';
-import { supabase } from '@/services/supabase';
+import { authService } from '@/services/authService';
 import { useRecoveryStore } from '@/store/recoveryStore';
 import { FONT_SIZES, RADII, SPACING, ThemeColors } from '@/constants/theme';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -31,7 +31,7 @@ export default function ResetPasswordScreen() {
     if (password !== confirmPassword) { setError('Şifreler eşleşmiyor.'); return; }
     setBusy(true);
     setError('');
-    const { error: err } = await supabase.auth.updateUser({ password });
+    const { error: err } = await authService.updateUser({ password });
     setBusy(false);
     if (err) { setError(err.message); return; }
     setSuccess(true);

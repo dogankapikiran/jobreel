@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Stack, router } from 'expo-router';
 import { useFonts } from 'expo-font';
 import * as Linking from 'expo-linking';
-import { supabase } from '@/services/supabase';
+import { authService } from '@/services/authService';
 
 import { checkClosedJobs } from '@/services/jobStatusChecker';
 import {
@@ -108,7 +108,7 @@ export default function RootLayout() {
         return;
       }
       setRecoveryMode(true);
-      await supabase.auth.setSession({ access_token, refresh_token });
+      await authService.setSession({ access_token, refresh_token });
       router.replace('/reset-password');
     };
     Linking.getInitialURL().then(url => { if (url) processUrl(url); });

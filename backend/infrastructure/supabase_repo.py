@@ -299,6 +299,9 @@ class SupabaseStorageRepository(SupabaseBaseRepository, StorageRepository):
             logger.exception("[SupabaseStorageRepository] download_storage_file error: %s", e)
             raise DatabaseError(f"Download storage file failed: {e}") from e
 
+    def get_public_file_url(self, bucket: str, path: str) -> str:
+        return f"{self.client.supabase_url}/storage/v1/object/public/{bucket}/{path}"
+
 
 class SupabaseDatabaseRepository(
     SupabaseProfileRepository,

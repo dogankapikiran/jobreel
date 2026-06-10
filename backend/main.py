@@ -26,6 +26,7 @@ from services.cv_service import CvService
 from services.alert_service import AlertService
 from services.storage_service import StorageService
 from services.profile_service import ProfileService
+from services.interaction_service import InteractionService
 from api.routers import feed, profile, interaction, alert, company, storage
 from core.config import CORS_ORIGINS
 
@@ -52,7 +53,8 @@ async def lifespan(app: FastAPI):
     alert_service = AlertService(db_repo, notifier)
     storage_service = StorageService(db_repo)
     profile_service = ProfileService(db_repo)
-    
+    interaction_service = InteractionService(db_repo)
+
     # 4. Bind instances to app.state for dependency injection via request.app.state
     app.state.db_repo = db_repo
     app.state.ai_client = ai_client
@@ -62,6 +64,7 @@ async def lifespan(app: FastAPI):
     app.state.alert_service = alert_service
     app.state.storage_service = storage_service
     app.state.profile_service = profile_service
+    app.state.interaction_service = interaction_service
     
     # 5. Define scheduler task wrappers that resolve alerts on the instantiated service
     async def daily_alerts_job():

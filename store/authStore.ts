@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Session } from '@supabase/supabase-js';
-import { supabase } from '@/services/supabase';
+import { authService } from '@/services/authService';
 import { runStoreCleanups } from './cleanupRegistry';
 import { useGuestStore } from './guestStore';
 
@@ -22,7 +22,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   initialize: async () => {
     try {
-      const { data } = await supabase.auth.getSession();
+      const { data } = await authService.getSession();
       set({ session: data.session, isLoading: false });
       if (data.session) {
         useGuestStore.getState().setGuest(false);
@@ -30,7 +30,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     } catch {
       set({ session: null, isLoading: false });
     }
-    supabase.auth.onAuthStateChange((_, newSession) => {
+    authService.onAuthStateChange((_, newSession) => {
       const prevSession = get().session;
       if (prevSession?.user.id !== newSession?.user.id) {
         runStoreCleanups().catch(() => {});
@@ -46,7 +46,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   signIn: async (email, password) => {
     set({ error: null });
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { error } = await authService.signInWithPassword({ email, password });
     if (error) {
       set({ error: error.message });
       return false;
@@ -57,7 +57,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   signUp: async (email, password) => {
     set({ error: null });
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await authService.signUp({ email, password });
     if (error) {
       const msg = error.message.toLowerCase();
       if (msg.includes('already registered') || msg.includes('user already exists')) {
@@ -77,7 +77,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   signOut: async () => {
     await runStoreCleanups();
-    await supabase.auth.signOut();
+    await authService.signOut();
     set({ session: null });
     useGuestStore.getState().setGuest(false);
   },

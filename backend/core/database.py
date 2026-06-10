@@ -154,6 +154,11 @@ class StorageRepository(ABC):
         """Download file content as bytes from storage."""
         pass
 
+    @abstractmethod
+    def get_public_file_url(self, bucket: str, path: str) -> str:
+        """Build a public (non-signed) URL for a storage object."""
+        pass
+
 
 class DatabaseRepository(
     ProfileRepository,

@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from auth import get_current_user
-from api.dependencies import get_db_repository
+from api.dependencies import get_interaction_service
 from api.limiter import limiter
-from core.database import DatabaseRepository
+from services.interaction_service import InteractionService
 from utils.validation import is_safe_url, limit_str_length
 
 router = APIRouter()
@@ -16,7 +16,7 @@ async def post_interaction(
     request: Request,
     body: dict,
     user: dict = Depends(get_current_user),
-    db_repo: DatabaseRepository = Depends(get_db_repository)
+    interaction_service: InteractionService = Depends(get_interaction_service)
 ):
     action = body.get("action", "")
     if action not in ALLOWED_ACTIONS:
@@ -30,10 +30,10 @@ async def post_interaction(
     duration = int(raw_duration) if isinstance(raw_duration, (int, float)) else None
 
     if action == "save":
-        if await db_repo.has_saved_job(user["sub"], job_id):
+        if await interaction_service.has_saved_job(user["sub"], job_id):
             return {"success": True}
 
-    await db_repo.insert_interaction({
+    await interaction_service.insert_interaction({
         "user_id": user["sub"],
         "job_id": job_id,
         "action": action,
@@ -51,22 +51,22 @@ async def post_interaction(
 @router.get("/api/saved")
 async def get_saved(
     user: dict = Depends(get_current_user),
-    db_repo: DatabaseRepository = Depends(get_db_repository)
+    interaction_service: InteractionService = Depends(get_interaction_service)
 ):
-    return await db_repo.get_saved_jobs(user["sub"])
+    return await interaction_service.get_saved_jobs(user["sub"])
 
 @router.delete("/api/saved/{job_id}")
 async def unsave_job(
     job_id: str,
     user: dict = Depends(get_current_user),
-    db_repo: DatabaseRepository = Depends(get_db_repository)
+    interaction_service: InteractionService = Depends(get_interaction_service)
 ):
-    await db_repo.delete_saved_job(user["sub"], job_id)
+    await interaction_service.delete_saved_job(user["sub"], job_id)
     return {"success": True}
 
 @router.get("/api/applications")
 async def get_applications(
     user: dict = Depends(get_current_user),
-    db_repo: DatabaseRepository = Depends(get_db_repository)
+    interaction_service: InteractionService = Depends(get_interaction_service)
 ):
-    return await db_repo.get_applied_jobs(user["sub"])
+    return await interaction_service.get_applied_jobs(user["sub"])

@@ -6,7 +6,8 @@ import { useRouter } from 'expo-router';
 import { makeRedirectUri } from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
 import * as AppleAuthentication from 'expo-apple-authentication';
-import { supabase } from '@/services/supabase';
+import { authService } from '@/services/authService';
+import { api } from '@/services/api';
 import { useAuthStore } from '@/store/authStore';
 import { useUserStore } from '@/store/userStore';
 import { useOnboardingStore } from '@/store/onboardingStore';
@@ -105,7 +106,7 @@ export function useAuthForm() {
         ],
       });
       if (!credential.identityToken) throw new Error('Apple kimlik token alınamadı');
-      const { data, error } = await supabase.auth.signInWithIdToken({
+      const { data, error } = await authService.signInWithIdToken({
         provider: 'apple',
         token: credential.identityToken,
       });
@@ -117,7 +118,7 @@ export function useAuthForm() {
           .filter(Boolean).join(' ');
         if (name) {
           useUserStore.getState().setProfile({ name });
-          supabase.from('profiles').update({ display_name: name }).eq('user_id', user.id).then(() => {});
+          api.updateProfile({ display_name: name }).catch(() => {});
         }
       }
     } catch (e: unknown) {
@@ -133,7 +134,7 @@ export function useAuthForm() {
     try {
       setBusy(true);
       const redirectTo = makeRedirectUri({ scheme: 'jobreel', path: 'auth-callback' });
-      const { data, error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await authService.signInWithOAuth({
         provider: 'google',
         options: { redirectTo, skipBrowserRedirect: true, queryParams: { prompt: 'select_account' } },
       });
@@ -145,7 +146,7 @@ export function useAuthForm() {
         const access_token = params.get('access_token');
         const refresh_token = params.get('refresh_token');
         if (!access_token || !refresh_token) throw new Error('Oturum bilgisi alınamadı');
-        const { data: sessionData, error: sessionError } = await supabase.auth.setSession({ access_token, refresh_token });
+        const { data: sessionData, error: sessionError } = await authService.setSession({ access_token, refresh_token });
         if (sessionError) throw sessionError;
         track('User Signed In', { method: 'google' });
         const user = sessionData.session?.user;
@@ -160,7 +161,7 @@ export function useAuthForm() {
             });
           }
           if (avatarUrl) {
-            supabase.from('profiles').update({ avatar_url: avatarUrl }).eq('user_id', user.id).then(() => {});
+            api.updateProfile({ avatar_url: avatarUrl }).catch(() => {});
           }
         }
       }
@@ -177,7 +178,7 @@ export function useAuthForm() {
     setBusy(true);
     setForgotError('');
     const redirectTo = makeRedirectUri({ scheme: 'jobreel', path: 'reset-password' });
-    const { error: err } = await supabase.auth.resetPasswordForEmail(email, { redirectTo });
+    const { error: err } = await authService.resetPasswordForEmail(email, { redirectTo });
     setBusy(false);
     if (err) { setForgotError(err.message); }
     else { setForgotSent(true); }

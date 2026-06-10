@@ -21,7 +21,7 @@ import { useAuthStore } from '@/store/authStore';
 import { useTheme } from '@/contexts/ThemeContext';
 import { FONT_SIZES, RADII, SPACING } from '@/constants/theme';
 import type { ThemeColors } from '@/constants/theme';
-import { supabase } from '@/services/supabase';
+import { authService } from '@/services/authService';
 import { api } from '@/services/api';
 
 const NOTIF_KEY = 'notification_settings';
@@ -144,7 +144,7 @@ export default function SettingsScreen() {
               {
                 text: 'Hesabı Sil', style: 'destructive',
                 onPress: async () => {
-                  const { error: rpcError } = await supabase.rpc('delete_user');
+                  const { error: rpcError } = await authService.deleteAccount();
                   if (rpcError) {
                     Alert.alert(
                       'Hata',
