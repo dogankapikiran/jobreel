@@ -8,6 +8,7 @@ from services.alert_service import AlertService
 from services.storage_service import StorageService
 from services.profile_service import ProfileService
 from services.interaction_service import InteractionService
+from services.company_service import CompanyService
 
 def get_db_repository(request: Request) -> DatabaseRepository:
     return request.app.state.db_repo
@@ -35,4 +36,7 @@ def get_profile_service(request: Request) -> ProfileService:
 
 def get_interaction_service(request: Request) -> InteractionService:
     return request.app.state.interaction_service
+
+def get_company_service(request: Request) -> CompanyService:
+    return request.app.state.company_service
 

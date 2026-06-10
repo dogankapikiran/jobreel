@@ -20,12 +20,3 @@ class InteractionService:
 
     async def get_applied_jobs(self, user_id: str) -> List[Dict[str, Any]]:
         return await self.db_repo.get_applied_jobs(user_id)
-
-    async def get_followed_companies(self, user_id: str) -> List[str]:
-        return await self.db_repo.get_followed_companies(user_id)
-
-    async def upsert_company_follow(self, user_id: str, company_name: str) -> None:
-        await self.db_repo.upsert_company_follow(user_id, company_name)
-
-    async def delete_company_follow(self, user_id: str, company_name: str) -> None:
-        await self.db_repo.delete_company_follow(user_id, company_name)
